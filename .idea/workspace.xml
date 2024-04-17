@@ -4,18 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="Initial commit after copy and paste from jupyter notebook for migration to traditional python codebase">
-      <change afterPath="$PROJECT_DIR$/my_modules/custom_models/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/my_modules/custom_models/classifier_models.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/my_modules/custom_models/image_to_image_models.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/my_modules/model_learning/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/my_modules/model_learning/model_iterators.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/my_modules/model_learning/model_phases.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
+    <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="Added model and model iterator classes and funcitons to project. Wrote parallel CNNets. Otherwise just copied and fixed formatting from Jupyter. Ready for main now">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/my_modules/nsclc_dataset/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/nsclc_dataset/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/my_modules/nsclc_dataset/image_loaders.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/nsclc_dataset/image_loaders.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/my_modules/nsclc_dataset/nsclc_dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/nsclc_dataset/nsclc_dataset.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/my_modules/nsclc_dataset/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/nsclc/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/my_modules/nsclc_dataset/image_loaders.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/nsclc/image_loaders.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/my_modules/nsclc_dataset/nsclc_dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/nsclc/nsclc_dataset.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -80,7 +74,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1713376350887</updated>
-      <workItem from="1713376351677" duration="9011000" />
+      <workItem from="1713376351677" duration="10064000" />
     </task>
     <task id="LOCAL-00001" summary="Ininitial commit after copy and paste from jupyter notebook for migration to traditional python codebase">
       <option name="closed" value="true" />
@@ -98,7 +92,15 @@
       <option name="project" value="LOCAL" />
       <updated>1713379197596</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Added model and model iterator classes and funcitons to project. Wrote parallel CNNets. Otherwise just copied and fixed formatting from Jupyter. Ready for main now">
+      <option name="closed" value="true" />
+      <created>1713386035182</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1713386035182</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -124,7 +126,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Ininitial commit after copy and paste from jupyter notebook for migration to traditional python codebase" />
     <MESSAGE value="Initial commit after copy and paste from jupyter notebook for migration to traditional python codebase" />
-    <option name="LAST_COMMIT_MESSAGE" value="Initial commit after copy and paste from jupyter notebook for migration to traditional python codebase" />
+    <MESSAGE value="Added model and model iterator classes and funcitons to project. Wrote parallel CNNets. Otherwise just copied and fixed formatting from Jupyter. Ready for main now" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added model and model iterator classes and funcitons to project. Wrote parallel CNNets. Otherwise just copied and fixed formatting from Jupyter. Ready for main now" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/NSCLC_Classification$image_loaders.coverage" NAME="image_loaders Coverage Results" MODIFIED="1713378371055" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/my_modules/nsclc_dataset" />
