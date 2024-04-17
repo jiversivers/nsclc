@@ -4,6 +4,7 @@ from my_modules.model_learning import single_model_iterator
 
 import torch.optim as optim
 from torch.nn import RNN
+
 '''
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.preprocessing import StandardScaler
@@ -25,11 +26,9 @@ from sklearn import metrics
 '''
 
 
-
-
 def main():
     # Prepare data
-    data = NSCLCDataset('E:\NSCLC Data - PMD', ['orr', 'photons', 'taumean', 'boundfraction'], label='Response')
+    data = NSCLCDataset('E:\\NSCLC Data - PMD', ['orr', 'photons', 'taumean', 'boundfraction'], label='Response')
     data.normalize_channels_to_max()
     data.dist_transform()
     data.show_random()
@@ -63,7 +62,7 @@ def main():
                 print(f'Currently training {aug} data at {style} rate on {key}...')
                 RESULTS['Hist']['Single'][style] = single_model_iterator(models, {key: data},
                                                                          hp['EP'], bs, criterion,
-                                                                         optim_fun, lr=hp['LR'])
+                                                                         optim_fun, lr=hp['LR'], num_workers=(8, 8, 8))
 
     # Show results from dist-based classification
     for key, item in RESULTS['Hist']['Single'].items():
@@ -80,7 +79,7 @@ def main():
                 print(f'Currently training {aug} data at {style} rate on {key}...')
                 RESULTS['Image']['Single'][style] = single_model_iterator(models, {key: data},
                                                                           hp['EP'], bs, criterion,
-                                                                          optim_fun, lr=hp['LR'])
+                                                                          optim_fun, lr=hp['LR'], num_workers=(8, 8, 8))
 
     # Show results from image-based classification
     for key, item in RESULTS['Image']['Single'].items():

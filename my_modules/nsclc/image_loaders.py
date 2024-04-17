@@ -1,4 +1,4 @@
-import torch.transforms as transforms
+import torchvision.transforms as transforms
 from PIL import Image
 import glob
 import torch

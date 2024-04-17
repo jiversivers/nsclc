@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from my_modules.model_learning.model_phases import train_epoch, valid_epoch, test_model
 
 
-def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim_fun, workers=(0, 0, 0),
+def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim_fun, num_workers=(0, 0, 0),
                           prefetch_factor=None, **kwargs):
     results = {}
     for key, data in datasets.items():
@@ -26,19 +26,19 @@ def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim
             batch_size=batch_size,
             shuffle=True,
             drop_last=True,
-            num_workers=workers[0],
+            num_workers=num_workers[0],
             prefetch_factor=prefetch_factor)
         val_loader = torch.utils.data.DataLoader(
             dataset=val_set,
             batch_size=batch_size,
             shuffle=False,
-            num_workers=workers[1],
+            num_workers=num_workers[1],
             prefetch_factor=prefetch_factor)
         test_loader = torch.utils.data.DataLoader(
             dataset=test_set,
             batch_size=batch_size,
             shuffle=False,
-            num_workers=workers[2],
+            num_workers=num_workers[2],
             prefetch_factor=prefetch_factor)
 
         data_shape = data[0][0].shape
