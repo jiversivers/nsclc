@@ -1,22 +1,10 @@
-import gc
-import os
-import glob
-import sys
-import gc
-import os
-import glob
-import sys
+from my_modules.nsclc.nsclc_dataset import NSCLCDataset
+from my_modules.custom_models import *
+from my_modules.model_learning import single_model_iterator
 
-import torch
-import torch.nn as nn
 import torch.optim as optim
-import torchvision.transforms as transforms
-
-import numpy as np
-from PIL import Image
-import matplotlib.pyplot as plt
-import pandas as pd
-
+from torch.nn import RNN
+'''
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
@@ -34,11 +22,9 @@ from sklearn.inspection import DecisionBoundaryDisplay
 from sklearn.utils import shuffle
 import sklearn.feature_selection
 from sklearn import metrics
-from torch.nn import RNN
+'''
 
-from my_modules.nsclc.nsclc_dataset import NSCLCDataset
-from my_modules.custom_models import *
-from my_modules.model_learning import single_model_iterator
+
 
 
 def main():
