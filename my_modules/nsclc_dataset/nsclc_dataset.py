@@ -1,4 +1,4 @@
-import torch.transforms as transforms
+import torchvision.transforms as transforms
 import os
 from .image_loaders import load_tiff, load_asc, load_weighted_average, load_bound_fraction
 import glob
@@ -46,8 +46,10 @@ class NSCLCDataset:
         # Find and load features spreadsheet (or load directly if path provided)
         if xl_file == 'find' or 'search':
             xl_file = glob.glob(self.root + os.sep + '*.xlsx')
-            if not xl_file: raise Exception(
-                'Features file not found, input path manually at dataset initialization using xl_file=<path_to_file>.')
+            if not xl_file:
+                raise Exception(
+                    'Features file not found,'
+                    ' input path manually at dataset initialization using xl_file=<path_to_file>.')
             xl_file = xl_file[0]
         self.features = pd.read_excel(xl_file)
 
@@ -55,7 +57,8 @@ class NSCLCDataset:
         self.fovs_by_slide = [glob.glob(self.root + os.sep + slide + '*') for slide in
                               self.features['Slide Name']]  # This gives a list of lists of fovs sorted by slide
         self.all_fovs = [fov for slide_fovs in self.fovs_by_slide for fov in
-                         slide_fovs]  # This will give a list of all fovs (still ordered, but now not nested, making it simple for indexing in __get item__)
+                         slide_fovs]  # This will give a list of all fovs (still ordered, but now not nested,
+        # making it simple for indexing in __get item__)
 
         # Iterate through FOVs and check for missing data. If any called modes are missing, pop the entire FOV
         for fov in self.all_fovs[:]:
@@ -149,7 +152,8 @@ class NSCLCDataset:
         self.nbins = nbins
         if not self.normalized:
             print(
-                'Normalization is automatically applied for the distribtution transform.\n     This can be manually overwritten by setting the NORMALIZED attribute to False')
+                'Normalization is automatically applied for the distribtution transform.\n     '
+                'This can be manually overwritten by setting the NORMALIZED attribute to False')
             self.normalize_channels_to_max()
         self.dist_transformed = True
 
