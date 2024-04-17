@@ -69,6 +69,8 @@ def main():
         print(f'{key} {item}%')
 
     # Iterate image-based classifiers (CNNs, no RNNs)
+    data.dist_transformed = False  # This will revert back to returning images
+    data.show_random()
     models = [CNNet, RegularizedCNNet, ParallelCNNet, RegularizedParallelCNNet,
               MLPNet, RegularizedMLPNet, ParallelMLPNet, RegularizedParallelMLPNet]
     for aug, styles in hyperparameters.items():

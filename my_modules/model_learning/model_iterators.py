@@ -61,14 +61,14 @@ def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim
             eval_loss = []
 
             for epoch in range(epochs):
-                print(f'>>>Epoch {epoch}...')
+                print(f'>>>{model.name} Epoch {epoch+1}...')
                 epoch_loss = train_epoch(model, train_loader, criterion, optimizer)
                 tran_loss.append(epoch_loss)
 
                 val_loss, val_accu = valid_epoch(model, val_loader, criterion)
                 eval_loss.append(val_loss)
                 eval_accu.append(val_accu)
-                print(f'>>>Train Loss: {epoch_loss} >>> Eval Loss: {val_loss}. Accu: {val_accu}. ')
+                print(f'>>>Train Loss: {epoch_loss} >>> Eval Loss: {val_loss}. Accu: {val_accu}.')
 
                 # Save best performing model
                 if epoch == 0:

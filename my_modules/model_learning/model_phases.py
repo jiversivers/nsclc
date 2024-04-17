@@ -40,9 +40,7 @@ def valid_epoch(model, loader, loss_fun):
             loss = masked_loss(loss_fun, out, target, x)
             total_loss += loss.item()
             prediction = torch.round(out)
-            print(f'Out: {out}. Pred: {prediction}. Targ: {target}.')
             correct += (prediction == target).sum().item()
-            print(f'Accu: {correct / len(out)}')
     val_loss = total_loss / len(loader)
     val_accu = correct / len(loader.dataset)
     return val_loss, val_accu
