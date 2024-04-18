@@ -90,7 +90,7 @@ def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim
             accu = correct / len(test_set)
 
             results[key][model.name] = accu
-            show_results(model.name, accu, tran_loss, eval_loss, eval_accu)
+            show_results(model.name, set, accu, tran_loss, eval_loss, eval_accu)
 
     return results
 
@@ -162,14 +162,14 @@ def fold_model_iterator(models, datasets, folds, epochs, batch_size, criterion, 
             accu = sum(k_results[key][model.name]) / folds
 
             results[key][model.name] = accu
-            show_results(model.name, accu, tran_loss, eval_loss, eval_accu)
+            show_results(model.name, set, accu, tran_loss, eval_loss, eval_accu)
 
     return results, k_results
 
 
-def show_results(name, accu, tran_loss, eval_loss, eval_accu):
+def show_results(name, set_name, accu, tran_loss, eval_loss, eval_accu):
     # Plot losses and eval accuracy from each epoch
-    print(f'|-- {name} accuracy on {set}: {accu:.2%} --|')
+    print(f'|-- {name} accuracy on {set_name}: {accu:.2%} --|')
     _, ax = plt.subplots(1, 2)
     ax[0].plot(tran_loss)
     ax[0].plot(eval_loss)
