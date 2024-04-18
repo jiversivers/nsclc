@@ -164,7 +164,7 @@ class RegularizedParallelMLPNet(nn.Module):
         self.name = 'Regularized Parallel MLP Net'
         self.input_size = input_size
         self.dims = self.input_size[0]
-        self.input_nodes = np.prod(self.input_size)
+        self.input_nodes = np.prod(self.input_size[1])
         self.flat = nn.Flatten()
         self.bn = self.dims * [nn.BatchNorm1d(self.input_nodes)]
         self.fc1 = self.dims * [nn.Linear(self.input_nodes, 64)]

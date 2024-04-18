@@ -53,7 +53,7 @@ def main():
                'Hist': {'Single': {}, 'KFold': {}}}
 
     # Iterate distribution-compatible models (RNNs, no CNNs)
-    models = [MLPNet, ParallelMLPNet, RegularizedMLPNet, RegularizedParallelMLPNet, RNN, RegularizedRNNet]
+    models = [ParallelMLPNet, RegularizedMLPNet, RegularizedParallelMLPNet, RNN, RegularizedRNNet, MLPNet]
     for aug, styles in hyperparameters.items():
         data.augmented = True if aug == 'Augmented' else False
         for key in status:
