@@ -49,7 +49,7 @@ def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim
             #################
             model = net(data_shape)
             model = model.to('cuda') if torch.cuda.is_available() else model
-            modelPath = f'./{key}_{model.name}.pth'
+            model_path = f'./{key}_{model.name}.pth'
 
             optimizer = optim_fun(model.parameters(), **kwargs)
 
@@ -73,16 +73,16 @@ def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim
                 # Save best performing model
                 if epoch == 0:
                     best_acc = eval_accu[-1]
-                    torch.save(model.state_dict(), modelPath)
+                    torch.save(model.state_dict(), model_path)
                 elif eval_accu[-1] > best_acc:
-                    torch.save(model.state_dict(), modelPath)
+                    torch.save(model.state_dict(), model_path)
                     best_acc = eval_accu[-1]
 
             ###########
             # Testing #
             ###########
             model = model.to('cuda') if torch.cuda.is_available() else model
-            model.load_state_dict(torch.load(modelPath))
+            model.load_state_dict(torch.load(model_path))
 
             correct = test_model(model, test_loader)
 

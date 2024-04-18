@@ -65,11 +65,11 @@ class RNNet(nn.Module):
         super(RNNet, self).__init__()
         self.name = 'RN Net'
         self.input_size = input_size
-        self.hidden_size = np.sqrt(np.prod(self.input_size))
+        self.hidden_size = int(np.sqrt(np.prod(self.input_size)))
         self.output_size = 1
-        self.num_layers = 1
+        self.num_layers = 2
 
-        self.rnn = nn.RNN(self.input_size[0], self.hidden_size, self.num_layers, batch_first=True,
+        self.rnn = nn.RNN(self.input_size[0], self.hidden_size, num_layers=self.num_layers, batch_first=True,
                           nonlinearity='tanh')
         self.fc = nn.Linear(self.hidden_size, self.output_size)
 
@@ -95,9 +95,10 @@ class RegularizedRNNet(nn.Module):
         super(RegularizedRNNet, self).__init__()
         self.name = 'Regularized RN Net'
         self.input_size = input_size
-        self.hidden_size = np.sqrt(np.prod(self.input_size))
+        self.hidden_size = int(np.sqrt(np.prod(self.input_size)))
+        print(self.hidden_size)
         self.output_size = 1
-        self.num_layers = 1
+        self.num_layers = 2
         self.bn = nn.BatchNorm1d(input_size[0])
         self.rnn = nn.RNN(self.input_size[0], self.hidden_size, self.num_layers, batch_first=True,
                           nonlinearity='tanh', dropout=0.25)

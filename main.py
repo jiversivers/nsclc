@@ -49,23 +49,23 @@ def main():
 
     status = ['Response', 'Metastases']
 
-    RESULTS = {'Image': {'Single': {}, 'KFold': {}},
+    results = {'Image': {'Single': {}, 'KFold': {}},
                'Hist': {'Single': {}, 'KFold': {}}}
 
     # Iterate distribution-compatible models (RNNs, no CNNs)
-    models = [ParallelMLPNet, RegularizedMLPNet, RegularizedParallelMLPNet, RNN, RegularizedRNNet, MLPNet]
+    models = [RNNet, RegularizedRNNet, ParallelMLPNet, RegularizedMLPNet, RegularizedParallelMLPNet, MLPNet]
     for aug, styles in hyperparameters.items():
         data.augmented = True if aug == 'Augmented' else False
         for key in status:
             data.label = key
             for style, hp in styles.items():
                 print(f'Currently training {aug} data at {style} rate on {key}...')
-                RESULTS['Hist']['Single'][style] = single_model_iterator(models, {key: data},
+                results['Hist']['Single'][style] = single_model_iterator(models, {key: data},
                                                                          hp['EP'], bs, criterion,
                                                                          optim_fun, lr=hp['LR'], num_workers=(8, 8, 8))
 
     # Show results from dist-based classification
-    for key, item in RESULTS['Hist']['Single'].items():
+    for key, item in results['Hist']['Single'].items():
         print(f'{key} {item}%')
 
     # Iterate image-based classifiers (CNNs, no RNNs)
@@ -79,12 +79,12 @@ def main():
             data.label = key
             for style, hp in styles.items():
                 print(f'Currently training {aug} data at {style} rate on {key}...')
-                RESULTS['Image']['Single'][style] = single_model_iterator(models, {key: data},
+                results['Image']['Single'][style] = single_model_iterator(models, {key: data},
                                                                           hp['EP'], bs, criterion,
                                                                           optim_fun, lr=hp['LR'], num_workers=(8, 8, 8))
 
     # Show results from image-based classification
-    for key, item in RESULTS['Image']['Single'].items():
+    for key, item in results['Image']['Single'].items():
         print(f'{key} {item}%')
 
 
