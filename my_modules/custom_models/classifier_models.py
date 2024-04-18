@@ -126,7 +126,7 @@ class ParallelMLPNet(nn.Module):
         self.name = 'Parallel MLP'
         self.input_size = input_size
         self.dims = self.input_size[0]
-        self.input_nodes = np.prod(self.input_size)
+        self.input_nodes = np.prod(self.input_size[1:])
         self.flat = nn.Flatten()
         self.fc1 = self.dims * [nn.Linear(self.input_nodes, 64)]
         self.fc2 = self.dims * [nn.Linear(64, 128)]
