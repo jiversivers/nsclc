@@ -4,7 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="fixed show_results fn not displaying set name at print" />
+    <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="fixed show_results fn not displaying set name at print">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/my_modules/custom_models/classifier_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/custom_models/classifier_models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/model_tests.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/model_tests.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -34,7 +39,7 @@
 }]]></component>
   <component name="GithubPullRequestsUISettings"><![CDATA[{
   "selectedUrlAndAccountId": {
-    "url": "https://github.com/jiversivers/NSCLC-DL",
+    "url": "https://github.com/jiversivers/nsclc.git",
     "accountId": "600dbc52-5cfc-4ea0-ae89-8f55c0b533b4"
   }
 }]]></component>
@@ -60,7 +65,7 @@
     "Python tests.Python tests for model_tests.TestModels.test_mlp_sizes_with_images.executor": "Run",
     "Python tests.Python tests in model_tests.py.executor": "Run",
     "Python.image_loaders.executor": "Run",
-    "Python.main.executor": "Run",
+    "Python.main.executor": "Profiler",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "git-widget-placeholder": "main",
@@ -76,6 +81,29 @@
   }
 }]]></component>
   <component name="RunManager" selected="Python tests.Python tests in model_tests.py">
+    <configuration name="main" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="NSCLC_Classification" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/main.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="Python tests for model_tests.BinaryClassifierTests.test_forward_with_images" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
       <module name="NSCLC_Classification" />
       <option name="ENV_FILES" value="" />
@@ -124,22 +152,6 @@
       <option name="_new_targetType" value="&quot;PYTHON&quot;" />
       <method v="2" />
     </configuration>
-    <configuration name="Python tests for model_tests.TestModels.test_mlp_sizes_with_dists" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
-      <module name="NSCLC_Classification" />
-      <option name="ENV_FILES" value="" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="_new_additionalArguments" value="&quot;&quot;" />
-      <option name="_new_target" value="&quot;model_tests.TestModels.test_mlp_sizes_with_dists&quot;" />
-      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
-      <method v="2" />
-    </configuration>
     <configuration name="Python tests in model_tests.py" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
       <module name="NSCLC_Classification" />
       <option name="ENV_FILES" value="" />
@@ -159,10 +171,10 @@
     <recent_temporary>
       <list>
         <item itemvalue="Python tests.Python tests in model_tests.py" />
-        <item itemvalue="Python tests.Python tests for model_tests.BinaryClassifierTests.test_forward_with_images" />
         <item itemvalue="Python tests.Python tests for model_tests.TestEachModel" />
+        <item itemvalue="Python.main" />
+        <item itemvalue="Python tests.Python tests for model_tests.BinaryClassifierTests.test_forward_with_images" />
         <item itemvalue="Python tests.Python tests for model_tests.TestModels" />
-        <item itemvalue="Python tests.Python tests for model_tests.TestModels.test_mlp_sizes_with_dists" />
       </list>
     </recent_temporary>
   </component>
@@ -182,7 +194,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1713376350887</updated>
-      <workItem from="1713376351677" duration="37092000" />
+      <workItem from="1713376351677" duration="43459000" />
     </task>
     <task id="LOCAL-00001" summary="Ininitial commit after copy and paste from jupyter notebook for migration to traditional python codebase">
       <option name="closed" value="true" />
@@ -312,7 +324,15 @@
       <option name="project" value="LOCAL" />
       <updated>1713614533947</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="fixed show_results fn not displaying set name at print">
+      <option name="closed" value="true" />
+      <created>1713614867226</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1713614867226</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -350,19 +370,8 @@
     <MESSAGE value="fixed show_results fn not displaying set name at print" />
     <option name="LAST_COMMIT_MESSAGE" value="fixed show_results fn not displaying set name at print" />
   </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/tests/model_tests.py</url>
-          <line>84</line>
-          <option name="timeStamp" value="5" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
-  </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/NSCLC_Classification$.coverage" NAME=" Coverage Results" MODIFIED="1713474297717" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
+    <SUITE FILE_PATH="coverage/NSCLC_Classification$.coverage" NAME=" Coverage Results" MODIFIED="1713799138918" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
     <SUITE FILE_PATH="coverage/NSCLC_Classification$image_loaders.coverage" NAME="image_loaders Coverage Results" MODIFIED="1713378371055" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/my_modules/nsclc_dataset" />
     <SUITE FILE_PATH="coverage/NSCLC_Classification$main.coverage" NAME="main Coverage Results" MODIFIED="1713453782171" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>

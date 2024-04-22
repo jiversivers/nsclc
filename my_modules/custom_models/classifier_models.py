@@ -241,6 +241,7 @@ class RegularizedCNNet(nn.Module):
         super(RegularizedCNNet, self).__init__()
         self.name = 'Regularized CN Net'
 
+        self.bn = nn.BatchNorm2d(self.input_nodes[0])
         self.conv1 = nn.Conv2d(input_size[0], 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -253,6 +254,7 @@ class RegularizedCNNet(nn.Module):
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
+        x = self.bn(x)
         x = self.conv1(x)
         x = self.pool(x)
         x = self.conv2(x)
