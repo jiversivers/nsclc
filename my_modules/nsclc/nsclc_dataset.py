@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 
 class NSCLCDataset:
-    def __init__(self, root, mode, xl_file='find', label=''):
+    def __init__(self, root, mode, xl_file=None, label=''):
         self.root = root
         # Set defaults
         if mode == ['all']:
@@ -45,7 +45,7 @@ class NSCLCDataset:
                           'alpha2': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_a2*']}
 
         # Find and load features spreadsheet (or load directly if path provided)
-        if xl_file == 'find' or 'search':
+        if xl_file is None:
             xl_file = glob.glob(self.root + os.sep + '*.xlsx')
             if not xl_file:
                 raise Exception(
