@@ -24,6 +24,8 @@ class NSCLCDataset:
         self.stack_height = len(self.mode)
         self.image_dims = None
         self.scalars = None
+        self._name = 'nsclc_'
+        self._shape = None
 
         # Define loading functions for different image types
         tensorfy = transforms.ToTensor()
@@ -80,6 +82,28 @@ class NSCLCDataset:
                         if not glob.glob(fov + self.mode_dict[mode][1]):
                             self.all_fovs.remove(fov)
                             break
+
+    # Use property to define name and shape, so that they are automatically updated with latest data setup
+    @property
+    def name(self):
+        self._name = (f'nsclc_{self.label}_{self.mode}_'
+                      f'Transformed-{self.dist_transformed}_'
+                      f'Augmented-{self.augmented}'
+                      f'_Normalized-{self.normalized}')
+        return self._name
+
+    @name.setter
+    def name(self, name):
+        self._name = name
+
+    @property
+    def shape(self):
+        self._shape = self[0][0].shape
+        return self._shape
+
+    @shape.setter
+    def shape(self, shape):
+        self._shape = shape
 
     def __len__(self):
         if self.augment:

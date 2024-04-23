@@ -23,7 +23,7 @@ def train_epoch(model, loader, loss_fun, optimizer):
         total_loss += loss.item()
         loss.backward()
         optimizer.step()
-    epoch_loss = total_loss / len(loader.dataset)
+    epoch_loss = total_loss / len(loader)
     return epoch_loss
 
 

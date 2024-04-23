@@ -3,6 +3,7 @@ import torch
 from sklearn.model_selection import KFold
 from matplotlib import pyplot as plt
 
+from my_modules.model_learning.loader_maker import loader_maker
 from my_modules.model_learning.model_phases import train_epoch, valid_epoch, test_model
 
 
@@ -11,37 +12,16 @@ def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim
     results = {}
     for key, data in datasets.items():
         results[key] = {}
-        ######################
-        # Create dataloaders #
-        ######################
-        train_size = int(0.75 * len(data))
-        val_size = int(0.2 * train_size)
-        test_size = len(data) - (train_size + val_size)
-        train_set, val_set, test_set = torch.utils.data.random_split(
-            dataset=data,
-            lengths=[train_size, val_size, test_size])
 
-        train_loader = torch.utils.data.DataLoader(
-            dataset=train_set,
-            batch_size=batch_size,
-            shuffle=True,
-            drop_last=True,
-            num_workers=num_workers[0],
-            prefetch_factor=prefetch_factor)
-        val_loader = torch.utils.data.DataLoader(
-            dataset=val_set,
-            batch_size=batch_size,
-            shuffle=False,
-            num_workers=num_workers[1],
-            prefetch_factor=prefetch_factor)
-        test_loader = torch.utils.data.DataLoader(
-            dataset=test_set,
-            batch_size=batch_size,
-            shuffle=False,
-            num_workers=num_workers[2],
-            prefetch_factor=prefetch_factor)
+        # Create data loaders
+        train_loader, val_loader, test_loader = loader_maker(data,
+                                                             batch_size=batch_size,
+                                                             split=(0.75, 0.2, 0.05),
+                                                             num_workers=num_workers,
+                                                             shuffle=(True, False, False),
+                                                             prefetch_factor=prefetch_factor)
 
-        data_shape = data[0][0].shape
+        data_shape = data.shape
 
         for net in models:
             #################
@@ -87,7 +67,7 @@ def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim
             correct = test_model(model, test_loader)
 
             # Testing results
-            accu = correct / len(test_set)
+            accu = correct / len(test_loader.dataset)
 
             results[key][model.name] = accu
             show_results(model.name, data.name, accu, tran_loss, eval_loss, eval_accu)
@@ -112,9 +92,8 @@ def fold_model_iterator(models, datasets, folds, epochs, batch_size, criterion, 
             eval_accu = []
             k_results[key][model.name] = []
             for fold, (train_ids, test_ids) in enumerate(kfold.split(np.arange(len(data)))):
-                ###############################
-                # Create Kth Fold Dataloaders #
-                ###############################
+
+                # Create Kth Fold Dataloaders by subsampling set
                 train_sampler = torch.utils.data.SubsetRandomSampler(train_ids)
                 test_sampler = torch.utils.data.SubsetRandomSampler(test_ids)
                 train_loader = torch.utils.data.DataLoader(data,
