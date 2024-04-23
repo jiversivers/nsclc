@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from jinja2 import loaders
 
 
 # Create dataloaders
@@ -28,4 +29,8 @@ def loader_maker(data, batch_size=32,
     loaders = [torch.utils.data.DataLoader(**kwargs, dataset=st, shuffle=sh, num_workers=nw, drop_last=dl)
                for (st, sh, nw, dl) in zip(sets, shuffle, num_workers, drop_last)]
 
-    return loaders
+    # handle one-loader edge case, remove iteration neccesity
+    if len(sets) == 1:
+        return loaders[0]
+    else:
+        return loaders
