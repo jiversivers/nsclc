@@ -45,6 +45,7 @@ class NSCLCDataset:
                           'alpha2': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_a2*']}
 
         # Find and load features spreadsheet (or load directly if path provided)
+        print(xl_file)
         if xl_file is None:
             xl_file = glob.glob(self.root + os.sep + '*.xlsx')
             if not xl_file:
