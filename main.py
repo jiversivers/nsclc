@@ -52,7 +52,6 @@ def main():
 
     # Iterate image-based classifiers (CNNs, no RNNs)
     data.dist_transformed = False  # This will revert back to returning images
-    data.show_random()
     models = [CNNet, RegularizedCNNet, ParallelCNNet, RegularizedParallelCNNet,
               MLPNet, RegularizedMLPNet, ParallelMLPNet, RegularizedParallelMLPNet]
     for aug, styles in hyperparameters.items():
@@ -74,7 +73,6 @@ def main():
 
     # Iterate distribution-compatible models (RNNs, no CNNs)
     data.dist_transform()
-    data.show_random()
     models = [RNNet, RegularizedRNNet, ParallelMLPNet, RegularizedMLPNet, RegularizedParallelMLPNet, MLPNet]
     for aug, styles in hyperparameters.items():
         data.augmented = True if aug == 'Augmented' else False
