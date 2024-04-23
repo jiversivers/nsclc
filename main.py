@@ -49,6 +49,8 @@ def main():
     results = {'Image': {'Single': {}, 'KFold': {}},
                'Hist': {'Single': {}, 'KFold': {}}}
     results_file_path = 'results.txt'
+    with open(results_file_path, 'w') as results_file:
+        results_file.write('Results')
 
     # Iterate image-based classifiers (CNNs, no RNNs)
     data.dist_transformed = False  # This will revert back to returning images
@@ -64,8 +66,8 @@ def main():
                                                                           hp['EP'], bs, criterion,
                                                                           optim_fun, lr=hp['LR'],
                                                                           num_workers=(16, 16, 8))
-                with open(results_file_path) as f:
-                    f.write(f'{aug} {style}: {results["Image"]["Single"][style]}')
+                with open(results_file_path, 'a') as f:
+                    f.write(f'{aug} {style}: {results["Image"]["Single"][style]}\n')
 
     # Show results from image-based classification
     for key, item in results['Image']['Single'].items():
