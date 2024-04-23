@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 
 class NSCLCDataset:
-    def __init__(self, root, mode, xl_file=None, label=''):
+    def __init__(self, root, mode, xl_file=None, label=None):
         self.root = root
         # Set defaults
         if mode == ['all']:
