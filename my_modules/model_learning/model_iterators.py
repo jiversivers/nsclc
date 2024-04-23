@@ -29,7 +29,7 @@ def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim
             #################
             model = net(data_shape)
             model = model.to('cuda') if torch.cuda.is_available() else model
-            model_path = f'./{key}_{model.name}_{epochs}.pth'
+            model_path = f'./{key}_{model.name}_{epochs}_{data.name}.pth'
 
             optimizer = optim_fun(model.parameters(), **kwargs)
 
