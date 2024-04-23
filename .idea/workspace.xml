@@ -4,8 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="fixed rounding problem in loader_maker causing datasize mismatch sometimes.">
-      <change beforePath="$PROJECT_DIR$/my_modules/model_learning/model_iterators.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/model_learning/model_iterators.py" afterDir="false" />
+    <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="updated model_path naming string to include data name for clarity at save">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/my_modules/custom_models/classifier_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/custom_models/classifier_models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/my_modules/model_learning/loader_maker.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/model_learning/loader_maker.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -46,7 +48,7 @@
   }
 }]]></component>
   <component name="ProblemsViewState">
-    <option name="selectedTabId" value="DEPENDENCY_CHECKER_PROBLEMS_TAB" />
+    <option name="selectedTabId" value="CurrentFile" />
   </component>
   <component name="ProjectColorInfo"><![CDATA[{
   "associatedIndex": 4
@@ -67,7 +69,7 @@
     "Python tests.Python tests for model_tests.TestModels.test_mlp_sizes_with_images.executor": "Run",
     "Python tests.Python tests in model_tests.py.executor": "Run",
     "Python.image_loaders.executor": "Run",
-    "Python.main.executor": "Run",
+    "Python.main.executor": "ConcurrencyExecutor",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "git-widget-placeholder": "main",
@@ -130,7 +132,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1713376350887</updated>
-      <workItem from="1713376351677" duration="66775000" />
+      <workItem from="1713376351677" duration="71828000" />
     </task>
     <task id="LOCAL-00001" summary="Ininitial commit after copy and paste from jupyter notebook for migration to traditional python codebase">
       <option name="closed" value="true" />
@@ -308,7 +310,15 @@
       <option name="project" value="LOCAL" />
       <updated>1713877285424</updated>
     </task>
-    <option name="localTasksCounter" value="23" />
+    <task id="LOCAL-00023" summary="updated model_path naming string to include data name for clarity at save">
+      <option name="closed" value="true" />
+      <created>1713883742111</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1713883742111</updated>
+    </task>
+    <option name="localTasksCounter" value="24" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -375,11 +385,12 @@
     <MESSAGE value="fixed datatype issue caused by normalizing, made some other hard-code dtypes to be safe, updated model paths for clarity" />
     <MESSAGE value="added loader maker -- split from iterator for clarity. Updated accuracy calc in testing with new loader creation restricting access to splits. Added name and shape properties to dataset to clean things up downstream." />
     <MESSAGE value="fixed rounding problem in loader_maker causing datasize mismatch sometimes." />
-    <option name="LAST_COMMIT_MESSAGE" value="fixed rounding problem in loader_maker causing datasize mismatch sometimes." />
+    <MESSAGE value="updated model_path naming string to include data name for clarity at save" />
+    <option name="LAST_COMMIT_MESSAGE" value="updated model_path naming string to include data name for clarity at save" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/NSCLC_Classification$.coverage" NAME=" Coverage Results" MODIFIED="1713799138918" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
     <SUITE FILE_PATH="coverage/NSCLC_Classification$image_loaders.coverage" NAME="image_loaders Coverage Results" MODIFIED="1713378371055" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/my_modules/nsclc_dataset" />
-    <SUITE FILE_PATH="coverage/NSCLC_Classification$main.coverage" NAME="main Coverage Results" MODIFIED="1713877423140" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/NSCLC_Classification$main.coverage" NAME="main Coverage Results" MODIFIED="1713893844366" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

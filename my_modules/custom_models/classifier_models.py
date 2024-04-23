@@ -241,7 +241,7 @@ class RegularizedCNNet(nn.Module):
         super(RegularizedCNNet, self).__init__()
         self.name = 'Regularized CN Net'
 
-        self.bn = nn.BatchNorm2d(self.input_nodes[0])
+        self.bn = nn.BatchNorm2d(self.input_size[0])
         self.conv1 = nn.Conv2d(input_size[0], 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
