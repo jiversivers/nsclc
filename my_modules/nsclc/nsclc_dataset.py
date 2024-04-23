@@ -34,10 +34,10 @@ class NSCLCDataset:
                    'ratio': load_bound_fraction}
 
         # Define a mode dict that matches call to load functions and filename patterns
-        self.mode_dict = {'mask': [load_fn['tiff'], os.sep + 'Redox' + os.sep + 'ROI_mask.tiff'],
-                          'orr': [load_fn['tiff'], os.sep + 'Redox' + os.sep + 'RawRedoxMap.tiff'],
-                          'g': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_phasor_G*', 'asc'],
-                          's': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_phasor_S*', 'asc'],
+        self.mode_dict = {'mask': [load_fn['tiff'], os.sep + 'Redox' + os.sep + 'ROI_mask.*'],
+                          'orr': [load_fn['tiff'], os.sep + 'Redox' + os.sep + 'RawRedoxMap.*'],
+                          'g': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_phasor_G*'],
+                          's': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_phasor_S*'],
                           'photons': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_photons*'],
                           'tau1': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_t1*'],
                           'tau2': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_t2*'],
