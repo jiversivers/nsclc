@@ -28,7 +28,6 @@ class NSCLCDataset:
         self._shape = None
 
         # Define loading functions for different image types
-        tensorfy = transforms.ToTensor()
         load_fn = {'tiff': load_tiff,
                    'asc': load_asc,
                    'weighted_average': load_weighted_average,
@@ -87,9 +86,9 @@ class NSCLCDataset:
     @property
     def name(self):
         self._name = (f'nsclc_{self.label}_{self.mode}_'
-                      f'Transformed-{self.dist_transformed}_'
-                      f'Augmented-{self.augmented}'
-                      f'_Normalized-{self.normalized}')
+                      f'{"_Transformed" if self.dist_transformed else ""}'
+                      f'{"_Augmented" if self.augmented else ""}'
+                      f'{"_Normalized" if self.normalized else ""}')
         return self._name
 
     @name.setter
