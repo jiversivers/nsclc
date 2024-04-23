@@ -93,5 +93,6 @@ def main():
     for key, item in results['Hist']['Single'].items():
         print(f'{key} {item}%')
 
+
 if __name__ == "__main__":
     main()

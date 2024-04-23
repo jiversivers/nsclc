@@ -19,7 +19,7 @@ def load_asc(load_fns_and_image_paths):
 
 # Function to simplify getting mean lifetime from raw parameters
 def load_weighted_average(load_fns_and_img_paths):
-    x = torch.Tensor([])
+    x = torch.empty(0, dtype=torch.float32)
     for fp in load_fns_and_img_paths[1]:
         x = torch.cat((x, torch.unsqueeze(fp[0](fp), dim=0)), dim=0)
     x = (x[0] * x[1] + x[2] * x[3]) / (x[0] + x[2])

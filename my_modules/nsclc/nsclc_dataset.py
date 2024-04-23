@@ -139,7 +139,7 @@ class NSCLCDataset:
             case _:
                 raise Exception('No data label selected. Update label attribute of dataset and try again.')
 
-        # Apply distirbution transform, if called
+        # Apply distribution transform, if called
         if self.dist_transformed:
             X_dist = torch.empty((self.stack_height,) + (self.nbins,), dtype=torch.float32)
             for ch, mode in enumerate(X):
@@ -152,7 +152,7 @@ class NSCLCDataset:
         self.nbins = nbins
         if not self.normalized:
             print(
-                'Normalization is automatically applied for the distribtution transform.\n     '
+                'Normalization is automatically applied for the distribution transform.\n     '
                 'This can be manually overwritten by setting the NORMALIZED attribute to False')
             self.normalize_channels_to_max()
         self.dist_transformed = True
@@ -166,7 +166,6 @@ class NSCLCDataset:
                 ax[ii].legend()
                 ax[ii].tick_params(top=False, bottom=False, left=False, right=False, labelleft=False, labelbottom=False)
                 ax[ii].set_title(f'Label: {self[index][1]}', fontsize=10)
-            plt.show()
         else:
             transform = transforms.ToPILImage()
             _, ax = plt.subplots(5, len(self.mode), figsize=(10, 10))
@@ -185,7 +184,7 @@ class NSCLCDataset:
                     ax[ii].tick_params(top=False, bottom=False, left=False, right=False, labelleft=False,
                                        labelbottom=False)
                     ax[ii].set_title(f'Response: {lab}. \n Mode: {self.mode[jj]}', fontsize=10)
-            plt.show()
+        plt.show()
 
     def augment(self):
         self.augmented = True
@@ -205,7 +204,7 @@ class NSCLCDataset:
         self.augmented = False
 
         # Preallocate an array. Each row is an individual image, each column is mode
-        maxes = np.zeros((len(self), self.stack_height))
+        maxes = np.zeros((len(self), self.stack_height), dtype=np.float32)
         for ii, (stack, _) in enumerate(self):
             maxes[ii] = np.nanmax(stack, axis=(1, 2))
         self.scalars = np.max(maxes, axis=0)

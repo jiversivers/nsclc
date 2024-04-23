@@ -49,7 +49,7 @@ def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim
             #################
             model = net(data_shape)
             model = model.to('cuda') if torch.cuda.is_available() else model
-            model_path = f'./{key}_{model.name}.pth'
+            model_path = f'./{key}_{model.name}_{epochs}.pth'
 
             optimizer = optim_fun(model.parameters(), **kwargs)
 
@@ -61,7 +61,7 @@ def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim
             eval_loss = []
 
             for epoch in range(epochs):
-                print(f'>>>{model.name} Epoch {epoch+1}...')
+                print(f'>>>{model.name} Epoch {epoch+1}/{epochs}...')
                 epoch_loss = train_epoch(model, train_loader, criterion, optimizer)
                 tran_loss.append(epoch_loss)
 
@@ -90,7 +90,7 @@ def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim
             accu = correct / len(test_set)
 
             results[key][model.name] = accu
-            show_results(model.name, set, accu, tran_loss, eval_loss, eval_accu)
+            show_results(model.name, data.name, accu, tran_loss, eval_loss, eval_accu)
 
     return results
 
@@ -129,7 +129,6 @@ def fold_model_iterator(models, datasets, folds, epochs, batch_size, criterion, 
                                                           drop_last=True,
                                                           num_workers=workers[2],
                                                           prefetch_factor=prefetch_factor)
-
                 #######################
                 # Prepare fresh model #
                 #######################
@@ -162,7 +161,7 @@ def fold_model_iterator(models, datasets, folds, epochs, batch_size, criterion, 
             accu = sum(k_results[key][model.name]) / folds
 
             results[key][model.name] = accu
-            show_results(model.name, set, accu, tran_loss, eval_loss, eval_accu)
+            show_results(model.name, data.name, accu, tran_loss, eval_loss, eval_accu)
 
     return results, k_results
 
