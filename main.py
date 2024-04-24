@@ -54,7 +54,7 @@ def main():
 
     # Iterate image-based classifiers (CNNs, no RNNs)
     data.dist_transformed = False  # This will revert back to returning images
-    models = [CNNet, RegularizedCNNet, ParallelCNNet, RegularizedParallelCNNet,
+    models = [ ParallelCNNet, RegularizedParallelCNNet, CNNet,
               MLPNet, RegularizedMLPNet, ParallelMLPNet, RegularizedParallelMLPNet]
     for aug, styles in hyperparameters.items():
         data.augmented = True if aug == 'Augmented' else False

@@ -6,13 +6,14 @@ import pandas as pd
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
+from functools import cache
 
 
 class NSCLCDataset:
     def __init__(self, root, mode, xl_file=None, label=None):
         self.root = root
         # Set defaults
-        if mode == ['all']:
+        if mode == ['all'] or not mode:
             self.mode = ['orr', 'g', 's', 'photons', 'taumean', 'boundfraction']
         else:
             self.mode = mode
@@ -34,8 +35,8 @@ class NSCLCDataset:
                    'ratio': load_bound_fraction}
 
         # Define a mode dict that matches call to load functions and filename patterns
-        self.mode_dict = {'mask': [load_fn['tiff'], os.sep + 'Redox' + os.sep + 'ROI_mask.*'],
-                          'orr': [load_fn['tiff'], os.sep + 'Redox' + os.sep + 'RawRedoxMap.*'],
+        self.mode_dict = {'mask': [load_fn['tiff'], os.sep + 'Redox' + os.sep + 'ROI_mask.tiff'],
+                          'orr': [load_fn['tiff'], os.sep + 'Redox' + os.sep + 'RawRedoxMap.tiff'],
                           'g': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_phasor_G*'],
                           's': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_phasor_S*'],
                           'photons': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_photons*'],
@@ -45,7 +46,6 @@ class NSCLCDataset:
                           'alpha2': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_a2*']}
 
         # Find and load features spreadsheet (or load directly if path provided)
-        print(xl_file)
         if xl_file is None:
             xl_file = glob.glob(self.root + os.sep + '*.xlsx')
             if not xl_file:
@@ -86,7 +86,7 @@ class NSCLCDataset:
     # Use property to define name and shape, so that they are automatically updated with latest data setup
     @property
     def name(self):
-        self._name = (f'nsclc_{self.label}_{self.mode}_'
+        self._name = (f"nsclc_{self.label}_{'+'.join(self.mode)}"
                       f'{"_Transformed" if self.dist_transformed else ""}'
                       f'{"_Augmented" if self.augmented else ""}'
                       f'{"_Normalized" if self.normalized else ""}')
@@ -111,6 +111,7 @@ class NSCLCDataset:
         else:
             return 5 * len(self.all_fovs)
 
+    @cache
     def __getitem__(self, index):
         # Get image path
         if self.augmented:
@@ -196,6 +197,7 @@ class NSCLCDataset:
             for ii in range(5):
                 index = np.random.randint(0, len(self))
                 img = self[index][0]
+                img[torch.isnan(img)] = 0
                 lab = self[index][1]
                 if len(self.mode) > 1:
                     for jj in range(len(self.mode)):

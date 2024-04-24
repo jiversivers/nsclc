@@ -141,7 +141,7 @@ class ParallelMLPNet(nn.Module):
     def forward(self, x):
         x[torch.isnan(x)] = 0
         xii = torch.tensor([])
-        # Create independent networks for each layer of the input
+        # Create independent MLP for each layer of the input
         for ii in range(self.dims):
             xi = self.flat(x[:, ii])
             xi = self.fc1[ii](xi)
@@ -240,8 +240,9 @@ class RegularizedCNNet(nn.Module):
     def __init__(self, input_size):
         super(RegularizedCNNet, self).__init__()
         self.name = 'Regularized CN Net'
+        self.input_size = input_size
 
-        self.bn = nn.BatchNorm2d(self.input_size[0])
+        self.bn = nn.BatchNorm2d(1)
         self.conv1 = nn.Conv2d(input_size[0], 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -277,7 +278,7 @@ class ParallelCNNet(nn.Module):
         self.input_size = input_size
         self.dims = self.input_size[0]
 
-        self.conv1 = self.dims * [nn.Conv2d(self.input_size[0], 32, kernel_size=3, padding=1)]
+        self.conv1 = self.dims * [nn.Conv2d(1, 32, kernel_size=3, padding=1)]
         self.conv2 = self.dims * [nn.Conv2d(32, 64, kernel_size=3, padding=1)]
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.flat = nn.Flatten()
@@ -288,24 +289,26 @@ class ParallelCNNet(nn.Module):
         self.relu = nn.ReLU()
         self.sigm = nn.Sigmoid()
 
-        def forward(self, x):
-            x[torch.isnan(x)] = 0
-            xii = torch.tensor([])
-            for ii in range(self.dims):
-                xi = self.conv1[ii](x[:, ii])
-                xi = self.pool(xi)
-                xi = self.conv2[ii](xi)
-                xi = self.pool(xi)
-                xi = self.flat(xi)
-                xi = self.fc1[ii](xi)
-                xi = self.relu(xi)
-                xi = self.fc2[ii](xi)
-                xii = torch.cat((xii, xi), 1)
+    def forward(self, x):
+        x[torch.isnan(x)] = 0
+        xii = torch.tensor([])
+        # Forward pass of CNN for each layer
+        for ii in range(self.dims):
+            xi = x[:, ii].unsqueeze(1)
+            xi = self.conv1[ii](xi)
+            xi = self.pool(xi)
+            xi = self.conv2[ii](xi)
+            xi = self.pool(xi)
+            xi = self.flat(xi)
+            xi = self.fc1[ii](xi)
+            xi = self.relu(xi)
+            xi = self.fc2[ii](xi)
+            xii = torch.cat((xii, xi), 1)
 
-            # Recombine layes into final dense layer
-            x = self.fc3(xii)
-            x = self.sigm(x)
-            return x
+        # Recombine layers into final dense layer
+        x = self.fc3(xii)
+        x = self.sigm(x)
+        return x
 
 
 class RegularizedParallelCNNet(nn.Module):
@@ -315,8 +318,8 @@ class RegularizedParallelCNNet(nn.Module):
         self.input_size = input_size
         self.dims = self.input_size[0]
 
-        self.bn = self.dims * [nn.BatchNorm2d(self.input_nodes)]
-        self.conv1 = self.dims * [nn.Conv2d(self.input_size[0], 32, kernel_size=3, padding=1)]
+        self.bn = self.dims * [nn.BatchNorm2d(1)]
+        self.conv1 = self.dims * [nn.Conv2d(1, 32, kernel_size=3, padding=1)]
         self.conv2 = self.dims * [nn.Conv2d(32, 64, kernel_size=3, padding=1)]
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.flat = nn.Flatten()
@@ -332,8 +335,10 @@ class RegularizedParallelCNNet(nn.Module):
     def forward(self, x):
         x[torch.isnan(x)] = 0
         xii = torch.tensor([])
+        # Forward pass of CNN for each layer
         for ii in range(self.dims):
-            xi = self.bn[ii](x[:, ii])
+            xi = x[:, ii].unsqueeze(1)
+            xi = self.bn[ii](xi)
             xi = self.drop(xi)
             xi = self.conv1[ii](xi)
             xi = self.pool(xi)
@@ -348,9 +353,7 @@ class RegularizedParallelCNNet(nn.Module):
             xi = self.fc2[ii](xi)
             xii = torch.cat((xii, xi), 1)
 
-        # Recombine layes into final dense layer
+        # Recombine layers into final dense layer
         x = self.fc3(xii)
         x = self.sigm(x)
         return x
-
-

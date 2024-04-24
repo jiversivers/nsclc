@@ -7,13 +7,13 @@ import numpy as np
 
 # Function to load TIFFs
 def load_tiff(load_fns_and_image_paths):
-    X = transforms.ToTensor()(Image.open(load_fns_and_image_paths[1] + '.tiff')).float()
+    X = transforms.ToTensor()(Image.open(load_fns_and_image_paths[1])).float()
     return X
 
 
 # Function to load ASCs
 def load_asc(load_fns_and_image_paths):
-    x = torch.from_numpy(np.genfromtxt(glob.glob(load_fns_and_image_paths[1] + '.asc')[0])).float()
+    x = torch.from_numpy(np.genfromtxt(glob.glob(load_fns_and_image_paths[1])[0])).float()
     return x
 
 
