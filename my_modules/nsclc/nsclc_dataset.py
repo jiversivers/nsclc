@@ -10,6 +10,30 @@ from functools import lru_cache
 
 
 class NSCLCDataset:
+    """
+    NSCLC dataset class to load NSCLC images from root dir (arg).
+
+    Image modes are specified at creation and can include any typical MPM image modes available from the dataset and
+    derived modes (bound fraction and mean lifetime).
+
+    Attributes:
+        - root (string): Root directory of NSCLC dataset.
+        - mode (list): Ordered list of image modes as they will be returned.
+        - label (string): Name of feature to be returned as data label.
+        - stack_height (int): Height of image stack, equivalent to number of modes
+        - image_dims (tuple): Tuple of image dimensions.
+        - scalars (arr): Max value of each mode used in normalization
+        - name (string): Name of the dataset dependent on data parameters.
+        - shape (tuple): Shape of individual image stack
+        - dist_transform (callable): Applies distribution transform to image stack
+        - dist_transformed (bool): Returns whether image stack is histograms
+        - augment (callable): Applies image augmentation to dataset using FiveCrop augmentation
+        - augmented (bool): Returns whether dataset is augmented
+        - normalize_channels_to_max (callable): Applies normalization to image stack channel-wise
+        - normalized (bool): Returns whether image stack is normalized
+        = show_random (callable): Shows 5 random samples from dataset
+    """
+
     def __init__(self, root, mode, xl_file=None, label=None):
         self.root = root
         # Set defaults
@@ -17,7 +41,6 @@ class NSCLCDataset:
             self.mode = ['orr', 'g', 's', 'photons', 'taumean', 'boundfraction']
         else:
             self.mode = mode
-        self.transform = None
         self.label = label
         self.stack_height = len(self.mode)
         self.image_dims = None

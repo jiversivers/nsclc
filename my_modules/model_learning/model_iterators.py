@@ -8,7 +8,7 @@ from my_modules.model_learning.model_phases import train_epoch, valid_epoch, tes
 
 
 def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim_fun, num_workers=(0, 0, 0),
-                          prefetch_factor=None, pin_memory=True, **kwargs):
+                          prefetch_factor=None, pin_memory=True, **optim_kwargs):
     results = {}
     for key, data in datasets.items():
         results[key] = {}
@@ -32,7 +32,7 @@ def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim
             model = model.to('cuda') if torch.cuda.is_available() else model
             model_path = f'./{model.name}_Epochs-{epochs}_{data.name}.pth'
 
-            optimizer = optim_fun(model.parameters(), **kwargs)
+            optimizer = optim_fun(model.parameters(), **optim_kwargs)
 
             ############
             # Training #
@@ -71,7 +71,7 @@ def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim
             accu = correct / len(test_loader.dataset)
 
             results[key][model.name] = accu
-            show_results(model.name, data.name, accu, tran_loss, eval_loss, eval_accu)
+            print(f'|-- {model.name} accuracy on {data.name}: {accu:.2%} --|')
 
     return results
 
