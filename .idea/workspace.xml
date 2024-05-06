@@ -4,19 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="corrected parallel model listing, added parallel CNN,  added memory pinning to loaders,">
-      <change afterPath="$PROJECT_DIR$/jobs/dist_aug_met.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/jobs/dist_aug_res.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/jobs/distribution_augmented_metastases.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/jobs/distribution_augmented_response.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/jobs/image_augmented_metastases.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/jobs/image_augmented_response.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/jobs/img_aug_met.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/jobs/img_aug_res.sh" afterDir="false" />
+    <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="NSCLC docstring added, added jobs files for individual breakouts on HPC (.py and .sh files)">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/my_modules/model_learning/model_iterators.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/model_learning/model_iterators.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/my_modules/nsclc/nsclc_dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/nsclc/nsclc_dataset.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -145,7 +134,7 @@
       <option name="presentableId" value="Default" />
       <updated>1713376350887</updated>
       <workItem from="1713376351677" duration="76953000" />
-      <workItem from="1713975008544" duration="44045000" />
+      <workItem from="1713975008544" duration="46468000" />
     </task>
     <task id="LOCAL-00001" summary="Ininitial commit after copy and paste from jupyter notebook for migration to traditional python codebase">
       <option name="closed" value="true" />
@@ -443,7 +432,15 @@
       <option name="project" value="LOCAL" />
       <updated>1715011966448</updated>
     </task>
-    <option name="localTasksCounter" value="38" />
+    <task id="LOCAL-00038" summary="NSCLC docstring added, added jobs files for individual breakouts on HPC (.py and .sh files)">
+      <option name="closed" value="true" />
+      <created>1715017959517</created>
+      <option name="number" value="00038" />
+      <option name="presentableId" value="LOCAL-00038" />
+      <option name="project" value="LOCAL" />
+      <updated>1715017959517</updated>
+    </task>
+    <option name="localTasksCounter" value="39" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -493,7 +490,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="C&amp;P into main, minor style edits" />
     <MESSAGE value="C&amp;P into main, minor style edits. Removed imports from main that were only in modules" />
     <MESSAGE value="C&amp;P into main, minor style edits. Removed imports from main that were only in modules and added my_module imports" />
     <MESSAGE value="added workers, updated name to num_workers for conssitency; fixed import errors" />
@@ -518,7 +514,8 @@
     <MESSAGE value="added req text, bug fix for image data in regularized MLP" />
     <MESSAGE value="major rework cacheing in dataset" />
     <MESSAGE value="corrected parallel model listing, added parallel CNN,  added memory pinning to loaders," />
-    <option name="LAST_COMMIT_MESSAGE" value="corrected parallel model listing, added parallel CNN,  added memory pinning to loaders," />
+    <MESSAGE value="NSCLC docstring added, added jobs files for individual breakouts on HPC (.py and .sh files)" />
+    <option name="LAST_COMMIT_MESSAGE" value="NSCLC docstring added, added jobs files for individual breakouts on HPC (.py and .sh files)" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

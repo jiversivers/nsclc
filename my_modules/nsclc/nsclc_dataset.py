@@ -51,6 +51,7 @@ class NSCLCDataset:
         self._augmented = False
         self._dist_transformed = False
         self._normalized = False
+        self._nbins = 25
 
         # Define loading functions for different image types
         load_fn = {'tiff': load_tiff,
@@ -168,9 +169,9 @@ class NSCLCDataset:
 
         # Apply distribution transform, if called
         if self.dist_transformed:
-            X_dist = torch.empty((self.stack_height,) + (self.nbins,), dtype=torch.float32)
+            X_dist = torch.empty((self.stack_height,) + (self._nbins,), dtype=torch.float32)
             for ch, mode in enumerate(X):
-                X_dist[ch], _ = torch.histogram(mode, bins=self.nbins, range=[0, 1], density=True)
+                X_dist[ch], _ = torch.histogram(mode, bins=self._nbins, range=[0, 1], density=True)
             X = X_dist
 
         return X, y
@@ -203,7 +204,7 @@ class NSCLCDataset:
     ##########################
     # Distribution transform #
     ##########################
-    def dist_transform(self, nbins=25):
+    def dist_transform(self, nbins=self._nbins):
         # If it is already transformed to the same bin number, leave it alone
         if self.dist_transformed and nbins == self._nbins:
             pass
