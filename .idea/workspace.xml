@@ -4,8 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="NSCLC docstring added, added jobs files for individual breakouts on HPC (.py and .sh files)">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="corrected nbins to _nbins error">
+      <change beforePath="$PROJECT_DIR$/jobs/dist_aug_res.sh" beforeDir="false" afterPath="$PROJECT_DIR$/jobs/dist_aug_res.sh" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -134,7 +134,7 @@
       <option name="presentableId" value="Default" />
       <updated>1713376350887</updated>
       <workItem from="1713376351677" duration="76953000" />
-      <workItem from="1713975008544" duration="46468000" />
+      <workItem from="1713975008544" duration="47208000" />
     </task>
     <task id="LOCAL-00001" summary="Ininitial commit after copy and paste from jupyter notebook for migration to traditional python codebase">
       <option name="closed" value="true" />
@@ -440,7 +440,15 @@
       <option name="project" value="LOCAL" />
       <updated>1715017959517</updated>
     </task>
-    <option name="localTasksCounter" value="39" />
+    <task id="LOCAL-00039" summary="corrected nbins to _nbins error">
+      <option name="closed" value="true" />
+      <created>1715028642357</created>
+      <option name="number" value="00039" />
+      <option name="presentableId" value="LOCAL-00039" />
+      <option name="project" value="LOCAL" />
+      <updated>1715028642357</updated>
+    </task>
+    <option name="localTasksCounter" value="40" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -490,7 +498,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="C&amp;P into main, minor style edits. Removed imports from main that were only in modules" />
     <MESSAGE value="C&amp;P into main, minor style edits. Removed imports from main that were only in modules and added my_module imports" />
     <MESSAGE value="added workers, updated name to num_workers for conssitency; fixed import errors" />
     <MESSAGE value="updated intermediate output statements and added reverse of dist transform" />
@@ -515,7 +522,8 @@
     <MESSAGE value="major rework cacheing in dataset" />
     <MESSAGE value="corrected parallel model listing, added parallel CNN,  added memory pinning to loaders," />
     <MESSAGE value="NSCLC docstring added, added jobs files for individual breakouts on HPC (.py and .sh files)" />
-    <option name="LAST_COMMIT_MESSAGE" value="NSCLC docstring added, added jobs files for individual breakouts on HPC (.py and .sh files)" />
+    <MESSAGE value="corrected nbins to _nbins error" />
+    <option name="LAST_COMMIT_MESSAGE" value="corrected nbins to _nbins error" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
