@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from functools import cache
+from functools import lru_cache
 
 
 class NSCLCDataset:
@@ -18,15 +18,16 @@ class NSCLCDataset:
         else:
             self.mode = mode
         self.transform = None
-        self.augmented = False
-        self.dist_transformed = False
-        self.normalized = False
         self.label = label
         self.stack_height = len(self.mode)
         self.image_dims = None
         self.scalars = None
+
         self._name = 'nsclc_'
         self._shape = None
+        self._augmented = False
+        self._dist_transformed = False
+        self._normalized = False
 
         # Define loading functions for different image types
         load_fn = {'tiff': load_tiff,
@@ -83,35 +84,13 @@ class NSCLCDataset:
                             self.all_fovs.remove(fov)
                             break
 
-    # Use property to define name and shape, so that they are automatically updated with latest data setup
-    @property
-    def name(self):
-        self._name = (f"nsclc_{self.label}_{'+'.join(self.mode)}"
-                      f'{"_Transformed" if self.dist_transformed else ""}'
-                      f'{"_Augmented" if self.augmented else ""}'
-                      f'{"_Normalized" if self.normalized else ""}')
-        return self._name
-
-    @name.setter
-    def name(self, name):
-        self._name = name
-
-    @property
-    def shape(self):
-        self._shape = self[0][0].shape
-        return self._shape
-
-    @shape.setter
-    def shape(self, shape):
-        self._shape = shape
-
     def __len__(self):
         if self.augment:
             return len(self.all_fovs)
         else:
             return 5 * len(self.all_fovs)
 
-    @cache
+    @lru_cache()
     def __getitem__(self, index):
         # Get image path
         if self.augmented:
@@ -173,15 +152,116 @@ class NSCLCDataset:
 
         return X, y
 
-    def dist_transform(self, nbins=25):
-        self.nbins = nbins
-        if not self.normalized:
-            print(
-                'Normalization is automatically applied for the distribution transform.\n     '
-                'This can be manually overwritten by setting the NORMALIZED attribute to False')
-            self.normalize_channels_to_max()
-        self.dist_transformed = True
+    ##############
+    # Properties #
+    ##############
+    # Use property to define name and shape, so that they are automatically updated with latest data setup
+    @property
+    def name(self):
+        self._name = (f"nsclc_{self.label}_{'+'.join(self.mode)}"
+                      f'{"_Transformed" if self.dist_transformed else ""}'
+                      f'{"_Augmented" if self.augmented else ""}'
+                      f'{"_Normalized" if self.normalized else ""}')
+        return self._name
 
+    @name.setter
+    def name(self, name):
+        self._name = name
+
+    @property
+    def shape(self):
+        self._shape = self[0][0].shape
+        return self._shape
+
+    @shape.setter
+    def shape(self, shape):
+        self._shape = shape
+
+    ##########################
+    # Distribution transform #
+    ##########################
+    def dist_transform(self, nbins=25):
+        # If it is already transformed to the same bin number, leave it alone
+        if self.dist_transformed and nbins == self._nbins:
+            pass
+        # If something is changed, reset and update
+        else:
+            self.__getitem__.cache_clear()
+            self._nbins = nbins
+            self.dist_transformed = True
+            if not self.normalized:
+                print(
+                    'Normalization is automatically applied for the distribution transform.\n     '
+                    'This can be manually overwritten by setting the NORMALIZED attribute to False')
+                self.normalize_channels_to_max()
+
+    @property
+    def dist_transformed(self):
+        return self._dist_transformed
+
+    @dist_transformed.setter
+    def dist_transformed(self, dist_transformed):
+        # If it is changing, reset and update
+        if dist_transformed is not self.dist_transformed:
+            self.__getitem__.cache_clear()
+            self._dist_transformed = dist_transformed
+
+    ################
+    # Augmentation #
+    ################
+    def augment(self):
+        self.augmented = True
+
+    @property
+    def augmented(self):
+        return self._augmented
+
+    @augmented.setter
+    def augmented(self, augmented):
+        # If it is changing, reset and update
+        if augmented is not self.augmented:
+            self.__getitem__.cache_clear()
+            self._augmented = augmented
+
+    #################
+    # Normalization #
+    #################
+    def normalize_channels_to_max(self):
+        # Find the max for each mode across the entire dataset
+        # This is mildly time-consuming, so we only do it once, then store the scalar and mark the set as normalized.
+        # In order to make distributions consistent, this step will be required for dist transforms, so it will be
+        # checked before performing the transform
+
+        # Check if previously normalized
+        if self._normalized:
+            return
+
+        # If scalars have not been previously calculated, calculate
+        if self.scalars is None:
+            # Preallocate an array. Each row is an individual image, each column is mode
+            maxes = np.zeros((len(self), self.stack_height), dtype=np.float32)
+            for ii, (stack, _) in enumerate(self):
+                maxes[ii] = np.nanmax(stack, axis=(1, 2))
+            self.scalars = np.max(maxes, axis=0)
+            self.scalars = self.scalars[:, None, None]  # Broadcast for easy channel-wise scaling
+
+        # Set normalized to TRUE so images will be scaled to max when retrieved
+        self._normalized = True
+
+    @property
+    def normalized(self):
+        return self._normalized
+
+    @normalized.setter
+    def normalized(self, normalized):
+        if normalized is not self.normalized:
+            self.__getitem__.cache_clear()
+        if normalized:
+            self.normalize_channels_to_max()
+
+    ############################
+    # Show random data samples #
+    ############################
     def show_random(self):
         if self.dist_transformed:
             _, ax = plt.subplots(5, 1, figsize=(10, 10))
@@ -189,7 +269,8 @@ class NSCLCDataset:
                 index = np.random.randint(0, len(self))
                 ax[ii].plot(self[index][0].T, label=self.mode)
                 ax[ii].legend()
-                ax[ii].tick_params(top=False, bottom=False, left=False, right=False, labelleft=False, labelbottom=False)
+                ax[ii].tick_params(top=False, bottom=False, left=False, right=False, labelleft=False,
+                                   labelbottom=False)
                 ax[ii].set_title(f'Label: {self[index][1]}', fontsize=10)
         else:
             transform = transforms.ToPILImage()
@@ -202,42 +283,14 @@ class NSCLCDataset:
                 if len(self.mode) > 1:
                     for jj in range(len(self.mode)):
                         ax[ii, jj].imshow(transform(img[jj]))
-                        ax[ii, jj].tick_params(top=False, bottom=False, left=False, right=False, labelleft=False,
+                        ax[ii, jj].tick_params(top=False, bottom=False, left=False, right=False,
+                                               labelleft=False,
                                                labelbottom=False)
-                        ax[ii, jj].set_title(f'Response: {self[index][1]}. \n Mode: {self.mode[jj]}', fontsize=10)
+                        ax[ii, jj].set_title(f'Response: {self[index][1]}. \n Mode: {self.mode[jj]}',
+                                             fontsize=10)
                 else:
                     ax[ii].imshow(transform(self[index][0][jj]))
                     ax[ii].tick_params(top=False, bottom=False, left=False, right=False, labelleft=False,
                                        labelbottom=False)
                     ax[ii].set_title(f'Response: {lab}. \n Mode: {self.mode[jj]}', fontsize=10)
         plt.show()
-
-    def augment(self):
-        self.augmented = True
-
-    def normalize_channels_to_max(self):
-        # Find the max for each mode across the entire dataset
-        # This is mildly time-consuming, so we only do it once, then store the scalar and mark the set as normalized.
-        # In order to make distributions consistent, this step will be required for dist transforms, so it will be
-        # checked before performing the transform
-
-        # Check if previously normalized
-        if self.normalized:
-            return
-
-        # Temporarily turn off augmentation so max doesn't have to run 5x
-        temp_aug = self.augmented  # Store for restoring later
-        self.augmented = False
-
-        # Preallocate an array. Each row is an individual image, each column is mode
-        maxes = np.zeros((len(self), self.stack_height), dtype=np.float32)
-        for ii, (stack, _) in enumerate(self):
-            maxes[ii] = np.nanmax(stack, axis=(1, 2))
-        self.scalars = np.max(maxes, axis=0)
-        self.scalars = self.scalars[:, None, None]  # Broadcast for easy channel-wise scaling
-
-        # Set normalized to TRUE so images will be scaled to max when retrieved
-        self.normalized = True
-
-        # Reset augmented
-        self.augmented = temp_aug

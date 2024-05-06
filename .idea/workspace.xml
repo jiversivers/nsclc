@@ -4,10 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="typos fixed">
-      <change afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+    <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="added req text, bug fix for image data in regularized MLP">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Individual_model_tests.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/Individual_model_tests.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/my_modules/nsclc/nsclc_dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/nsclc/nsclc_dataset.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -136,7 +135,7 @@
       <option name="presentableId" value="Default" />
       <updated>1713376350887</updated>
       <workItem from="1713376351677" duration="76953000" />
-      <workItem from="1713975008544" duration="23496000" />
+      <workItem from="1713975008544" duration="37618000" />
     </task>
     <task id="LOCAL-00001" summary="Ininitial commit after copy and paste from jupyter notebook for migration to traditional python codebase">
       <option name="closed" value="true" />
@@ -410,7 +409,15 @@
       <option name="project" value="LOCAL" />
       <updated>1713974819096</updated>
     </task>
-    <option name="localTasksCounter" value="35" />
+    <task id="LOCAL-00035" summary="added req text, bug fix for image data in regularized MLP">
+      <option name="closed" value="true" />
+      <created>1714180786718</created>
+      <option name="number" value="00035" />
+      <option name="presentableId" value="LOCAL-00035" />
+      <option name="project" value="LOCAL" />
+      <updated>1714180786718</updated>
+    </task>
+    <option name="localTasksCounter" value="36" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -447,7 +454,7 @@
                   <entry key="branch">
                     <value>
                       <list>
-                        <option value="glob_fix_in_nsclc" />
+                        <option value="origin/main" />
                       </list>
                     </value>
                   </entry>
@@ -460,7 +467,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Ininitial commit after copy and paste from jupyter notebook for migration to traditional python codebase" />
     <MESSAGE value="Initial commit after copy and paste from jupyter notebook for migration to traditional python codebase" />
     <MESSAGE value="Added model and model iterator classes and funcitons to project. Wrote parallel CNNets. Otherwise just copied and fixed formatting from Jupyter. Ready for main now" />
     <MESSAGE value="C&amp;P into main, minor style edits" />
@@ -485,7 +491,8 @@
     <MESSAGE value="updated xl_file default in dataset" />
     <MESSAGE value="updated label default in dataset" />
     <MESSAGE value="typos fixed" />
-    <option name="LAST_COMMIT_MESSAGE" value="typos fixed" />
+    <MESSAGE value="added req text, bug fix for image data in regularized MLP" />
+    <option name="LAST_COMMIT_MESSAGE" value="added req text, bug fix for image data in regularized MLP" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
