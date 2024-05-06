@@ -8,7 +8,7 @@ from my_modules.model_learning.model_phases import train_epoch, valid_epoch, tes
 
 
 def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim_fun, num_workers=(0, 0, 0),
-                          prefetch_factor=None, **kwargs):
+                          prefetch_factor=None, pin_memory=True, **kwargs):
     results = {}
     for key, data in datasets.items():
         results[key] = {}
@@ -19,7 +19,8 @@ def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim
                                                              split=(0.75, 0.2, 0.05),
                                                              num_workers=num_workers,
                                                              shuffle=(True, False, False),
-                                                             prefetch_factor=prefetch_factor)
+                                                             prefetch_factor=prefetch_factor,
+                                                             pin_memory=pin_memory)
 
         data_shape = data.shape
 

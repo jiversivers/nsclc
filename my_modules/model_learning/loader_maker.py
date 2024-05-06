@@ -8,7 +8,8 @@ def loader_maker(data, batch_size=32,
                  num_workers=(1, 1, 1),
                  shuffle=(True, False, False),
                  drop_last=None,
-                 prefetch_factor=None):
+                 prefetch_factor=None,
+                 pin_memory=True):
     # Normalize split and scale to len(data)
     loader_size = [round(x) for x in len(data) * (split / np.sum(split))]
     # Adjust for possible rounding overage
@@ -19,7 +20,7 @@ def loader_maker(data, batch_size=32,
         drop_last = ((True if int(sp * len(data)) % batch_size == 1 else False) for sp in split)
 
     # Create dict for easy function filling where inputs are the same
-    kwargs = {'batch_size': batch_size, 'prefetch_factor': prefetch_factor}
+    kwargs = {'batch_size': batch_size, 'prefetch_factor': prefetch_factor, 'pin_memory': pin_memory }
 
     sets = torch.utils.data.random_split(
         dataset=data,

@@ -65,7 +65,7 @@ class RNNet(nn.Module):
         super(RNNet, self).__init__()
         self.name = 'RN Net'
         self.input_size = input_size
-        self.hidden_size = int(np.sqrt(np.prod(self.input_size)))
+        self.hidden_size = 32
         self.output_size = 1
         self.num_layers = 2
 
@@ -95,8 +95,7 @@ class RegularizedRNNet(nn.Module):
         super(RegularizedRNNet, self).__init__()
         self.name = 'Regularized RN Net'
         self.input_size = input_size
-        self.hidden_size = int(np.sqrt(np.prod(self.input_size)))
-        print(self.hidden_size)
+        self.hidden_size = 32
         self.output_size = 1
         self.num_layers = 2
         self.bn = nn.BatchNorm1d(input_size[0])
@@ -129,9 +128,9 @@ class ParallelMLPNet(nn.Module):
         self.dims = self.input_size[0]
         self.input_nodes = np.prod(self.input_size[1:])
         self.flat = nn.Flatten()
-        self.fc1 = self.dims * [nn.Linear(self.input_nodes, 64)]
-        self.fc2 = self.dims * [nn.Linear(64, 128)]
-        self.out1 = self.dims * [nn.Linear(128, 1)]
+        self.fc1 = nn.ModuleList([nn.Linear(self.input_nodes, 64) for _ in range(self.dims)])
+        self.fc2 = nn.ModuleList([nn.Linear(64, 128) for _ in range(self.dims)])
+        self.out1 = nn.ModuleList([nn.Linear(128, 1) for _ in range(self.dims)])
 
         self.fc3 = nn.Linear(self.dims, 64)
         self.out = nn.Linear(64, 1)
@@ -140,7 +139,7 @@ class ParallelMLPNet(nn.Module):
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
-        xii = torch.tensor([])
+        xii = torch.tensor([], device=x.device)
         # Create independent MLP for each layer of the input
         for ii in range(self.dims):
             xi = self.flat(x[:, ii])
@@ -167,11 +166,11 @@ class RegularizedParallelMLPNet(nn.Module):
         self.dims = self.input_size[0]
         self.input_nodes = np.prod(self.input_size[1:])
         self.flat = nn.Flatten()
-        self.bn = self.dims * [nn.BatchNorm1d(self.input_nodes)]
-        self.fc1 = self.dims * [nn.Linear(self.input_nodes, 64)]
-        self.fc2 = self.dims * [nn.Linear(64, 128)]
-        self.fc3 = self.dims * [nn.Linear(128, 64)]
-        self.out1 = self.dims * [nn.Linear(64, 1)]
+        self.bn = nn.ModuleList([nn.BatchNorm1d(self.input_nodes) for _ in range(self.dims)])
+        self.fc1 = nn.ModuleList([nn.Linear(self.input_nodes, 64) for _ in range(self.dims)])
+        self.fc2 = nn.ModuleList([nn.Linear(64, 128) for _ in range(self.dims)])
+        self.fc3 = nn.ModuleList([nn.Linear(128, 64) for _ in range(self.dims)])
+        self.out1 = nn.ModuleList([nn.Linear(64, 1) for _ in range(self.dims)])
 
         self.fc4 = nn.Linear(self.dims, 25)
         self.out = nn.Linear(25, 1)
@@ -182,7 +181,7 @@ class RegularizedParallelMLPNet(nn.Module):
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
-        xii = torch.tensor([])
+        xii = torch.tensor([], device=x.device)
         # Create independent networks for each layer of the input
         for ii in range(self.dims):
             xi = self.flat(x[:, ii])
@@ -204,6 +203,78 @@ class RegularizedParallelMLPNet(nn.Module):
         x = self.fc4(x)
         x = self.relu(x)
         x = self.out(x)
+        x = self.sigm(x)
+        return x
+
+
+class ParallelRNNet(nn.Module):
+    def __init__(self, input_size):
+        super(ParallelRNNet, self).__init__()
+        self.name = 'Parallel RN Net'
+        self.input_size = input_size
+        self.dims = self.input_size[0]
+        self.hidden_size = 16
+        self.output_size = 1
+        self.num_layers = 2
+
+        self.rnn = nn.ModuleList(
+            [nn.RNN(input_size=1, hidden_size=self.hidden_size, num_layers=self.num_layers, batch_first=True) for _ in
+             range(self.dims)])
+        self.fc1 = nn.Linear(self.hidden_size * self.dims, 64)
+        self.fc2 = nn.Linear(64, 1)
+
+        self.relu = nn.ReLU()
+        self.sigm = nn.Sigmoid()
+
+    def forward(self, x):
+        x[torch.isnan(x)] = 0
+        xii = torch.tensor([], device=x.device)
+
+        for ii in range(self.dims):
+            xi = x[:, ii].unsqueeze(2)
+            xi, _ = self.rnn[ii](xi)
+            xi = xi[:, -1, :]
+            xii = torch.cat((xii, xi), 1)
+
+        x = self.fc1(xii)
+        x = self.relu(x)
+        x = self.fc2(x)
+        x = self.sigm(x)
+        return x
+
+
+class RegularizedParallelRNNet(nn.Module):
+    def __init__(self, input_size):
+        super(RegularizedParallelRNNet, self).__init__()
+        self.name = 'Regularaized Parallel RN Net'
+        self.input_size = input_size
+        self.dims = self.input_size[0]
+        self.hidden_size = 16
+        self.output_size = 1
+        self.num_layers = 2
+
+        self.bn = nn.ModuleList([nn.BatchNorm1d(1) for _ in range(self.dims)])
+        self.rnn = nn.ModuleList([nn.RNN(input_size=1, hidden_size=self.hidden_size, num_layers=self.num_layers,
+                                         batch_first=True, dropout=0.25) for _ in range(self.dims)])
+        self.fc1 = nn.Linear(self.hidden_size * self.dims, 64)
+        self.fc2 = nn.Linear(64, 1)
+
+        self.relu = nn.ReLU()
+        self.sigm = nn.Sigmoid()
+
+    def forward(self, x):
+        x[torch.isnan(x)] = 0
+        xii = torch.tensor([], device=x.device)
+
+        for ii in range(self.dims):
+            xi = x[:, ii].unsqueeze(2)
+            xi, _ = self.rnn[ii](xi)
+            xi = xi[:, -1, :]
+            xii = torch.cat((xii, xi), 1)
+
+        x = self.fc1(xii)
+        x = self.relu(x)
+        x = self.fc2(x)
         x = self.sigm(x)
         return x
 
@@ -278,12 +349,12 @@ class ParallelCNNet(nn.Module):
         self.input_size = input_size
         self.dims = self.input_size[0]
 
-        self.conv1 = self.dims * [nn.Conv2d(1, 32, kernel_size=3, padding=1)]
-        self.conv2 = self.dims * [nn.Conv2d(32, 64, kernel_size=3, padding=1)]
+        self.conv1 = nn.ModuleList([nn.Conv2d(1, 32, kernel_size=3, padding=1) for _ in range(self.dims)])
+        self.conv2 = nn.ModuleList([nn.Conv2d(32, 64, kernel_size=3, padding=1) for _ in range(self.dims)])
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.flat = nn.Flatten()
-        self.fc1 = self.dims * [nn.Linear(64 * int(np.prod(input_size[1:]) // 16), 128)]
-        self.fc2 = self.dims * [nn.Linear(128, 1)]
+        self.fc1 = nn.ModuleList([nn.Linear(64 * int(np.prod(input_size[1:]) // 16), 128) for _ in range(self.dims)])
+        self.fc2 = nn.ModuleList([nn.Linear(128, 1) for _ in range(self.dims)])
         self.fc3 = nn.Linear(self.dims, 1)
 
         self.relu = nn.ReLU()
@@ -291,11 +362,11 @@ class ParallelCNNet(nn.Module):
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
-        xii = torch.tensor([])
+        xii = torch.tensor([], device=x.device)
         # Forward pass of CNN for each layer
         for ii in range(self.dims):
             xi = x[:, ii].unsqueeze(1)
-            xi = self.conv1[ii](xi)
+            xi = self.conv1[ii](xi).to(x.device)
             xi = self.pool(xi)
             xi = self.conv2[ii](xi)
             xi = self.pool(xi)
@@ -318,13 +389,13 @@ class RegularizedParallelCNNet(nn.Module):
         self.input_size = input_size
         self.dims = self.input_size[0]
 
-        self.bn = self.dims * [nn.BatchNorm2d(1)]
-        self.conv1 = self.dims * [nn.Conv2d(1, 32, kernel_size=3, padding=1)]
-        self.conv2 = self.dims * [nn.Conv2d(32, 64, kernel_size=3, padding=1)]
+        self.bn = nn.ModuleList([nn.BatchNorm2d(1) for _ in range(self.dims)])
+        self.conv1 = nn.ModuleList([nn.Conv2d(1, 32, kernel_size=3, padding=1) for _ in range(self.dims)])
+        self.conv2 = nn.ModuleList([nn.Conv2d(32, 64, kernel_size=3, padding=1) for _ in range(self.dims)])
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.flat = nn.Flatten()
-        self.fc1 = self.dims * [nn.Linear(64 * int(np.prod(input_size[1:]) // 16), 128)]
-        self.fc2 = self.dims * [nn.Linear(128, 1)]
+        self.fc1 = nn.ModuleList([nn.Linear(64 * int(np.prod(input_size[1:]) // 16), 128) for _ in range(self.dims)])
+        self.fc2 = nn.ModuleList([nn.Linear(128, 1) for _ in range(self.dims)])
         self.fc3 = nn.Linear(self.dims, 1)
 
         self.relu = nn.ReLU()
@@ -334,7 +405,7 @@ class RegularizedParallelCNNet(nn.Module):
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
-        xii = torch.tensor([])
+        xii = torch.tensor([], device=x.device)
         # Forward pass of CNN for each layer
         for ii in range(self.dims):
             xi = x[:, ii].unsqueeze(1)
