@@ -28,11 +28,12 @@ from sklearn import metrics
 def main():
     # Prepare data
     data = NSCLCDataset('E:\\NSCLC Data - PMD', ['orr', 'photons', 'taumean', 'boundfraction'], label='Response')
-    data.show_random()
     data.normalize_channels_to_max()
+    data.augment()
+    data.show_random()
 
     # Prepare training/data-loading parameters
-    optim_fun = optim.Adam
+    optim_fun = optim.SGD
     criterion = nn.BCELoss()
     bs = 32  # Batch size
     kf = 5  # Number of folds for cross validation
@@ -62,7 +63,7 @@ def main():
                                                                           hp['EP'], bs, criterion,
                                                                           optim_fun, lr=hp['LR'],
                                                                           num_workers=(16, 16, 8),
-                                                                          pin_memory=True)
+                                                                          pin_memory=True, momentum=0.9)
                 with open(results_file_path, 'a') as f:
                     f.write(f'{aug} {style}: {results["Image"]["Single"][style]}\n')
 

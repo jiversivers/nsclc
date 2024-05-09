@@ -147,7 +147,7 @@ class NSCLCDataset:
         else:
             return len(self.all_fovs)
 
-    @lru_cache()
+    @lru_cache(maxsize=None)
     def __getitem__(self, index):
         # Get image path
         if self.augmented:
