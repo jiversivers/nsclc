@@ -12,7 +12,7 @@ def load_tiff(load_fns_and_img_paths):
 
 # Function to load ASCs
 def load_asc(load_fns_and_img_paths):
-    x = torch.from_numpy(np.genfromtxt(load_fns_and_img_paths[1])[0]).float()
+    x = torch.from_numpy(np.genfromtxt(load_fns_and_img_paths[1])).float()
     return x
 
 

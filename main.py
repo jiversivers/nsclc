@@ -28,6 +28,7 @@ from sklearn import metrics
 def main():
     # Prepare data
     data = NSCLCDataset('E:\\NSCLC Data - PMD', ['orr', 'photons', 'taumean', 'boundfraction'], label='Response')
+    data.show_random()
     data.normalize_channels_to_max()
 
     # Prepare training/data-loading parameters
