@@ -1,3 +1,5 @@
+     Show Dotfiles Show Owner/Mode
+/scrfs/storage/jdivers/home/ondemand/data/sys/myjobs/projects/default/12/
 #!/bin/bash
 
 #SBATCH -J nsclc_img_aug_res
@@ -19,7 +21,10 @@ module load python
 cd $SLURM_SUBMIT_DIR || exit
 # input files needed for job
 files=/home/jdivers/ondemand/data/sys/myjobs/projects/default/6/nsclc_project/data
-rsync -av -q $files /scratch/$SLURM_JOB_ID/data
+rsync -av -q $files /scratch/$SLURM_JOB_ID
+rsync -av -q my_modules /scratch/$SLURM_JOB_ID
+rsync -av -q myenv /scratch/$SLURM_JOB_ID
+rsync -av -q *.py /scratch/$SLURM_JOB_ID
 wait
 
 cd /scratch/$SLURM_JOB_ID/ || exit
@@ -30,7 +35,6 @@ source myenv/bin/activate
 
 # Install dependencies
 pip install --upgrade pip
-pip install -r requirements.txt
 pip install torch
 pip install numpy
 pip install matplotlib

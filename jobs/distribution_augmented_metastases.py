@@ -25,8 +25,7 @@ def main():
     # Iterable hyperparameters
     hyperparameters = {'lightning': {'LR': 0.1, 'EP': 100},
                        'fast': {'LR': 0.01, 'EP': 150},
-                       'mid': {'LR': 0.001, 'EP': 500},
-                       'slow': {'LR': 0.00001, 'EP': 2500}}
+                       'mid': {'LR': 0.001, 'EP': 500}}
 
     # Init results
     results = {}

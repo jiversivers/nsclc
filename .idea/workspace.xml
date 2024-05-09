@@ -5,8 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="corrected nbins to _nbins error">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/my_modules/nsclc/nsclc_dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/nsclc/nsclc_dataset.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/jobs/distribution_augmented_metastases.py" beforeDir="false" afterPath="$PROJECT_DIR$/jobs/distribution_augmented_metastases.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/jobs/distribution_augmented_response.py" beforeDir="false" afterPath="$PROJECT_DIR$/jobs/distribution_augmented_response.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/jobs/image_augmented_metastases.py" beforeDir="false" afterPath="$PROJECT_DIR$/jobs/image_augmented_metastases.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/jobs/image_augmented_response.py" beforeDir="false" afterPath="$PROJECT_DIR$/jobs/image_augmented_response.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -31,7 +34,7 @@
     </option>
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="loader_split" />
+        <entry key="$PROJECT_DIR$" value="main" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -74,7 +77,7 @@
     "Python.main.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "fix__glob__case__sensitivty",
+    "git-widget-placeholder": "main",
     "ignore.virus.scanning.warn.message": "true",
     "last_opened_file_path": "C:/Users/jdivers/PycharmProjects/jivers_global",
     "node.js.detected.package.eslint": "true",
@@ -535,16 +538,12 @@
           <line>43</line>
           <option name="timeStamp" value="20" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/main.py</url>
-          <option name="timeStamp" value="26" />
-        </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/NSCLC_Classification$.coverage" NAME=" Coverage Results" MODIFIED="1713799138918" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
     <SUITE FILE_PATH="coverage/NSCLC_Classification$image_loaders.coverage" NAME="image_loaders Coverage Results" MODIFIED="1713378371055" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/my_modules/nsclc_dataset" />
-    <SUITE FILE_PATH="coverage/NSCLC_Classification$main.coverage" NAME="main Coverage Results" MODIFIED="1713975768159" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/NSCLC_Classification$main.coverage" NAME="main Coverage Results" MODIFIED="1715285156412" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

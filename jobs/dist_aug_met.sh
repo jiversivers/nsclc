@@ -20,6 +20,10 @@ cd $SLURM_SUBMIT_DIR || exit
 # input files needed for job
 files=/home/jdivers/ondemand/data/sys/myjobs/projects/default/6/nsclc_project/data
 rsync -av -q $files /scratch/$SLURM_JOB_ID/data
+rsync -av -q $files /scratch/$SLURM_JOB_ID
+rsync -av -q my_modules /scratch/$SLURM_JOB_ID
+rsync -av -q myenv /scratch/$SLURM_JOB_ID
+rsync -av -q *.py /scratch/$SLURM_JOB_ID
 wait
 
 cd /scratch/$SLURM_JOB_ID/ || exit

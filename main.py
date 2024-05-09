@@ -37,12 +37,7 @@ def main():
     kf = 5  # Number of folds for cross validation
 
     # Iterable hyperparameters
-    hyperparameters = {'Raw': {'Fast': {'LR': 0.01, 'EP': 125},
-                               'Mid': {'LR': 0.001, 'EP': 500},
-                               'Slow': {'LR': 0.00001, 'EP': 2500}},
-                       'Augmented': {'Fast': {'LR': 0.01, 'EP': 125},
-                                     'Mid': {'LR': 0.001, 'EP': 500},
-                                     'Slow': {'LR': 0.00001, 'EP': 2500}}}
+    hyperparameters = {'Augmented': {'Fast': {'LR': 0.01, 'EP': 125}}}
 
     status = ['Response', 'Metastases']
 
