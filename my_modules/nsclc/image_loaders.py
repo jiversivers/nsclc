@@ -1,19 +1,18 @@
 import torchvision.transforms as transforms
 from PIL import Image
-import glob
 import torch
 import numpy as np
 
 
 # Function to load TIFFs
-def load_tiff(load_fns_and_image_paths):
-    X = transforms.ToTensor()(Image.open(load_fns_and_image_paths[1])).float()
+def load_tiff(load_fns_and_img_paths):
+    X = transforms.ToTensor()(Image.open(load_fns_and_img_paths[1])).float()
     return X
 
 
 # Function to load ASCs
-def load_asc(load_fns_and_image_paths):
-    x = torch.from_numpy(np.genfromtxt(glob.glob(load_fns_and_image_paths[1])[0])).float()
+def load_asc(load_fns_and_img_paths):
+    x = torch.from_numpy(np.genfromtxt(load_fns_and_img_paths[1])[0]).float()
     return x
 
 

@@ -9,6 +9,7 @@ from functools import lru_cache
 import re
 import glob
 
+
 class NSCLCDataset:
     """
     NSCLC dataset class to load NSCLC images from root dir (arg).
@@ -45,7 +46,6 @@ class NSCLCDataset:
         self.stack_height = len(self.mode)
         self.image_dims = None
         self.scalars = None
-        self.fov_mode_dict = []
 
         self._name = 'nsclc_'
         self._shape = None
@@ -63,13 +63,13 @@ class NSCLCDataset:
         # Define a mode dict that matches call to load functions and filename regex
         self.mode_dict = {'mask': [load_fn['tiff'], rf'.*?\{os.sep}Redox\{os.sep}ROI_mask\.(tiff|TIFF)'],
                           'orr': [load_fn['tiff'], rf'.*?\{os.sep}Redox\{os.sep}RawRedoxMap\.(tiff|TIFF)'],
-                          'g': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_phasor_G.*?\.(asc|ASC)'],
-                          's': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_phasor_S.*?\.(asc|ASC)'],
-                          'photons': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_photons.*?\.(asc|ASC)'],
-                          'tau1': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_t1.*?\.(asc|ASC)'],
-                          'tau2': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_t2.*?\.(asc|ASC)'],
-                          'alpha1': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_a1.*?\.(asc|ASC)'],
-                          'alpha2': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_a2.*?\.(asc|ASC)']}
+                          'g': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_phasor_G\.(asc|ASC)'],
+                          's': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_phasor_S\.(asc|ASC)'],
+                          'photons': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_photons\.(asc|ASC)'],
+                          'tau1': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_t1\.(asc|ASC)'],
+                          'tau2': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_t2\.(asc|ASC)'],
+                          'alpha1': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_a1\.(asc|ASC)'],
+                          'alpha2': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_a2\.(asc|ASC)']}
         self.mode_dict = {key: [item[0], re.compile(item[1])] for key, item in self.mode_dict.items()}
 
         # Find and load features spreadsheet (or load directly if path provided)
@@ -90,23 +90,25 @@ class NSCLCDataset:
         # making it simple for indexing in __getitem__)
 
         # Make and indexed FOV-LUT dict list of loaders and files
+        self.fov_mode_dict = [{} for _ in range(len(self.all_fovs))]
         # Iterate through all FOVs
         for index, fov in enumerate(self.all_fovs):
             # Iterate through all base modes (from mode_dict)
-            for mode, (load_fn, file_pattern) in self.mode_dict.keys():
+            for mode, (load_fn, file_pattern) in self.mode_dict.items():
                 matched = []
                 # Iterate through the current FOV tree
-                for root, _, files in os.walk(fov):
+                for trunk, dirs, files in os.walk(fov):
                     # Check if any file in the tree matches the pattern for the mode from the base LUT (mode_dict)
                     for file in files:
-                        matched.append(re.match(file_pattern, os.path.join(root, file)))
+                        matched.append(re.match(file_pattern, os.path.join(trunk, file)))
                 # If exactly one file matched, then add it to the FOV-LUT dict
                 if sum(t is not None for t in matched) == 1:
-                    self.fov_mode_dict[index][mode] = [load_fn, next(match.string for match in matched)]
+                    for match in matched:
+                        if match:
+                            self.fov_mode_dict[index][mode] = [load_fn, match.string]
                 # Else, add <None> for later removal and move on to next FOV
                 else:
                     self.fov_mode_dict[index][mode] = [fov, None]
-                    break
 
             # Add derived modes
             self.fov_mode_dict[index]['boundfraction'] = [load_bound_fraction, [self.fov_mode_dict[index]['alpha1'],
@@ -116,7 +118,6 @@ class NSCLCDataset:
                                                      self.fov_mode_dict[index]['tau1'],
                                                      self.fov_mode_dict[index]['alpha2'],
                                                      self.fov_mode_dict[index]['tau2']]]
-
         # Remove items that are missing a called mode
         # Note the [:] makes a copy of the list so indices don't change on removal
         for ii, fov_lut in enumerate(self.fov_mode_dict[:]):
@@ -125,6 +126,7 @@ class NSCLCDataset:
                     case 'taumean':
                         if not all([fov_lut['alpha1'][1], fov_lut['tau1'][1],
                                     fov_lut['alpha2'][1], fov_lut['tau2'][1]]):
+                            print(fov_lut['taumean'])
                             self.all_fovs.remove(fov_lut['alpha1'][0])
                             self.fov_mode_dict.remove(fov_lut)
                             break
