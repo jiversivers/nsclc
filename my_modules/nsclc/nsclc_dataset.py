@@ -1,12 +1,12 @@
 import torchvision.transforms as transforms
 import os
 from .image_loaders import load_tiff, load_asc, load_weighted_average, load_bound_fraction
-import glob
 import pandas as pd
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from functools import lru_cache
+import re
 
 
 class NSCLCDataset:
@@ -31,7 +31,7 @@ class NSCLCDataset:
         - augmented (bool): Returns whether dataset is augmented
         - normalize_channels_to_max (callable): Applies normalization to image stack channel-wise
         - normalized (bool): Returns whether image stack is normalized
-        = show_random (callable): Shows 5 random samples from dataset
+        - show_random (callable): Shows 5 random samples from dataset
     """
 
     def __init__(self, root, mode, xl_file=None, label=None):
@@ -45,6 +45,7 @@ class NSCLCDataset:
         self.stack_height = len(self.mode)
         self.image_dims = None
         self.scalars = None
+        self.fov_mode_dict = []
 
         self._name = 'nsclc_'
         self._shape = None
@@ -59,16 +60,17 @@ class NSCLCDataset:
                    'weighted_average': load_weighted_average,
                    'ratio': load_bound_fraction}
 
-        # Define a mode dict that matches call to load functions and filename patterns
-        self.mode_dict = {'mask': [load_fn['tiff'], os.sep + 'Redox' + os.sep + 'ROI_mask.tiff'],
-                          'orr': [load_fn['tiff'], os.sep + 'Redox' + os.sep + 'RawRedoxMap.tiff'],
-                          'g': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_phasor_G*'],
-                          's': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_phasor_S*'],
-                          'photons': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_photons*'],
-                          'tau1': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_t1*'],
-                          'tau2': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_t2*'],
-                          'alpha1': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_a1*'],
-                          'alpha2': [load_fn['asc'], os.sep + 'FLIM' + os.sep + '*_a2*']}
+        # Define a mode dict that matches call to load functions and filename regex
+        self.mode_dict = {'mask': [load_fn['tiff'], rf'.*?\{os.sep}Redox\{os.sep}ROI_mask\.(tiff|TIFF)'],
+                          'orr': [load_fn['tiff'], rf'.*?\{os.sep}Redox\{os.sep}RawRedoxMap\.(tiff|TIFF)'],
+                          'g': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_phasor_G.*?\.(asc|ASC)'],
+                          's': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_phasor_S.*?\.(asc|ASC)'],
+                          'photons': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_photons.*?\.(asc|ASC)'],
+                          'tau1': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_t1.*?\.(asc|ASC)'],
+                          'tau2': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_t2.*?\.(asc|ASC)'],
+                          'alpha1': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_a1.*?\.(asc|ASC)'],
+                          'alpha2': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_a2.*?\.(asc|ASC)']}
+        self.mode_dict = {key: [item[0], re.compile(item[1])] for key, item in self.mode_dict.items()}
 
         # Find and load features spreadsheet (or load directly if path provided)
         if xl_file is None:
@@ -85,34 +87,63 @@ class NSCLCDataset:
                               self.features['Slide Name']]  # This gives a list of lists of fovs sorted by slide
         self.all_fovs = [fov for slide_fovs in self.fovs_by_slide for fov in
                          slide_fovs]  # This will give a list of all fovs (still ordered, but now not nested,
-        # making it simple for indexing in __get item__)
+        # making it simple for indexing in __getitem__)
 
-        # Iterate through FOVs and check for missing data. If any called modes are missing, pop the entire FOV
-        for fov in self.all_fovs[:]:
+        # Make and indexed FOV-LUT dict list of loaders and files
+        # Iterate through all FOVs
+        for index, fov in enumerate(self.all_fovs):
+            # Iterate through all base modes (from mode_dict)
+            for mode, (load_fn, file_pattern) in self.mode_dict.keys():
+                matched = []
+                # Iterate through the current FOV tree
+                for root, _, files in os.walk(fov):
+                    # Check if any file in the tree matches the pattern for the mode from the base LUT (mode_dict)
+                    for file in files:
+                        matched.append(re.match(file_pattern, os.path.join(root, file)))
+                # If exactly one file matched, then add it to the FOV-LUT dict
+                if sum(t is not None for t in matched) == 1:
+                    self.fov_mode_dict[index][mode] = [load_fn, next(match.string for match in matched)]
+                # Else, add <None> for later removal and move on to next FOV
+                else:
+                    self.fov_mode_dict[index][mode] = [fov, None]
+                    break
+
+            # Add derived modes
+            self.fov_mode_dict[index]['boundfraction'] = [load_bound_fraction, [self.fov_mode_dict[index]['alpha1'],
+                                                                                self.fov_mode_dict[index]['alpha2']]]
+            self.fov_mode_dict[index]['taumean'] = [load_weighted_average,
+                                                    [self.fov_mode_dict[index]['alpha1'],
+                                                     self.fov_mode_dict[index]['tau1'],
+                                                     self.fov_mode_dict[index]['alpha2'],
+                                                     self.fov_mode_dict[index]['tau2']]]
+
+        # Remove items that are missing a called mode
+        # Note the [:] makes a copy of the list so indices don't change on removal
+        for ii, fov_lut in enumerate(self.fov_mode_dict[:]):
             for mode in self.mode:
                 match mode.lower():
                     case 'taumean':
-                        if not (glob.glob(fov + self.mode_dict['alpha1'][1]) and glob.glob(
-                                fov + self.mode_dict['tau1'][1])
-                                and glob.glob(fov + self.mode_dict['alpha2'][1]) and glob.glob(
-                                    fov + self.mode_dict['tau2'][1])):
-                            self.all_fovs.remove(fov)
+                        if not all([fov_lut['alpha1'][1], fov_lut['tau1'][1],
+                                    fov_lut['alpha2'][1], fov_lut['tau2'][1]]):
+                            self.all_fovs.remove(fov_lut['alpha1'][0])
+                            self.fov_mode_dict.remove(fov_lut)
                             break
                     case 'boundfraction':
-                        if not (glob.glob(fov + self.mode_dict['alpha1'][1]) and glob.glob(
-                                fov + self.mode_dict['alpha2'][1])):
-                            self.all_fovs.remove(fov)
+                        if not all([fov_lut['alpha1'][1], fov_lut['alpha2'][1]]):
+                            self.all_fovs.remove(fov_lut['alpha1'][0])
+                            self.fov_mode_dict.remove(fov_lut)
                             break
                     case _:
-                        if not glob.glob(fov + self.mode_dict[mode][1]):
-                            self.all_fovs.remove(fov)
+                        if fov_lut[mode][1] is None:
+                            self.all_fovs.remove(fov_lut[mode][0])
+                            self.fov_mode_dict.remove(fov_lut)
                             break
 
     def __len__(self):
-        if self.augment:
-            return len(self.all_fovs)
-        else:
+        if self.augmented:
             return 5 * len(self.all_fovs)
+        else:
+            return len(self.all_fovs)
 
     @lru_cache()
     def __getitem__(self, index):
@@ -122,45 +153,38 @@ class NSCLCDataset:
             sub_index = index % 5  # This will give us the index for the crop within the fov
         fov = self.all_fovs[index]
 
-        # Create FOV path dict from mode_dict
-        fov_mode_dict = {key: [self.mode_dict[key][0], fov + self.mode_dict[key][1]] for key in self.mode_dict.keys()}
-        fov_mode_dict['boundfraction'] = [load_bound_fraction, [fov_mode_dict['alpha1'], fov_mode_dict['alpha2']]]
-        fov_mode_dict['taumean'] = [load_weighted_average,
-                                    [fov_mode_dict['alpha1'], fov_mode_dict['tau1'], fov_mode_dict['alpha2'],
-                                     fov_mode_dict['tau2']]]
-
         # Load mask
-        fov_mask = fov_mode_dict['mask'][0](fov_mode_dict['mask'])
+        fov_mask = self.fov_mode_dict[index]['mask'][0](self.fov_mode_dict[index]['mask'])
         fov_mask[fov_mask == 0] = float('nan')
 
         # Preallocate output tensor based on mask size
         self.image_dims = (self.stack_height,) + tuple(fov_mask.size()[1:])
-        X = torch.empty(self.image_dims, dtype=torch.float32)
+        x = torch.empty(self.image_dims, dtype=torch.float32)
 
         # Load modes using load functions
         for ii, mode in enumerate(self.mode):
-            X[ii] = fov_mode_dict[mode][0](fov_mode_dict[mode])
+            x[ii] = self.fov_mode_dict[index][mode][0](self.fov_mode_dict[index][mode])
 
         # Scale by the max value of normalized
         if self.normalized:
-            X = X / self.scalars
+            x = x / self.scalars
 
         # Crop and sub index if necessary
         if self.augmented:
             cropper = transforms.FiveCrop((round(self.image_dims[1] / 2), round(self.image_dims[2] / 2)))
-            X = cropper(X)
+            x = cropper(x)
             fov_mask = cropper(fov_mask)
-            X = X[sub_index]
+            x = x[sub_index]
             fov_mask = fov_mask[sub_index]
 
         # Get data label and apply mask to all channels for binary classes
         slide_idx = [fov in slide for slide in self.fovs_by_slide].index(True)  # Get features index
         match self.label.lower():
             case 'response' | 'r':
-                X[torch.isnan(fov_mask).expand(X.size(0), *fov_mask.size()[1:])] = float('nan')
+                x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
                 y = 1 if self.features['Status (NR/R)'].iloc[slide_idx] == 'R' else 0
             case 'metastases' | 'mets' | 'm':
-                X[torch.isnan(fov_mask).expand(X.size(0), *fov_mask.size()[1:])] = float('nan')
+                x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
                 y = 1 if self.features['Status (Mets/NM)'].iloc[slide_idx] == 'NM' else 0
             case 'mask':
                 y = fov_mask
@@ -169,12 +193,12 @@ class NSCLCDataset:
 
         # Apply distribution transform, if called
         if self.dist_transformed:
-            X_dist = torch.empty((self.stack_height,) + (self._nbins,), dtype=torch.float32)
-            for ch, mode in enumerate(X):
-                X_dist[ch], _ = torch.histogram(mode, bins=self._nbins, range=[0, 1], density=True)
-            X = X_dist
+            x_dist = torch.empty((self.stack_height,) + (self._nbins,), dtype=torch.float32)
+            for ch, mode in enumerate(x):
+                x_dist[ch], _ = torch.histogram(mode, bins=self._nbins, range=[0, 1], density=True)
+            x = x_dist
 
-        return X, y
+        return x, y
 
     ##############
     # Properties #
@@ -204,7 +228,7 @@ class NSCLCDataset:
     ##########################
     # Distribution transform #
     ##########################
-    def dist_transform(self, nbins=self._nbins):
+    def dist_transform(self, nbins=25):
         # If it is already transformed to the same bin number, leave it alone
         if self.dist_transformed and nbins == self._nbins:
             pass

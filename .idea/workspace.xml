@@ -5,7 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="corrected nbins to _nbins error">
-      <change beforePath="$PROJECT_DIR$/jobs/dist_aug_res.sh" beforeDir="false" afterPath="$PROJECT_DIR$/jobs/dist_aug_res.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/my_modules/nsclc/nsclc_dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/my_modules/nsclc/nsclc_dataset.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -34,6 +35,7 @@
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="UPDATE_TYPE" value="REBASE" />
   </component>
   <component name="GitHubPullRequestSearchHistory">{
   &quot;lastFilter&quot;: {
@@ -72,7 +74,7 @@
     "Python.main.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "main",
+    "git-widget-placeholder": "fix__glob__case__sensitivty",
     "ignore.virus.scanning.warn.message": "true",
     "last_opened_file_path": "C:/Users/jdivers/PycharmProjects/jivers_global",
     "node.js.detected.package.eslint": "true",
@@ -485,7 +487,7 @@
                   <entry key="branch">
                     <value>
                       <list>
-                        <option value="origin/main" />
+                        <option value="fix_glob_case_sensitivty" />
                       </list>
                     </value>
                   </entry>
