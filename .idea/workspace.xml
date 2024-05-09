@@ -4,13 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="corrected nbins to _nbins error">
-      <change beforePath="$PROJECT_DIR$/jobs/distribution_augmented_metastases.py" beforeDir="false" afterPath="$PROJECT_DIR$/jobs/distribution_augmented_metastases.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/jobs/distribution_augmented_response.py" beforeDir="false" afterPath="$PROJECT_DIR$/jobs/distribution_augmented_response.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/jobs/image_augmented_metastases.py" beforeDir="false" afterPath="$PROJECT_DIR$/jobs/image_augmented_metastases.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/jobs/image_augmented_response.py" beforeDir="false" afterPath="$PROJECT_DIR$/jobs/image_augmented_response.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-    </list>
+    <list default="true" id="44ff6ae2-e5f4-4030-beb3-f4381738149c" name="Changes" comment="updating jobs for HPC" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -453,7 +447,15 @@
       <option name="project" value="LOCAL" />
       <updated>1715028642357</updated>
     </task>
-    <option name="localTasksCounter" value="40" />
+    <task id="LOCAL-00040" summary="updating jobs for HPC">
+      <option name="closed" value="true" />
+      <created>1715285447378</created>
+      <option name="number" value="00040" />
+      <option name="presentableId" value="LOCAL-00040" />
+      <option name="project" value="LOCAL" />
+      <updated>1715285447378</updated>
+    </task>
+    <option name="localTasksCounter" value="41" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -503,7 +505,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="C&amp;P into main, minor style edits. Removed imports from main that were only in modules and added my_module imports" />
     <MESSAGE value="added workers, updated name to num_workers for conssitency; fixed import errors" />
     <MESSAGE value="updated intermediate output statements and added reverse of dist transform" />
     <MESSAGE value="corrected calculation of input size for each branch of parallel mlp" />
@@ -528,18 +529,8 @@
     <MESSAGE value="corrected parallel model listing, added parallel CNN,  added memory pinning to loaders," />
     <MESSAGE value="NSCLC docstring added, added jobs files for individual breakouts on HPC (.py and .sh files)" />
     <MESSAGE value="corrected nbins to _nbins error" />
-    <option name="LAST_COMMIT_MESSAGE" value="corrected nbins to _nbins error" />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/my_modules/model_learning/model_iterators.py</url>
-          <line>43</line>
-          <option name="timeStamp" value="20" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
+    <MESSAGE value="updating jobs for HPC" />
+    <option name="LAST_COMMIT_MESSAGE" value="updating jobs for HPC" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/NSCLC_Classification$.coverage" NAME=" Coverage Results" MODIFIED="1713799138918" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />

@@ -61,15 +61,15 @@ class NSCLCDataset:
                    'ratio': load_bound_fraction}
 
         # Define a mode dict that matches call to load functions and filename regex
-        self.mode_dict = {'mask': [load_fn['tiff'], rf'.*?\{os.sep}Redox\{os.sep}ROI_mask\.(tiff|TIFF)'],
-                          'orr': [load_fn['tiff'], rf'.*?\{os.sep}Redox\{os.sep}RawRedoxMap\.(tiff|TIFF)'],
-                          'g': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_phasor_G\.(asc|ASC)'],
-                          's': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_phasor_S\.(asc|ASC)'],
-                          'photons': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_photons\.(asc|ASC)'],
-                          'tau1': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_t1\.(asc|ASC)'],
-                          'tau2': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_t2\.(asc|ASC)'],
-                          'alpha1': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_a1\.(asc|ASC)'],
-                          'alpha2': [load_fn['asc'], rf'.*?\{os.sep}FLIM\{os.sep}.*?_a2\.(asc|ASC)']}
+        self.mode_dict = {'mask': [load_fn['tiff'], rf'.*?(\\|/)Redox(\\|/)ROI_mask\.(tiff|TIFF)'],
+                          'orr': [load_fn['tiff'], rf'.*?(\\|/)Redox(\\|/)RawRedoxMap\.(tiff|TIFF)'],
+                          'g': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_phasor_G\.(asc|ASC)'],
+                          's': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_phasor_S\.(asc|ASC)'],
+                          'photons': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_photons\.(asc|ASC)'],
+                          'tau1': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_t1\.(asc|ASC)'],
+                          'tau2': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_t2\.(asc|ASC)'],
+                          'alpha1': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_a1\.(asc|ASC)'],
+                          'alpha2': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_a2\.(asc|ASC)']}
         self.mode_dict = {key: [item[0], re.compile(item[1])] for key, item in self.mode_dict.items()}
 
         # Find and load features spreadsheet (or load directly if path provided)
