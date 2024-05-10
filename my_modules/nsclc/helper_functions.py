@@ -35,3 +35,10 @@ def load_bound_fraction(load_fns_and_img_paths):
     X[X < 0] = 0
     X[X > 1] = 1
     return X
+
+
+def convert_mp_to_torch(mp_array, shape):
+    np_array = np.ctypeslib.as_array(mp_array.get_obj())
+    np_array = np.reshape(np_array, shape)
+    torch_array = torch.from_numpy(np_array)
+    return torch_array

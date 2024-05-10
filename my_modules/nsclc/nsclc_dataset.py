@@ -1,13 +1,14 @@
 import torchvision.transforms as transforms
 import os
-from .image_loaders import load_tiff, load_asc, load_weighted_average, load_bound_fraction
+from .helper_functions import load_tiff, load_asc, load_weighted_average, load_bound_fraction, convert_mp_to_torch
 import pandas as pd
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from functools import lru_cache
 import re
 import glob
+import multiprocessing as mp
+import ctypes
 
 
 class NSCLCDataset:
@@ -26,6 +27,7 @@ class NSCLCDataset:
         - scalars (arr): Max value of each mode used in normalization
         - name (string): Name of the dataset dependent on data parameters.
         - shape (tuple): Shape of individual image stack
+        - reset_cache (callable): Function to reset cached data in shared caches
         - dist_transform (callable): Applies distribution transform to image stack
         - dist_transformed (bool): Returns whether image stack is histograms
         - augment (callable): Applies image augmentation to dataset using FiveCrop augmentation
@@ -38,6 +40,7 @@ class NSCLCDataset:
     # region Main Dataset Methods (init, len, getitem)
     def __init__(self, root, mode, xl_file=None, label=None):
         self.root = root
+
         # Set defaults
         if mode == ['all'] or not mode:
             self.mode = ['orr', 'g', 's', 'photons', 'taumean', 'boundfraction']
@@ -48,6 +51,12 @@ class NSCLCDataset:
         self.scalars = None
         self.label = label
 
+        # Init placeholder cache arrays (actual arrays are set at end of __init__ using reset_cache method)
+        self.index_cache = None
+        self.shared_x = None
+        self.shared_y = None
+
+        # Set hidden property defaults
         self._name = 'nsclc_'
         self._shape = None
         self._augmented = False
@@ -141,6 +150,8 @@ class NSCLCDataset:
                             self.all_fovs.remove(fov_lut[mode][0])
                             self.fov_mode_dict.remove(fov_lut)
                             break
+        # Init shared memory arrays
+        self.reset_cache()
 
     def __len__(self):
         if self.augmented:
@@ -149,6 +160,18 @@ class NSCLCDataset:
             return len(self.all_fovs)
 
     def __getitem__(self, index):
+        # Check if indexed sample is in cache (by checking for index in index_cache)...
+        # if it is, pull it from the cache;
+        if self.index_cache is not None and index in self.index_cache:
+            x = self.shared_x[index]
+            y = self.shared_y[index]
+            return x, y
+        # if not, cache the index if the index_cache is open...
+        elif self.index_cache is not None:
+            self.index_cache[index] = index
+
+        # load the sample, and cache the sample (if cache is open)
+        # region Load Data and Label
         # Get image path
         if self.augmented:
             index = int(np.floor(index / 5))  # This will give us the index for the fov
@@ -181,18 +204,19 @@ class NSCLCDataset:
 
         # Get data label and apply mask to all channels for binary classes
         slide_idx = [fov in slide for slide in self.fovs_by_slide].index(True)  # Get features index
-        match self.label.lower():
-            case 'response':
+        match self.label:
+            case 'Response':
                 x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
                 y = 1 if self.features['Status (NR/R)'].iloc[slide_idx] == 'R' else 0
-            case 'metastases':
+            case 'Metastases':
                 x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
                 y = 1 if self.features['Status (Mets/NM)'].iloc[slide_idx] == 'NM' else 0
-            case 'mask':
+            case 'Mask':
                 y = fov_mask
+            case None:
+                y = -999999  # Placeholder for NaN label
             case _:
-                raise Exception('Either no data label has been applied or an unrecognized label is in use. '
-                                'Update label attribute of dataset and try again.')
+                raise Exception('An unrecognized label is in use. Update label attribute of dataset and try again.')
 
         # Apply distribution transform, if called
         if self.dist_transformed:
@@ -201,15 +225,43 @@ class NSCLCDataset:
                 x_dist[ch], _ = torch.histogram(mode, bins=self._nbins, range=[0, 1], density=True)
             x = x_dist
 
+        # Cache the sample if the caches have been opened
+        if self.shared_x is not None and self.shared_y is not None:
+            self.shared_x[index] = x
+            self.shared_y[index] = y
         return x, y
+        # endregion
+
+    def reset_cache(self):
+        # Hard reset
+        self.index_cache = None
+        self.shared_x = None
+        self.shared_y = None
+
+        # Setup shared memory arrays (i.e. caches that are compatible with multiple workers)
+        # negative initialization ensure no overlap with actual cached indices
+        index_cache_base = mp.Array(ctypes.c_int, len(self) * [-1])
+        shared_x_base = mp.Array(ctypes.c_double, int(len(self) * np.prod(self.shape)))
+
+        # Label-size determines cache size, so if no label is set, we will fill cache with -999999 at __getitem__
+        match self.label:
+            case 'Response' | 'Metastases' | None:
+                shared_y_base = mp.Array(ctypes.c_int, len(self))
+                y_shape = (len(self),)
+            case 'Mask':
+                shared_y_base = mp.Array(ctypes.c_double, int(len(self) * np.prod(self.shape[-2:])))
+                y_shape = (len(self),) + self.shape[-2:]
+
+        # Convert all arrays to desired data structure
+        self.index_cache = convert_mp_to_torch(index_cache_base, (len(self),))
+        self.shared_x = convert_mp_to_torch(shared_x_base, (len(self),) + self.shape)
+        self.shared_y = convert_mp_to_torch(shared_y_base, y_shape)
 
     # endregion
 
     # region Properties
     # Use property to define name, shape, and label, so that they are automatically updated with latest data setup
     # and/or appropriately clear the cache
-
-    # region name
     @property
     def name(self):
         self._name = (f"nsclc_{self.label}_{'+'.join(self.mode)}"
@@ -218,48 +270,33 @@ class NSCLCDataset:
                       f'{"_Normalized" if self.normalized else ""}')
         return self._name
 
-    @name.setter
-    def name(self, name):
-        self._name = name
-
-    # endregion
-    # region shape
     @property
     def shape(self):
-        self._shape = self[0][0].shape
+        self.shape = self[0][0].shape
         return self._shape
 
     @shape.setter
     def shape(self, shape):
         self._shape = shape
 
-    # endregion
-    # region label
     @property
     def label(self):
         return self._label
 
     @label.setter
     def label(self, label):
-        if label is None:
-            self._label = None
-            print('Consider setting a data label before proceeding. Without a label set, __getitem__ '
-                  '(and all methods that depend on it) will fail.')
-        else:
-            match label.lower():
-                case 'response' | 'r':
-                    self._label = 'Response'
-                case 'metastases' | 'mets' | 'm':
-                    self._label = 'Metastases'
-                case 'mask':
-                    self._label = 'Mask'
-                case _:
-                    raise Exception('Invalid data label entered. '
-                                    'Allowed labels are "RESPONSE", "METASTASES", and "MASK".')
+        match label.lower():
+            case 'response' | 'r':
+                self._label = 'Response'
+            case 'metastases' | 'mets' | 'm':
+                self._label = 'Metastases'
+            case 'mask':
+                self._label = 'Mask'
+            case _:
+                raise Exception('Invalid data label entered. Allowed labels are "RESPONSE", "METASTASES", and "MASK".')
         if label is not self.label:
-            self.__getitem__.cache_clear()
+            self.reset_cache()
 
-    # endregion
     # endregion
 
     # region Distribution transform
@@ -269,7 +306,7 @@ class NSCLCDataset:
             pass
         # If something is changed, reset and update
         else:
-            self.__getitem__.cache_clear()
+            self.reset_cache()
             self._nbins = nbins
             if not self.normalized:
                 print(
@@ -286,8 +323,8 @@ class NSCLCDataset:
     def dist_transformed(self, dist_transformed):
         # If it is changing, reset and update
         if dist_transformed is not self.dist_transformed:
-            self.__getitem__.cache_clear()
             self._dist_transformed = dist_transformed
+            self.reset_cache()
 
     # endregion
 
@@ -303,8 +340,8 @@ class NSCLCDataset:
     def augmented(self, augmented):
         # If it is changing, reset and update
         if augmented is not self.augmented:
-            self.__getitem__.cache_clear()
             self._augmented = augmented
+            self.reset_cache()
 
     # endregion
 
@@ -316,7 +353,7 @@ class NSCLCDataset:
         # checked before performing the transform
 
         # Check if previously normalized
-        if self._normalized:
+        if self.normalized:
             return
 
         # If scalars have not been previously calculated, calculate
@@ -339,7 +376,7 @@ class NSCLCDataset:
     def normalized(self, normalized):
         # Check if the cache needs to be reset
         if normalized is not self.normalized:
-            self.__getitem__.cache_clear()
+            self.reset_cache()
         # Apply the normalization requested (note: method call will set attribute if TRUE)
         if normalized:
             self.normalize_channels_to_max()
