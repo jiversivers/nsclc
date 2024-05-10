@@ -35,6 +35,7 @@ class NSCLCDataset:
         - show_random (callable): Shows 5 random samples from dataset
     """
 
+    # region Main Dataset Methods (init, len, getitem)
     def __init__(self, root, mode, xl_file=None, label=None):
         self.root = root
         # Set defaults
@@ -147,7 +148,6 @@ class NSCLCDataset:
         else:
             return len(self.all_fovs)
 
-    @lru_cache(maxsize=None)
     def __getitem__(self, index):
         # Get image path
         if self.augmented:
@@ -203,9 +203,9 @@ class NSCLCDataset:
 
         return x, y
 
-    ##############
-    # Properties #
-    ##############
+    # endregion
+
+    # region Properties
     # Use property to define name, shape, and label, so that they are automatically updated with latest data setup
     # and/or appropriately clear the cache
     @property
@@ -247,9 +247,9 @@ class NSCLCDataset:
         if label is not self.label:
             self.__getitem__.cache_clear()
 
-    ##########################
-    # Distribution transform #
-    ##########################
+    # endregion
+
+    # region Distribution transform
     def dist_transform(self, nbins=25):
         # If it is already transformed to the same bin number, leave it alone
         if self.dist_transformed and nbins == self._nbins:
@@ -276,9 +276,9 @@ class NSCLCDataset:
             self.__getitem__.cache_clear()
             self._dist_transformed = dist_transformed
 
-    ################
-    # Augmentation #
-    ################
+    # endregion
+
+    # region Augmentation
     def augment(self):
         self.augmented = True
 
@@ -293,9 +293,9 @@ class NSCLCDataset:
             self.__getitem__.cache_clear()
             self._augmented = augmented
 
-    #################
-    # Normalization #
-    #################
+    # endregion
+
+    # region Normalization
     def normalize_channels_to_max(self):
         # Find the max for each mode across the entire dataset
         # This is mildly time-consuming, so we only do it once, then store the scalar and mark the set as normalized.
@@ -305,11 +305,6 @@ class NSCLCDataset:
         # Check if previously normalized
         if self._normalized:
             return
-
-        # Temporarily turn augmentation off to prevent 5-fold loading
-        # Switching through hidden attribute to prevent unnecessary cache clearing.
-
-
 
         # If scalars have not been previously calculated, calculate
         if self.scalars is None:
@@ -338,9 +333,9 @@ class NSCLCDataset:
         else:
             self._normalized = normalized
 
-    ############################
-    # Show random data samples #
-    ############################
+    # endregion
+
+    # region Show random data samples
     def show_random(self):
         if self.dist_transformed:
             _, ax = plt.subplots(5, 1, figsize=(10, 10))
@@ -373,3 +368,5 @@ class NSCLCDataset:
                                        labelbottom=False)
                     ax[ii].set_title(f'{self.label}: {lab}. \n Mode: {self.mode[jj]}', fontsize=10)
         plt.show()
+
+    # endregion
