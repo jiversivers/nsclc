@@ -48,6 +48,9 @@ class NSCLCDataset:
         self.scalars = None
         self.label = label
 
+        # Setup shared memory arrays (i.e. caches that are compatible with multiple workers)
+
+        # Set hidden property defaults
         self._name = 'nsclc_'
         self._shape = None
         self._augmented = False
@@ -149,6 +152,17 @@ class NSCLCDataset:
             return len(self.all_fovs)
 
     def __getitem__(self, index):
+        # Check if indexed sample is in cache (by checking for index in index_cache)...
+        # if it is, pull it from the cache;
+        if index in self.index_cache:
+            return self.shared_x[index], self.shared_y[index]
+
+        # if not, cache the index...
+        else:
+            self.index_cache.append(index)
+
+        # load the sample, and cache the sample
+        # region Load Data into Shared Cache
         # Get image path
         if self.augmented:
             index = int(np.floor(index / 5))  # This will give us the index for the fov
@@ -202,6 +216,7 @@ class NSCLCDataset:
             x = x_dist
 
         return x, y
+        # endregion
 
     # endregion
 
