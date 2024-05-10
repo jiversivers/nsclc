@@ -208,6 +208,8 @@ class NSCLCDataset:
     # region Properties
     # Use property to define name, shape, and label, so that they are automatically updated with latest data setup
     # and/or appropriately clear the cache
+
+    # region name
     @property
     def name(self):
         self._name = (f"nsclc_{self.label}_{'+'.join(self.mode)}"
@@ -220,6 +222,8 @@ class NSCLCDataset:
     def name(self, name):
         self._name = name
 
+    # endregion
+    # region shape
     @property
     def shape(self):
         self._shape = self[0][0].shape
@@ -229,24 +233,33 @@ class NSCLCDataset:
     def shape(self, shape):
         self._shape = shape
 
+    # endregion
+    # region label
     @property
     def label(self):
         return self._label
 
     @label.setter
     def label(self, label):
-        match label.lower():
-            case 'response' | 'r':
-                self._label = 'Response'
-            case 'metastases' | 'mets' | 'm':
-                self._label = 'Metastases'
-            case 'mask':
-                self._label = 'Mask'
-            case _:
-                raise Exception('Invalid data label entered. Allowed labels are "RESPONSE", "METASTASES", and "MASK".')
+        if label is None:
+            self._label = None
+            print('Consider setting a data label before proceeding. Without a label set, __getitem__ '
+                  '(and all methods that depend on it) will fail.')
+        else:
+            match label.lower():
+                case 'response' | 'r':
+                    self._label = 'Response'
+                case 'metastases' | 'mets' | 'm':
+                    self._label = 'Metastases'
+                case 'mask':
+                    self._label = 'Mask'
+                case _:
+                    raise Exception('Invalid data label entered. '
+                                    'Allowed labels are "RESPONSE", "METASTASES", and "MASK".')
         if label is not self.label:
             self.__getitem__.cache_clear()
 
+    # endregion
     # endregion
 
     # region Distribution transform
