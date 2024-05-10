@@ -42,10 +42,10 @@ class NSCLCDataset:
             self.mode = ['orr', 'g', 's', 'photons', 'taumean', 'boundfraction']
         else:
             self.mode = mode
-        self.label = label
         self.stack_height = len(self.mode)
         self.image_dims = None
         self.scalars = None
+        self.label = label
 
         self._name = 'nsclc_'
         self._shape = None
@@ -182,16 +182,17 @@ class NSCLCDataset:
         # Get data label and apply mask to all channels for binary classes
         slide_idx = [fov in slide for slide in self.fovs_by_slide].index(True)  # Get features index
         match self.label.lower():
-            case 'response' | 'r':
+            case 'response':
                 x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
                 y = 1 if self.features['Status (NR/R)'].iloc[slide_idx] == 'R' else 0
-            case 'metastases' | 'mets' | 'm':
+            case 'metastases':
                 x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
                 y = 1 if self.features['Status (Mets/NM)'].iloc[slide_idx] == 'NM' else 0
             case 'mask':
                 y = fov_mask
             case _:
-                raise Exception('No data label selected. Update label attribute of dataset and try again.')
+                raise Exception('Either no data label has been applied or an unrecognized label is in use. '
+                                'Update label attribute of dataset and try again.')
 
         # Apply distribution transform, if called
         if self.dist_transformed:
@@ -205,7 +206,8 @@ class NSCLCDataset:
     ##############
     # Properties #
     ##############
-    # Use property to define name and shape, so that they are automatically updated with latest data setup
+    # Use property to define name, shape, and label, so that they are automatically updated with latest data setup
+    # and/or appropriately clear the cache
     @property
     def name(self):
         self._name = (f"nsclc_{self.label}_{'+'.join(self.mode)}"
@@ -227,6 +229,24 @@ class NSCLCDataset:
     def shape(self, shape):
         self._shape = shape
 
+    @property
+    def label(self):
+        return self._label
+
+    @label.setter
+    def label(self, label):
+        match label.lower():
+            case 'response' | 'r':
+                self._label = 'Response'
+            case 'metastases' | 'mets' | 'm':
+                self._label = 'Metastases'
+            case 'mask':
+                self._label = 'Mask'
+            case _:
+                raise Exception('Invalid data label entered. Allowed labels are "RESPONSE", "METASTASES", and "MASK".')
+        if label is not self.label:
+            self.__getitem__.cache_clear()
+
     ##########################
     # Distribution transform #
     ##########################
@@ -238,12 +258,12 @@ class NSCLCDataset:
         else:
             self.__getitem__.cache_clear()
             self._nbins = nbins
-            self.dist_transformed = True
             if not self.normalized:
                 print(
                     'Normalization is automatically applied for the distribution transform.\n     '
                     'This can be manually overwritten by setting the NORMALIZED attribute to False')
                 self.normalize_channels_to_max()
+        self.dist_transformed = True
 
     @property
     def dist_transformed(self):
@@ -286,6 +306,11 @@ class NSCLCDataset:
         if self._normalized:
             return
 
+        # Temporarily turn augmentation off to prevent 5-fold loading
+        # Switching through hidden attribute to prevent unnecessary cache clearing.
+
+
+
         # If scalars have not been previously calculated, calculate
         if self.scalars is None:
             # Preallocate an array. Each row is an individual image, each column is mode
@@ -304,10 +329,14 @@ class NSCLCDataset:
 
     @normalized.setter
     def normalized(self, normalized):
+        # Check if the cache needs to be reset
         if normalized is not self.normalized:
             self.__getitem__.cache_clear()
+        # Apply the normalization requested (note: method call will set attribute if TRUE)
         if normalized:
             self.normalize_channels_to_max()
+        else:
+            self._normalized = normalized
 
     ############################
     # Show random data samples #
@@ -321,7 +350,7 @@ class NSCLCDataset:
                 ax[ii].legend()
                 ax[ii].tick_params(top=False, bottom=False, left=False, right=False, labelleft=False,
                                    labelbottom=False)
-                ax[ii].set_title(f'Label: {self[index][1]}', fontsize=10)
+                ax[ii].set_title(f'{self.label}: {self[index][1]}', fontsize=10)
         else:
             transform = transforms.ToPILImage()
             _, ax = plt.subplots(5, len(self.mode), figsize=(10, 10))
@@ -336,11 +365,11 @@ class NSCLCDataset:
                         ax[ii, jj].tick_params(top=False, bottom=False, left=False, right=False,
                                                labelleft=False,
                                                labelbottom=False)
-                        ax[ii, jj].set_title(f'Response: {self[index][1]}. \n Mode: {self.mode[jj]}',
+                        ax[ii, jj].set_title(f'{self.label}: {self[index][1]}. \n Mode: {self.mode[jj]}',
                                              fontsize=10)
                 else:
                     ax[ii].imshow(transform(self[index][0][jj]))
                     ax[ii].tick_params(top=False, bottom=False, left=False, right=False, labelleft=False,
                                        labelbottom=False)
-                    ax[ii].set_title(f'Response: {lab}. \n Mode: {self.mode[jj]}', fontsize=10)
+                    ax[ii].set_title(f'{self.label}: {lab}. \n Mode: {self.mode[jj]}', fontsize=10)
         plt.show()

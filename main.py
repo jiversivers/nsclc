@@ -62,7 +62,7 @@ def main():
                 results['Image']['Single'][style] = single_model_iterator(models, {key: data},
                                                                           hp['EP'], bs, criterion,
                                                                           optim_fun, lr=hp['LR'],
-                                                                          num_workers=(16, 16, 8),
+                                                                          num_workers=(0, 0, 0),
                                                                           pin_memory=True, momentum=0.9)
                 with open(results_file_path, 'a') as f:
                     f.write(f'{aug} {style}: {results["Image"]["Single"][style]}\n')
