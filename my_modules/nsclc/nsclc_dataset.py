@@ -9,9 +9,10 @@ import re
 import glob
 import multiprocessing as mp
 import ctypes
+from torch.utils.data import Dataset
 
 
-class NSCLCDataset:
+class NSCLCDataset(Dataset):
     """
     NSCLC dataset class to load NSCLC images from root dir (arg).
 
@@ -241,7 +242,7 @@ class NSCLCDataset:
         # Setup shared memory arrays (i.e. caches that are compatible with multiple workers)
         # negative initialization ensure no overlap with actual cached indices
         index_cache_base = mp.Array(ctypes.c_int, len(self) * [-1])
-        shared_x_base = mp.Array(ctypes.c_double, int(len(self) * np.prod(self.shape)))
+        shared_x_base = mp.Array(ctypes.c_float, int(len(self) * np.prod(self.shape)))
 
         # Label-size determines cache size, so if no label is set, we will fill cache with -999999 at __getitem__
         match self.label:
@@ -249,7 +250,7 @@ class NSCLCDataset:
                 shared_y_base = mp.Array(ctypes.c_int, len(self))
                 y_shape = (len(self),)
             case 'Mask':
-                shared_y_base = mp.Array(ctypes.c_double, int(len(self) * np.prod(self.shape[-2:])))
+                shared_y_base = mp.Array(ctypes.c_float, int(len(self) * np.prod(self.shape[-2:])))
                 y_shape = (len(self),) + self.shape[-2:]
 
         # Convert all arrays to desired data structure
