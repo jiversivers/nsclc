@@ -39,8 +39,10 @@ class NSCLCDataset(Dataset):
     """
 
     # region Main Dataset Methods (init, len, getitem)
-    def __init__(self, root, mode, xl_file=None, label=None):
+    def __init__(self, root, mode, xl_file=None, label=None,
+                 device=(torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'))):
         self.root = root
+        self.device = device
 
         # Set defaults
         if mode == ['all'] or not mode:
@@ -185,7 +187,7 @@ class NSCLCDataset(Dataset):
 
         # Preallocate output tensor based on mask size
         self.image_dims = (self.stack_height,) + tuple(fov_mask.size()[1:])
-        x = torch.empty(self.image_dims, dtype=torch.float32)
+        x = torch.empty(self.image_dims, dtype=torch.float32, device=self.device)
 
         # Load modes using load functions
         for ii, mode in enumerate(self.mode):
@@ -254,9 +256,9 @@ class NSCLCDataset(Dataset):
                 y_shape = (len(self),) + self.shape[-2:]
 
         # Convert all arrays to desired data structure
-        self.index_cache = convert_mp_to_torch(index_cache_base, (len(self),))
-        self.shared_x = convert_mp_to_torch(shared_x_base, (len(self),) + self.shape)
-        self.shared_y = convert_mp_to_torch(shared_y_base, y_shape)
+        self.index_cache = convert_mp_to_torch(index_cache_base, (len(self),), device=self.device)
+        self.shared_x = convert_mp_to_torch(shared_x_base, (len(self),) + self.shape, device=self.device)
+        self.shared_y = convert_mp_to_torch(shared_y_base, y_shape, device=self.device)
 
     # endregion
 
@@ -360,11 +362,13 @@ class NSCLCDataset(Dataset):
         # If scalars have not been previously calculated, calculate
         if self.scalars is None:
             # Preallocate an array. Each row is an individual image, each column is mode
-            maxes = np.zeros((len(self), self.stack_height), dtype=np.float32)
+            maxes = torch.zeros((len(self), self.stack_height), dtype=np.float32, device=self.device)
             for ii, (stack, _) in enumerate(self):
-                maxes[ii] = np.nanmax(stack, axis=(1, 2))
-            self.scalars = np.max(maxes, axis=0)
-            self.scalars = self.scalars[:, None, None]  # Broadcast for easy channel-wise scaling
+                # Does the same as np.nanmax(stack, dim=(1,2)) and the broadcast line, but keeps the tensor on the GPU
+                maxes[ii] = torch.max(
+                    torch.max(
+                        torch.nan_to_num(stack, nan=-100000), 1, keepdim=True).values, 1, keepdim=True).values
+            self.scalars = torch.max(maxes, 0)
 
         # Set normalized to TRUE so images will be scaled to max when retrieved
         self._normalized = True

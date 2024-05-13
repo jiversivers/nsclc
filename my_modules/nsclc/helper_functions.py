@@ -37,8 +37,9 @@ def load_bound_fraction(load_fns_and_img_paths):
     return X
 
 
-def convert_mp_to_torch(mp_array, shape):
+def convert_mp_to_torch(mp_array, shape,
+                        device=(torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'))):
     np_array = np.ctypeslib.as_array(mp_array.get_obj())
     np_array = np.reshape(np_array, shape)
-    torch_array = torch.from_numpy(np_array)
+    torch_array = torch.from_numpy(np_array).to(device)
     return torch_array
