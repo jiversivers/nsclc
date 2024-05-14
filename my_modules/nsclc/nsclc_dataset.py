@@ -225,8 +225,8 @@ class NSCLCDataset(Dataset):
         if self.dist_transformed:
             x_dist = torch.empty((self.stack_height,) + (self._nbins,), dtype=torch.float32)
             for ch, mode in enumerate(x):
-                x_dist[ch], _ = torch.histogram(mode, bins=self._nbins, range=[0, 1], density=True)
-            x = x_dist
+                x_dist[ch], _ = torch.histogram(mode.cpu(), bins=self._nbins, range=[0, 1], density=True)
+            x = x_dist.to(self.device)
 
         # Cache the sample if the caches have been opened
         if self.shared_x is not None and self.shared_y is not None:
@@ -362,13 +362,12 @@ class NSCLCDataset(Dataset):
         # If scalars have not been previously calculated, calculate
         if self.scalars is None:
             # Preallocate an array. Each row is an individual image, each column is mode
-            maxes = torch.zeros((len(self), self.stack_height), dtype=np.float32, device=self.device)
+            maxes = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
             for ii, (stack, _) in enumerate(self):
                 # Does the same as np.nanmax(stack, dim=(1,2)) and the broadcast line, but keeps the tensor on the GPU
-                maxes[ii] = torch.max(
-                    torch.max(
-                        torch.nan_to_num(stack, nan=-100000), 1, keepdim=True).values, 1, keepdim=True).values
-            self.scalars = torch.max(maxes, 0)
+                maxes[ii] = torch.max(torch.max(torch.nan_to_num(stack, nan=-100000), 1).values, 1).values
+            self.scalars = torch.max(maxes, 0).values
+            self.scalars = self.scalars[:, None, None]
 
         # Set normalized to TRUE so images will be scaled to max when retrieved
         self._normalized = True
