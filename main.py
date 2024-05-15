@@ -39,9 +39,10 @@ def main():
     kf = 5  # Number of folds for cross validation
 
     # Iterable hyperparameters
-    hyperparameters = {'Augmented': {'Fast': {'LR': 0.01, 'EP': 125}}}
+    hyperparameters = {'Augmented': {'Fast': {'LR': 0.01, 'EP': 125}},
+                       'Raw': {'Fast': {'LR': 0.01, 'EP': 125}}}
 
-    status = ['Response', 'Metastases']
+    status = ['Metastases', 'Response']
 
     results = {'Image': {'Single': {}, 'KFold': {}},
                'Hist': {'Single': {}, 'KFold': {}}}
@@ -59,10 +60,10 @@ def main():
             data.label = key
             for style, hp in styles.items():
                 print(f'Currently training {aug} data at {style} rate on {key}...')
-                results['Image']['Single'][style] = single_model_iterator(models, {key: data},
+                results['Image']['Single'][style] = single_model_iterator(models, data,
                                                                           hp['EP'], bs, criterion,
                                                                           optim_fun, lr=hp['LR'],
-                                                                          num_workers=(0, 0, 0),
+                                                                          num_workers=(16, 16, 8),
                                                                           pin_memory=True, momentum=0.9)
                 with open(results_file_path, 'a') as f:
                     f.write(f'{aug} {style}: {results["Image"]["Single"][style]}\n')
@@ -80,7 +81,7 @@ def main():
             data.label = key
             for style, hp in styles.items():
                 print(f'Currently training {aug} data at {style} rate on {key}...')
-                results['Hist']['Single'][style] = single_model_iterator(models, {key: data},
+                results['Hist']['Single'][style] = single_model_iterator(models, data,
                                                                          hp['EP'], bs, criterion,
                                                                          optim_fun, lr=hp['LR'],
                                                                          num_workers=(16, 16, 8))

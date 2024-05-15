@@ -7,71 +7,73 @@ from my_modules.model_learning.loader_maker import loader_maker
 from my_modules.model_learning.model_phases import train_epoch, valid_epoch, test_model
 
 
-def single_model_iterator(models, datasets, epochs, batch_size, criterion, optim_fun, num_workers=(0, 0, 0),
-                          prefetch_factor=None, pin_memory=True, **optim_kwargs):
+def single_model_iterator(models, dataset, epochs, batch_size, criterion, optim_fun, num_workers=(0, 0, 0),
+                          prefetch_factor=None, pin_memory=None, **optim_kwargs):
+    # Set default pin memory behavior
+    if pin_memory is None:
+        pin_memory = (False if dataset.device is torch.device('cuda') else True)
+
     results = {}
-    for key, data in datasets.items():
-        results[key] = {}
 
-        # Create data loaders
-        train_loader, val_loader, test_loader = loader_maker(data,
-                                                             batch_size=batch_size,
-                                                             split=(0.75, 0.2, 0.05),
-                                                             num_workers=num_workers,
-                                                             shuffle=(True, False, False),
-                                                             prefetch_factor=prefetch_factor,
-                                                             pin_memory=pin_memory)
+    # Create data loaders
+    train_loader, val_loader, test_loader = loader_maker(dataset,
+                                                         batch_size=batch_size,
+                                                         split=(0.75, 0.2, 0.05),
+                                                         num_workers=num_workers,
+                                                         shuffle=(True, False, False),
+                                                         prefetch_factor=prefetch_factor,
+                                                         pin_memory=pin_memory)
 
-        data_shape = data.shape
+    data_shape = dataset.shape
 
-        for net in models:
-            #################
-            # Prepare model #
-            #################
-            model = net(data_shape)
-            model = model.to('cuda') if torch.cuda.is_available() else model
-            model_path = f'./{model.name}_Epochs-{epochs}_{data.name}.pth'
+    for net in models:
+        #################
+        # Prepare model #
+        #################
+        model = net(data_shape)
+        model = model.to('cuda') if torch.cuda.is_available() else model
+        model_path = f'./{model.name}_Epochs-{epochs}_{dataset.name}.pth'
 
-            optimizer = optim_fun(model.parameters(), **optim_kwargs)
+        optimizer = optim_fun(model.parameters(), **optim_kwargs)
 
-            ############
-            # Training #
-            ############
-            tran_loss = []
-            eval_accu = []
-            eval_loss = []
+        ############
+        # Training #
+        ############
+        tran_loss = []
+        eval_accu = []
+        eval_loss = []
 
-            for epoch in range(epochs):
-                print(f'>>>{model.name} Epoch {epoch+1}/{epochs}...')
-                epoch_loss = train_epoch(model, train_loader, criterion, optimizer)
-                tran_loss.append(epoch_loss)
+        for epoch in range(epochs):
+            print(f'>>>{model.name} Epoch {epoch+1}/{epochs}...')
+            epoch_loss = train_epoch(model, train_loader, criterion, optimizer)
+            tran_loss.append(epoch_loss)
 
-                val_loss, val_accu = valid_epoch(model, val_loader, criterion)
-                eval_loss.append(val_loss)
-                eval_accu.append(val_accu)
-                print(f'>>>Train Loss: {epoch_loss} >>> Eval Loss: {val_loss}. Accu: {val_accu}.')
+            val_loss, val_accu = valid_epoch(model, val_loader, criterion)
+            eval_loss.append(val_loss)
+            eval_accu.append(val_accu)
+            print(f'>>>Train Loss: {epoch_loss} >>> Eval Loss: {val_loss}. Accu: {val_accu}.')
 
-                # Save best performing model
-                if epoch == 0:
-                    best_acc = eval_accu[-1]
-                    torch.save(model.state_dict(), model_path)
-                elif eval_accu[-1] > best_acc:
-                    torch.save(model.state_dict(), model_path)
-                    best_acc = eval_accu[-1]
+            # Save best performing model
+            if epoch == 0:
+                best_acc = eval_accu[-1]
+                torch.save(model.state_dict(), model_path)
+            elif eval_accu[-1] > best_acc:
+                torch.save(model.state_dict(), model_path)
+                best_acc = eval_accu[-1]
 
-            ###########
-            # Testing #
-            ###########
-            model = model.to('cuda') if torch.cuda.is_available() else model
-            model.load_state_dict(torch.load(model_path))
+        ###########
+        # Testing #
+        ###########
+        model = model.to('cuda') if torch.cuda.is_available() else model
+        model.load_state_dict(torch.load(model_path))
 
-            correct = test_model(model, test_loader)
+        correct = test_model(model, test_loader)
 
-            # Testing results
-            accu = correct / len(test_loader.dataset)
+        # Testing results
+        accu = correct / len(test_loader.dataset)
 
-            results[key][model.name] = accu
-            print(f'|-- {model.name} accuracy on {data.name}: {accu:.2%} --|')
+        results[model.name] = accu
+        print(f'|-- {model.name} accuracy on {dataset.name}: {accu:.2%} --|')
 
     return results
 
