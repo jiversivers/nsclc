@@ -27,7 +27,8 @@ from sklearn import metrics
 
 def main():
     # Prepare data
-    data = NSCLCDataset('E:\\NSCLC Data - PMD', ['orr', 'photons', 'taumean', 'boundfraction'], label='Response')
+    data = NSCLCDataset('E:\\NSCLC Data - PMD', ['orr', 'taumean', 'boundfraction'],
+                        label='Metastases', mask_on=False)
     data.normalize_channels_to_max()
     data.augment()
     data.show_random()
@@ -39,13 +40,12 @@ def main():
     kf = 5  # Number of folds for cross validation
 
     # Iterable hyperparameters
-    hyperparameters = {'Augmented': {'Fast': {'LR': 0.01, 'EP': 125}},
-                       'Raw': {'Fast': {'LR': 0.01, 'EP': 125}}}
+    hyperparameters = {'Augmented': {'Fast': {'LR': 0.01, 'EP': 125}}}
 
-    status = ['Metastases', 'Response']
+    status = ['Metastases']
 
-    results = {'Image': {'Single': {}, 'KFold': {}},
-               'Hist': {'Single': {}, 'KFold': {}}}
+    results = {'Image': {'Single': {}},
+               'Hist': {'Single': {}}}
     results_file_path = 'results.txt'
     with open(results_file_path, 'w') as results_file:
         results_file.write('Results')
@@ -63,7 +63,7 @@ def main():
                 results['Image']['Single'][style] = single_model_iterator(models, data,
                                                                           hp['EP'], bs, criterion,
                                                                           optim_fun, lr=hp['LR'],
-                                                                          num_workers=(16, 16, 8),
+                                                                          num_workers=(0, 0, 0),
                                                                           pin_memory=True, momentum=0.9)
                 with open(results_file_path, 'a') as f:
                     f.write(f'{aug} {style}: {results["Image"]["Single"][style]}\n')
@@ -84,7 +84,7 @@ def main():
                 results['Hist']['Single'][style] = single_model_iterator(models, data,
                                                                          hp['EP'], bs, criterion,
                                                                          optim_fun, lr=hp['LR'],
-                                                                         num_workers=(16, 16, 8))
+                                                                         num_workers=(0, 0, 0))
                 with open(results_file_path) as f:
                     f.write(f'{aug} {style}: {results["Image"]["Single"][style]}')
 

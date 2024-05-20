@@ -3,7 +3,7 @@ import torch
 
 def masked_loss(loss_fn, predictions, targets, image):
     mask = (~torch.isnan(image)).float()
-    loss = loss_fn(predictions.float(), targets.float())
+    loss = loss_fn(predictions, targets)
     masked = mask * loss
     masked = torch.sum(masked) / torch.sum(mask)  # Loss averaged over pixels that were numeric
     return masked
@@ -12,14 +12,15 @@ def masked_loss(loss_fn, predictions, targets, image):
 def train_epoch(model, loader, loss_fun, optimizer):
     model.train()
     total_loss = 0
-    if torch.cuda.is_available():
+    if torch.cuda.is_available() and not next(model.parameters()).is_cuda:
         model.cuda()
     for x, target in loader:
         if torch.cuda.is_available():
-            x, target = x.cuda(), target.cuda()
+            x = x.cuda() if x.device.type != 'cuda' else x
+            target = target.cuda() if target.device.type != 'cuda' else target
         optimizer.zero_grad()
         out = model(x).squeeze(1)
-        loss = masked_loss(loss_fun, out, target, x)
+        loss = loss_fun(out.float(), target.float())
         total_loss += loss.item()
         loss.backward()
         optimizer.step()
@@ -29,15 +30,16 @@ def train_epoch(model, loader, loss_fun, optimizer):
 
 def valid_epoch(model, loader, loss_fun):
     model.eval()
-    if torch.cuda.is_available():
+    if torch.cuda.is_available() and not next(model.parameters()).is_cuda:
         model.cuda()
-    with torch.no_grad():
+    with torch.inference_mode():
         correct, total_loss = 2 * [0]
         for x, target in loader:
             if torch.cuda.is_available():
-                x, target = x.cuda(), target.cuda()
+                x = x.cuda() if x.device.type != 'cuda' else x
+                target = target.cuda() if target.device.type != 'cuda' else target
             out = model(x).squeeze(1)
-            loss = masked_loss(loss_fun, out, target, x)
+            loss = loss_fun(out.float(), target.float())
             total_loss += loss.item()
             prediction = torch.round(out)
             correct += (prediction == target).sum().item()
@@ -49,10 +51,13 @@ def valid_epoch(model, loader, loss_fun):
 def test_model(model, loader):
     correct = 0
     model.eval()
-    with torch.no_grad():
+    if torch.cuda.is_available() and not next(model.parameters()).is_cuda:
+        model.cuda()
+    with torch.inference_mode():
         for x, target in loader:
             if torch.cuda.is_available():
-                x, target = x.cuda(), target.cuda()
+                x = x.cuda() if x.device.type != 'cuda' else x
+                target = target.cuda() if target.device.type != 'cuda' else target
             out = model(x).squeeze(1)
             prediction = torch.round(out)
             correct += (prediction == target).sum().item()
