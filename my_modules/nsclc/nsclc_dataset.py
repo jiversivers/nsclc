@@ -36,13 +36,24 @@ class NSCLCDataset(Dataset):
         - normalize_channels_to_max (callable): Applies normalization to image stack channel-wise
         - normalized (bool): Returns whether image stack is normalized
         - show_random (callable): Shows 5 random samples from dataset
+        - device (str or torch.device): Device type or device ID
+        - to (callable): Move any currently cached items to DEVICE from input argument in call and return all future
+            items on DEVICE.
     """
 
     # region Main Dataset Methods (init, len, getitem)
-    def __init__(self, root, mode, xl_file=None, label=None,
+    def __init__(self, root, mode, xl_file=None, label=None, mask_on=True,
                  device=(torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'))):
         self.root = root
         self.device = device
+
+        # Set hidden property defaults
+        self._name = 'nsclc_'
+        self._shape = None
+        self._augmented = False
+        self._dist_transformed = False
+        self._normalized = False
+        self._nbins = 25
 
         # Set defaults
         if mode == ['all'] or not mode:
@@ -53,19 +64,12 @@ class NSCLCDataset(Dataset):
         self.image_dims = None
         self.scalars = None
         self.label = label
+        self.mask_on = mask_on
 
         # Init placeholder cache arrays (actual arrays are set at end of __init__ using reset_cache method)
         self.index_cache = None
         self.shared_x = None
         self.shared_y = None
-
-        # Set hidden property defaults
-        self._name = 'nsclc_'
-        self._shape = None
-        self._augmented = False
-        self._dist_transformed = False
-        self._normalized = False
-        self._nbins = 25
 
         # Define loading functions for different image types
         load_fn = {'tiff': load_tiff,
@@ -95,7 +99,7 @@ class NSCLCDataset(Dataset):
             xl_file = xl_file[0]
         self.features = pd.read_excel(xl_file)
 
-        # Prepare a list of FOVs matched to slide names from the features data
+        # Prepare a list of FOVs from data dir matched to slide names from the features excel file
         self.fovs_by_slide = [glob.glob(self.root + os.sep + slide + '*') for slide in
                               self.features['Slide Name']]  # This gives a list of lists of fovs sorted by slide
         self.all_fovs = [fov for slide_fovs in self.fovs_by_slide for fov in
@@ -139,7 +143,6 @@ class NSCLCDataset(Dataset):
                     case 'taumean':
                         if not all([fov_lut['alpha1'][1], fov_lut['tau1'][1],
                                     fov_lut['alpha2'][1], fov_lut['tau2'][1]]):
-                            print(fov_lut['taumean'])
                             self.all_fovs.remove(fov_lut['alpha1'][0])
                             self.fov_mode_dict.remove(fov_lut)
                             break
@@ -175,14 +178,16 @@ class NSCLCDataset(Dataset):
 
         # load the sample, and cache the sample (if cache is open)
         # region Load Data and Label
-        # Get image path
+        # Get image path from index
         if self.augmented:
-            index = int(np.floor(index / 5))  # This will give us the index for the fov
+            fov_index = int(np.floor(index / 5))  # This will give us the index for the fov
             sub_index = index % 5  # This will give us the index for the crop within the fov
-        fov = self.all_fovs[index]
+        else:
+            fov_index = index
+        fov = self.all_fovs[fov_index]
 
         # Load mask
-        fov_mask = self.fov_mode_dict[index]['mask'][0](self.fov_mode_dict[index]['mask'])
+        fov_mask = self.fov_mode_dict[fov_index]['mask'][0](self.fov_mode_dict[fov_index]['mask'])
         fov_mask[fov_mask == 0] = float('nan')
 
         # Preallocate output tensor based on mask size
@@ -191,7 +196,7 @@ class NSCLCDataset(Dataset):
 
         # Load modes using load functions
         for ii, mode in enumerate(self.mode):
-            x[ii] = self.fov_mode_dict[index][mode][0](self.fov_mode_dict[index][mode])
+            x[ii] = self.fov_mode_dict[fov_index][mode][0](self.fov_mode_dict[fov_index][mode])
 
         # Scale by the max value of normalized
         if self.normalized:
@@ -206,18 +211,21 @@ class NSCLCDataset(Dataset):
             fov_mask = fov_mask[sub_index]
 
         # Get data label and apply mask to all channels for binary classes
-        slide_idx = [fov in slide for slide in self.fovs_by_slide].index(True)  # Get features index
+        # Get features based on what slide the FOV is from
+        slide_idx = [fov in slide for slide in self.fovs_by_slide].index(True)
         match self.label:
             case 'Response':
-                x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
-                y = 1 if self.features['Status (NR/R)'].iloc[slide_idx] == 'R' else 0
+                if self.mask_on:
+                    x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
+                y = torch.tensor(1 if self.features['Status (NR/R)'].iloc[slide_idx] == 'R' else 0)
             case 'Metastases':
-                x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
-                y = 1 if self.features['Status (Mets/NM)'].iloc[slide_idx] == 'NM' else 0
+                if self.mask_on:
+                    x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
+                y = torch.tensor(1 if self.features['Status (Mets/NM)'].iloc[slide_idx] == 'NM' else 0)
             case 'Mask':
                 y = fov_mask
             case None:
-                y = -999999  # Placeholder for NaN label
+                y = torch.tensor(-999999)  # Placeholder for NaN label
             case _:
                 raise Exception('An unrecognized label is in use. Update label attribute of dataset and try again.')
 
@@ -236,6 +244,7 @@ class NSCLCDataset(Dataset):
         # endregion
 
     def reset_cache(self):
+        print('Cache reset')
         # Hard reset
         self.index_cache = None
         self.shared_x = None
@@ -249,7 +258,7 @@ class NSCLCDataset(Dataset):
         # Label-size determines cache size, so if no label is set, we will fill cache with -999999 at __getitem__
         match self.label:
             case 'Response' | 'Metastases' | None:
-                shared_y_base = mp.Array(ctypes.c_int, len(self))
+                shared_y_base = mp.Array(ctypes.c_int, len(self) * [-1])
                 y_shape = (len(self),)
             case 'Mask':
                 shared_y_base = mp.Array(ctypes.c_float, int(len(self) * np.prod(self.shape[-2:])))
@@ -259,6 +268,15 @@ class NSCLCDataset(Dataset):
         self.index_cache = convert_mp_to_torch(index_cache_base, (len(self),), device=self.device)
         self.shared_x = convert_mp_to_torch(shared_x_base, (len(self),) + self.shape, device=self.device)
         self.shared_y = convert_mp_to_torch(shared_y_base, y_shape, device=self.device)
+
+    def to(self, device):
+        # Move caches to device
+        self.index_cache = self.index_cache.to(device)
+        self.shared_x = self.shared_x.to(device)
+        self.shared_y = self.shared_y.to(device)
+
+        # Update device for future items
+        self.device = device
 
     # endregion
 
@@ -270,7 +288,8 @@ class NSCLCDataset(Dataset):
         self._name = (f"nsclc_{self.label}_{'+'.join(self.mode)}"
                       f'{"_Transformed" if self.dist_transformed else ""}'
                       f'{"_Augmented" if self.augmented else ""}'
-                      f'{"_Normalized" if self.normalized else ""}')
+                      f'{"_Normalized" if self.normalized else ""}'
+                      f'{"_Masked" if self.mask_on else ""}')
         return self._name
 
     @property
@@ -290,15 +309,27 @@ class NSCLCDataset(Dataset):
     def label(self, label):
         match label.lower():
             case 'response' | 'r':
-                self._label = 'Response'
+                label = 'Response'
             case 'metastases' | 'mets' | 'm':
-                self._label = 'Metastases'
+                label = 'Metastases'
             case 'mask':
-                self._label = 'Mask'
+                label = 'Mask'
+                self.mask_on = False
             case _:
                 raise Exception('Invalid data label entered. Allowed labels are "RESPONSE", "METASTASES", and "MASK".')
-        if label is not self.label:
+        if hasattr(self, '_label') and label != self.label:
             self.reset_cache()
+        self._label = label
+
+    @property
+    def mask_on(self):
+        return self._mask_on
+
+    @mask_on.setter
+    def mask_on(self, mask_on):
+        if hasattr(self, '_mask_on') and mask_on != self.mask_on:
+            self.reset_cache()
+        self._mask_on = mask_on
 
     # endregion
 
@@ -364,7 +395,7 @@ class NSCLCDataset(Dataset):
             # Preallocate an array. Each row is an individual image, each column is mode
             maxes = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
             for ii, (stack, _) in enumerate(self):
-                # Does the same as np.nanmax(stack, dim=(1,2)) and the broadcast line, but keeps the tensor on the GPU
+                # Does the same as np.nanmax(stack, dim=(1,2)) but keeps the tensor on the GPU
                 maxes[ii] = torch.max(torch.max(torch.nan_to_num(stack, nan=-100000), 1).values, 1).values
             self.scalars = torch.max(maxes, 0).values
             self.scalars = self.scalars[:, None, None]
