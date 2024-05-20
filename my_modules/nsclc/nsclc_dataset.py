@@ -168,12 +168,13 @@ class NSCLCDataset(Dataset):
     def __getitem__(self, index):
         # Check if indexed sample is in cache (by checking for index in index_cache)...
         # if it is, pull it from the cache;
-        if self.index_cache is not None and index in self.index_cache:
+        if (all(cache_arr is not None for cache_arr in [self.index_cache, self.shared_x, self.shared_y])
+                and index in self.index_cache):
             x = self.shared_x[index]
             y = self.shared_y[index]
             return x, y
         # if not, cache the index if the index_cache is open...
-        elif self.index_cache is not None:
+        elif all(cache_arr is not None for cache_arr in [self.index_cache, self.shared_x, self.shared_y]):
             self.index_cache[index] = index
 
         # load the sample, and cache the sample (if cache is open)
@@ -448,10 +449,10 @@ class NSCLCDataset(Dataset):
                         ax[ii, jj].set_title(f'{self.label}: {self[index][1]}. \n Mode: {self.mode[jj]}',
                                              fontsize=10)
                 else:
-                    ax[ii].imshow(transform(self[index][0][jj]))
+                    ax[ii].imshow(transform(self[index][0]))
                     ax[ii].tick_params(top=False, bottom=False, left=False, right=False, labelleft=False,
                                        labelbottom=False)
-                    ax[ii].set_title(f'{self.label}: {lab}. \n Mode: {self.mode[jj]}', fontsize=10)
+                    ax[ii].set_title(f'{self.label}: {lab}. \n Mode: {self.mode[0]}', fontsize=10)
         plt.show()
 
     # endregion
