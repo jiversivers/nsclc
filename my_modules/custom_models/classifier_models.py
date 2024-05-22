@@ -3,6 +3,7 @@ import torch
 from torch import nn
 
 
+# region MLPs
 class MLPNet(nn.Module):
     def __init__(self, input_size):
         super(MLPNet, self).__init__()
@@ -58,66 +59,6 @@ class RegularizedMLPNet(nn.Module):
         x = self.fc3(x)
         x = self.sigm(x)
         return x
-
-
-class RNNet(nn.Module):
-    def __init__(self, input_size):
-        super(RNNet, self).__init__()
-        self.name = 'RN Net'
-        self.input_size = input_size
-        self.hidden_size = 32
-        self.output_size = 1
-        self.num_layers = 2
-
-        self.rnn = nn.RNN(self.input_size[0], self.hidden_size, num_layers=self.num_layers, batch_first=True,
-                          nonlinearity='tanh')
-        self.fc = nn.Linear(self.hidden_size, self.output_size)
-
-        self.sigm = nn.Sigmoid()
-
-    def forward(self, x):
-        x[torch.isnan(x)] = 0
-        batch_size = x.size(0)
-        hn = self.hidden_init(batch_size, x.device)
-        x = torch.reshape(x, (batch_size, self.input_size[1], self.input_size[0]))
-        x, hn = self.rnn(x, hn)
-        x = self.fc(x[:, -1])
-        x = self.sigm(x)
-        return x
-
-    def hidden_init(self, batch_size, device):
-        hn = torch.zeros(self.num_layers, batch_size, self.hidden_size, device=device)
-        return hn
-
-
-class RegularizedRNNet(nn.Module):
-    def __init__(self, input_size):
-        super(RegularizedRNNet, self).__init__()
-        self.name = 'Regularized RN Net'
-        self.input_size = input_size
-        self.hidden_size = 32
-        self.output_size = 1
-        self.num_layers = 2
-        self.bn = nn.BatchNorm1d(input_size[0])
-        self.rnn = nn.RNN(self.input_size[0], self.hidden_size, self.num_layers, batch_first=True,
-                          nonlinearity='tanh', dropout=0.25)
-        self.fc = nn.Linear(self.hidden_size, self.output_size)
-        self.sigm = nn.Sigmoid()
-
-    def forward(self, x):
-        x[torch.isnan(x)] = 0
-        batch_size = x.size(0)
-        hn = self.hidden_init(batch_size, x.device)
-        x = self.bn(x)
-        x = torch.reshape(x, (batch_size, self.input_size[1], self.input_size[0]))
-        x, hn = self.rnn(x, hn)
-        x = self.fc(x[:, -1])
-        x = self.sigm(x)
-        return x
-
-    def hidden_init(self, batch_size, device):
-        hn = torch.zeros(self.num_layers, batch_size, self.hidden_size, device=device)
-        return hn
 
 
 class ParallelMLPNet(nn.Module):
@@ -207,6 +148,69 @@ class RegularizedParallelMLPNet(nn.Module):
         return x
 
 
+# endregion
+
+# region RNNS
+class RNNet(nn.Module):
+    def __init__(self, input_size):
+        super(RNNet, self).__init__()
+        self.name = 'RN Net'
+        self.input_size = input_size
+        self.hidden_size = 32
+        self.output_size = 1
+        self.num_layers = 2
+
+        self.rnn = nn.RNN(self.input_size[0], self.hidden_size, num_layers=self.num_layers, batch_first=True,
+                          nonlinearity='tanh')
+        self.fc = nn.Linear(self.hidden_size, self.output_size)
+
+        self.sigm = nn.Sigmoid()
+
+    def forward(self, x):
+        x[torch.isnan(x)] = 0
+        batch_size = x.size(0)
+        hn = self.hidden_init(batch_size, x.device)
+        x = torch.reshape(x, (batch_size, self.input_size[1], self.input_size[0]))
+        x, hn = self.rnn(x, hn)
+        x = self.fc(x[:, -1])
+        x = self.sigm(x)
+        return x
+
+    def hidden_init(self, batch_size, device):
+        hn = torch.zeros(self.num_layers, batch_size, self.hidden_size, device=device)
+        return hn
+
+
+class RegularizedRNNet(nn.Module):
+    def __init__(self, input_size):
+        super(RegularizedRNNet, self).__init__()
+        self.name = 'Regularized RN Net'
+        self.input_size = input_size
+        self.hidden_size = 32
+        self.output_size = 1
+        self.num_layers = 2
+        self.bn = nn.BatchNorm1d(input_size[0])
+        self.rnn = nn.RNN(self.input_size[0], self.hidden_size, self.num_layers, batch_first=True,
+                          nonlinearity='tanh', dropout=0.25)
+        self.fc = nn.Linear(self.hidden_size, self.output_size)
+        self.sigm = nn.Sigmoid()
+
+    def forward(self, x):
+        x[torch.isnan(x)] = 0
+        batch_size = x.size(0)
+        hn = self.hidden_init(batch_size, x.device)
+        x = self.bn(x)
+        x = torch.reshape(x, (batch_size, self.input_size[1], self.input_size[0]))
+        x, hn = self.rnn(x, hn)
+        x = self.fc(x[:, -1])
+        x = self.sigm(x)
+        return x
+
+    def hidden_init(self, batch_size, device):
+        hn = torch.zeros(self.num_layers, batch_size, self.hidden_size, device=device)
+        return hn
+
+
 class ParallelRNNet(nn.Module):
     def __init__(self, input_size):
         super(ParallelRNNet, self).__init__()
@@ -279,10 +283,14 @@ class RegularizedParallelRNNet(nn.Module):
         return x
 
 
+# endregion
+
+# region CNNs
 class CNNet(nn.Module):
     def __init__(self, input_size):
         super(CNNet, self).__init__()
         self.name = 'CN Net'
+        self.input_size = input_size
 
         self.conv1 = nn.Conv2d(input_size[0], 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
@@ -428,3 +436,49 @@ class RegularizedParallelCNNet(nn.Module):
         x = self.fc3(xii)
         x = self.sigm(x)
         return x
+
+
+# endregion
+
+# region More Involved Classifiers
+class RegularizedMLPNetWithPretrainedFeatureExtractor(nn.Module):
+    def __init__(self, input_size, feature_extractor):
+        super(RegularizedMLPNetWithPretrainedFeatureExtractor, self).__init__()
+        self.feature_extractor = feature_extractor
+        self.input_size = input_size
+        self.feature_map_dims = self.get_features(torch.rand(1, *input_size))
+
+        # Get average value for each feature map
+        self.GlobalAvgPool = nn.AvgPool2d(self.feature_map_dims[-2::], stride=2)
+        self.flat = nn.Flatten()
+        self.fc1 = nn.Linear(self.feature_map_dims[1], 256)
+        self.fc2 = nn.Linear(256, 64)
+        self.fc3 = nn.Linear(64, 2)
+
+        self.relu = nn.ReLU()
+        self.softmax = nn.Softmax(dim=1)
+
+        self.dropout1 = nn.Dropout(0.1)
+        self.dropout2 = nn.Dropout(0.2)
+
+    def forward(self, x):
+        # Extract features
+        x = self.get_features(x)
+
+        # Classify
+        x = self.GlobalAvgPool(x)
+        x = self.flat(x)
+        x = self.dropout1(x)
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.dropout2(x)
+        x = self.fc2(x)
+        x = self.relu(x)
+        x = self.dropout1(x)
+        x = self.fc3(x)
+        x = self.softmax(x)
+        return x
+
+    def get_features(self, x):
+        return self.feature_extractor(x)
+# endregion
