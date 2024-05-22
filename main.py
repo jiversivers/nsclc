@@ -52,7 +52,7 @@ def main():
 
     # Iterate image-based classifiers (CNNs, no RNNs)
     data.dist_transformed = False  # This will revert back to returning images
-    models = [ParallelCNNet, RegularizedParallelCNNet, CNNet,
+    models = [ParallelCNNet, RegularizedParallelCNNet, CNNet, RegularizedCNNet,
               MLPNet, RegularizedMLPNet, ParallelMLPNet, RegularizedParallelMLPNet]
     for aug, styles in hyperparameters.items():
         data.augmented = True if aug == 'Augmented' else False
@@ -85,7 +85,7 @@ def main():
                                                                          hp['EP'], bs, criterion,
                                                                          optim_fun, lr=hp['LR'],
                                                                          num_workers=(0, 0, 0))
-                with open(results_file_path) as f:
+                with open(results_file_path, 'a') as f:
                     f.write(f'{aug} {style}: {results["Image"]["Single"][style]}')
 
     # Show results from dist-based classification
