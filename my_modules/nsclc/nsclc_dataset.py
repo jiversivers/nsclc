@@ -56,15 +56,14 @@ class NSCLCDataset(Dataset):
         self._nbins = 25
 
         # Set defaults
-        if mode == ['all'] or not mode:
-            self.mode = ['orr', 'g', 's', 'photons', 'taumean', 'boundfraction']
-        else:
-            self.mode = mode
+        self.mode = mode
+        self.label = label
+        self.mask_on = mask_on
+
+        # Set data descriptors
         self.stack_height = len(self.mode)
         self.image_dims = None
         self.scalars = None
-        self.label = label
-        self.mask_on = mask_on
 
         # Init placeholder cache arrays (actual arrays are set at end of __init__ using reset_cache method)
         self.index_cache = None
@@ -282,8 +281,11 @@ class NSCLCDataset(Dataset):
     # endregion
 
     # region Properties
-    # Use property to define name, shape, and label, so that they are automatically updated with latest data setup
-    # and/or appropriately clear the cache
+    # Name, shape, label, mode, mask
+    # Use of property (instead of simple attribute) to define ensures automatic updates with latest data setup and/or
+    # appropriate clearing of the cache
+
+    # Name (cannot be changed directly)
     @property
     def name(self):
         self._name = (f"nsclc_{self.label}_{'+'.join(self.mode)}"
@@ -293,15 +295,13 @@ class NSCLCDataset(Dataset):
                       f'{"_Masked" if self.mask_on else ""}')
         return self._name
 
+    # Shape (cannot be changed directly)
     @property
     def shape(self):
-        self.shape = self[0][0].shape
+        self._shape = self[0][0].shape
         return self._shape
 
-    @shape.setter
-    def shape(self, shape):
-        self._shape = shape
-
+    # Label
     @property
     def label(self):
         return self._label
@@ -322,6 +322,27 @@ class NSCLCDataset(Dataset):
             self.reset_cache()
         self._label = label
 
+    # Modes
+    @property
+    def mode(self):
+        return self._mode
+
+    @mode.setter
+    def mode(self, mode):
+        # Set default/shortcut behavior
+        if mode == ['all'] or mode == 'all' or mode is None:
+            mode = ['orr', 'g', 's', 'photons', 'taumean', 'boundfraction']
+        # Force update all attributes/properties that depend on mode
+        if hasattr(self, '_mode') and mode != self.mode:
+            self.stack_height = len(mode)
+            if self.normalized:
+                self.normalized = False # This will reset the cache
+                self.normalize_channels_to_max()
+            else:
+                self.reset_cache()
+        self._mode = mode
+
+    # Masking
     @property
     def mask_on(self):
         return self._mask_on
@@ -387,19 +408,13 @@ class NSCLCDataset(Dataset):
         # In order to make distributions consistent, this step will be required for dist transforms, so it will be
         # checked before performing the transform
 
-        # Check if previously normalized
-        if self.normalized:
-            return
-
-        # If scalars have not been previously calculated, calculate
-        if self.scalars is None:
-            # Preallocate an array. Each row is an individual image, each column is mode
-            maxes = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
-            for ii, (stack, _) in enumerate(self):
-                # Does the same as np.nanmax(stack, dim=(1,2)) but keeps the tensor on the GPU
-                maxes[ii] = torch.max(torch.max(torch.nan_to_num(stack, nan=-100000), 1).values, 1).values
-            self.scalars = torch.max(maxes, 0).values
-            self.scalars = self.scalars[:, None, None]
+        # Preallocate an array. Each row is an individual image, each column is mode
+        maxes = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
+        for ii, (stack, _) in enumerate(self):
+            # Does the same as np.nanmax(stack, dim=(1,2)) but keeps the tensor on the GPU
+            maxes[ii] = torch.max(torch.max(torch.nan_to_num(stack, nan=-100000), 1).values, 1).values
+        self.scalars = torch.max(maxes, 0).values
+        self.scalars = self.scalars[:, None, None]
 
         # Set normalized to TRUE so images will be scaled to max when retrieved
         self._normalized = True
@@ -412,12 +427,11 @@ class NSCLCDataset(Dataset):
     def normalized(self, normalized):
         # Check if the cache needs to be reset
         if normalized is not self.normalized:
+            self._normalized = normalized
             self.reset_cache()
         # Apply the normalization requested (note: method call will set attribute if TRUE)
         if normalized:
             self.normalize_channels_to_max()
-        else:
-            self._normalized = normalized
 
     # endregion
 
