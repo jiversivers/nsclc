@@ -446,7 +446,7 @@ class RegularizedMLPNetWithPretrainedFeatureExtractor(nn.Module):
         super(RegularizedMLPNetWithPretrainedFeatureExtractor, self).__init__()
         self.feature_extractor = feature_extractor
         self.input_size = input_size
-        self.feature_map_dims = self.get_features(torch.rand(1, *input_size))
+        self.feature_map_dims = self.get_features(torch.rand(1, *input_size)).shape
 
         # Get average value for each feature map
         self.GlobalAvgPool = nn.AvgPool2d(self.feature_map_dims[-2::], stride=2)
