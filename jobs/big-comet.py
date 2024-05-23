@@ -36,6 +36,7 @@ def main():
     loss_fn = torch.nn.CrossEntropyLoss()
 
     # Check that shapes are as expected
+    feature_extractor.to(device)
     m = Classifier(data.shape, feature_extractor.features)
     out = m(data[0][0].unsqueeze(0))
     print(f'Input shape {data[0][0].unsqueeze(0)}')
