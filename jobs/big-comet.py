@@ -16,7 +16,8 @@ def main():
     feature_extractor = inceptionresnetv2(num_classes=1001, pretrained=False)
 
     # Load pretrained from download
-    feature_extractor.load_state_dict(torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/'))
+    feature_extractor.load_state_dict(
+        torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth'))
     for params in feature_extractor.parameters():
         params.requires_grad = False
 
