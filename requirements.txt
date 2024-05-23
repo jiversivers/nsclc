@@ -5,3 +5,5 @@ pillow~=10.3.0
 scikit-learn~=1.4.2
 torch~=2.2.2
 torchvision~=0.17.2
+pretrainedmodels~=0.7.4
+torchinfo~=1.8.0
