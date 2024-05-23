@@ -172,9 +172,6 @@ class NSCLCDataset(Dataset):
             x = self.shared_x[index]
             y = self.shared_y[index]
             return x, y
-        # if not, cache the index if the index_cache is open...
-        elif all(cache_arr is not None for cache_arr in [self.index_cache, self.shared_x, self.shared_y]):
-            self.index_cache[index] = index
 
         # load the sample, and cache the sample (if cache is open)
         # region Load Data and Label
@@ -217,15 +214,18 @@ class NSCLCDataset(Dataset):
             case 'Response':
                 if self.mask_on:
                     x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
-                y = torch.tensor(1 if self.features['Status (NR/R)'].iloc[slide_idx] == 'R' else 0)
+                y = torch.tensor(1 if self.features['Status (NR/R)'].iloc[slide_idx] == 'R' else 0,
+                                 dtype=torch.float32)
             case 'Metastases':
                 if self.mask_on:
                     x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
-                y = torch.tensor(1 if self.features['Status (Mets/NM)'].iloc[slide_idx] == 'NM' else 0)
+                y = torch.tensor(1 if self.features['Status (Mets/NM)'].iloc[slide_idx] == 'NM' else 0,
+                                 dtype=torch.float32)
             case 'Mask':
                 y = fov_mask
             case None:
-                y = torch.tensor(-999999)  # Placeholder for NaN label
+                y = torch.tensor(-999999,  # Placeholder for NaN label
+                                 dtype=torch.float32)
             case _:
                 raise Exception('An unrecognized label is in use. Update label attribute of dataset and try again.')
 
@@ -240,6 +240,7 @@ class NSCLCDataset(Dataset):
         if self.shared_x is not None and self.shared_y is not None:
             self.shared_x[index] = x
             self.shared_y[index] = y
+            self.index_cache[index] = index
         return x, y
         # endregion
 
@@ -258,11 +259,14 @@ class NSCLCDataset(Dataset):
         # Label-size determines cache size, so if no label is set, we will fill cache with -999999 at __getitem__
         match self.label:
             case 'Response' | 'Metastases' | None:
-                shared_y_base = mp.Array(ctypes.c_int, len(self) * [-1])
+                shared_y_base = mp.Array(ctypes.c_float, len(self) * [-1])
                 y_shape = (len(self),)
             case 'Mask':
                 shared_y_base = mp.Array(ctypes.c_float, int(len(self) * np.prod(self.shape[-2:])))
                 y_shape = (len(self),) + self.shape[-2:]
+            case _:
+                raise Exception('An unrecognized label is in use that is blocking the cache from initializing. '
+                                'Update label attribute of dataset and try again.')
 
         # Convert all arrays to desired data structure
         self.index_cache = convert_mp_to_torch(index_cache_base, (len(self),), device=self.device)
@@ -336,7 +340,7 @@ class NSCLCDataset(Dataset):
         if hasattr(self, '_mode') and mode != self.mode:
             self.stack_height = len(mode)
             if self.normalized:
-                self.normalized = False # This will reset the cache
+                self.normalized = False  # This will reset the cache
                 self.normalize_channels_to_max()
             else:
                 self.reset_cache()
