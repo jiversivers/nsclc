@@ -34,3 +34,30 @@ def loader_maker(data, batch_size=32,
         return loaders[0]
     else:
         return loaders
+
+
+
+# Create folds by random sampling then multiplying samples by dataset numbers to augment without repeating slides in
+# any group
+def fold_augmented_data(data, num_folds=5, augmentation_factor=5):
+    # Randomly sample indices from augmented dataset that are _only_ indices of main images
+    subsampler = torch.utils.data.SubsetRandomSampler(range(0, len(data), augmentation_factor))
+
+    # Read the subsampler
+    indices = [i for i in subsampler]
+
+    data_folds = []
+    end = 0
+    for fold in range(num_folds):
+        # Get end indices for fold of data and set start from where last left off
+        start = end
+        end = int((fold + 1) * (len(data) / num_folds / augmentation_factor))
+        # Get the parent sample indices for the first 1/num_folds samples
+        main_parents = indices[start: end]
+        # Get the all (number depends on augmentation_factor) the children indices from those indices
+        augmented_children = [parent_idx + child_idx for parent_idx in main_parents for child_idx in
+                              range(augmentation_factor)]
+
+        # Now actually subset the data
+        data_folds.append(torch.utils.data.Subset(data, augmented_children))
+    return data_folds
