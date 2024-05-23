@@ -88,7 +88,7 @@ def main():
                     # Validate
                     model.eval()
                     loss, accu = valid_epoch(model, eval_loader, loss_function)
-                    eval_accu.append(loss)
+                    eval_loss.append(loss)
                     eval_accu.append(accu)
 
                     print(f'Epoch: {ep + 1} -- Training loss: {train_loss[-1]:.4f} -- '
@@ -162,7 +162,7 @@ def main():
                     # Validate
                     model.eval()
                     loss, accu = valid_epoch(model, eval_loader, loss_function)
-                    eval_accu.append(loss)
+                    eval_loss.append(loss)
                     eval_accu.append(accu)
 
                     print(f'Epoch: {ep + 1} -- Training loss: {train_loss[-1]:.4f} -- '
@@ -240,7 +240,7 @@ def main():
                     # Validate
                     model.eval()
                     loss, accu = valid_epoch(model, eval_loader, loss_function)
-                    eval_accu.append(loss)
+                    eval_loss.append(loss)
                     eval_accu.append(accu)
 
                     print(f'Epoch: {ep + 1} -- Training loss: {train_loss[-1]:.4f} -- '
@@ -316,7 +316,7 @@ def main():
                     # Validate
                     model.eval()
                     loss, accu = valid_epoch(model, eval_loader, loss_function)
-                    eval_accu.append(loss)
+                    eval_loss.append(loss)
                     eval_accu.append(accu)
 
                     print(f'Epoch: {ep + 1} -- Training loss: {train_loss[-1]:.4f} -- '
