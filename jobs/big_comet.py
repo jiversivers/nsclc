@@ -45,7 +45,7 @@ def main():
     for fold, test_set in enumerate(data_folds):
         print(f'Fold {fold + 1}\n________________________________')
         # Make model, loaders, & optimizer for fold
-        model = Classifier(data.shape, feature_extractor.features)
+        model = Classifier(data.shape, feature_extractor, method='features')
         model.to(device)
         train_sets = [data_folds[index] for index in range(5) if index != fold]
         train_set = torch.utils.data.ConcatDataset(train_sets)
