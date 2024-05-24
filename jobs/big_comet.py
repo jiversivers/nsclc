@@ -70,7 +70,7 @@ def main():
 
                 # Put 100% certainty on the class
                 for r, t in enumerate(target):
-                    y[r, t] = 1
+                    y[r, t.long(())] = 1
 
                 loss = loss_fn(out, y)
                 optimizer.zero_grad()
