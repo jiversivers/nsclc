@@ -92,10 +92,12 @@ def fold_cross_validate(model_fn, data_folds,
         model.train()
         if torch.cuda.is_available() and not next(model.parameters()).is_cuda:
             model.to(torch.device('cuda'))
+
+        running_loss.append([])
         for epoch in range(epochs):
             model.train(True)
             loss = train_epoch(model, train_loader, loss_fn, optimizer)
-            running_loss.append(loss)
+            running_loss[fold].append(loss)
         model.eval()
         correct = test_model(model, test_loader)
         accuracy.append(100 * correct / len(test_loader.sampler))
