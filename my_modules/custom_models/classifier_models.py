@@ -442,11 +442,13 @@ class RegularizedParallelCNNet(nn.Module):
 
 # region More Involved Classifiers
 class RegularizedMLPNetWithPretrainedFeatureExtractor(nn.Module):
-    def __init__(self, input_size, feature_extractor):
+    def __init__(self, input_size, feature_extractor, method='features'):
         super(RegularizedMLPNetWithPretrainedFeatureExtractor, self).__init__()
         self.feature_extractor = feature_extractor
         self.input_size = input_size
-        self.feature_map_dims = self.get_features(torch.rand(1, *input_size)).shape
+        self.method = method
+        self.feature_map_dims = self.get_features(
+            torch.rand(1, *input_size, device=next(feature_extractor.parameters()).device)).shape
 
         # Get average value for each feature map
         self.GlobalAvgPool = nn.AvgPool2d(self.feature_map_dims[-2::], stride=2)
@@ -462,11 +464,14 @@ class RegularizedMLPNetWithPretrainedFeatureExtractor(nn.Module):
         self.dropout2 = nn.Dropout(0.2)
 
     def forward(self, x):
+        # Force input to match device and store original to put it back from where it came
+        input_device = x.device
+
         # Extract features
-        x = self.get_features(x)
+        x = self.get_features(x.to(next(self.feature_extractor.parameters()).device))
 
         # Classify
-        x = self.GlobalAvgPool(x)
+        x = self.GlobalAvgPool(x.to(next(self.parameters()).device))
         x = self.flat(x)
         x = self.dropout1(x)
         x = self.fc1(x)
@@ -477,8 +482,9 @@ class RegularizedMLPNetWithPretrainedFeatureExtractor(nn.Module):
         x = self.dropout1(x)
         x = self.fc3(x)
         x = self.softmax(x)
-        return x
+        return x.to(input_device)
 
     def get_features(self, x):
-        return self.feature_extractor(x)
+        features = eval(f'self.feature_extractor.{self.method}(x)')
+        return features
 # endregion
