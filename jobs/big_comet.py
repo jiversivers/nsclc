@@ -4,7 +4,7 @@ import torch.multiprocessing as mp
 
 from my_modules.model_learning.loader_maker import fold_augmented_data
 from my_modules.nsclc import NSCLCDataset
-from my_modules.custom_models import FeatureExtractorToClassifier as Classifier
+from my_modules.custom_models import CometClassifier, FeatureExtractorToClassifier as FETC
 
 
 def main():
@@ -18,7 +18,6 @@ def main():
     # Load pretrained from download
     feature_extractor.load_state_dict(
         torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth'))
-    feature_extractor.to(device)
     for params in feature_extractor.parameters():
         params.requires_grad = False
 
@@ -38,6 +37,20 @@ def main():
     epochs = [125, 250, 500, 100, 2500]
     loss_fn = torch.nn.CrossEntropyLoss()
 
+    # Dry run feature extractor to get output dims for classifier creation
+    feature_extractor.eval()
+    with torch.no_grad():
+        x = torch.rand(1, *data.shape)
+        dry_run = feature_extractor.features(x)
+    feature_map_dims = dry_run.shape
+
+    # Define base extractor
+    classifier = CometClassifier(feature_map_dims[1:])
+
+    # Send both submodules to device
+    feature_extractor.to(device)
+    classifier.to(device)
+
     models = []
     accuracy = []
     running_loss = []
@@ -52,7 +65,8 @@ def main():
                     for fold, test_set in enumerate(data_folds):
                         print(f'Fold {fold + 1}\n________________________________')
                         # Make model, loaders, & optimizer for fold
-                        model = Classifier(data.shape, feature_extractor, method='features')
+                        model = FETC(data.shape, feature_extractor=feature_extractor, classifier=classifier,
+                                     layer='avgpool_1a')
                         model.to(device)
                         train_sets = [data_folds[index] for index in range(5) if index != fold]
                         train_set = torch.utils.data.ConcatDataset(train_sets)
