@@ -244,7 +244,7 @@ class NSCLCDataset(Dataset):
             self.index_cache[index] = index
 
         # Apply transforms that were input (if any)
-        x = self.transforms(x)
+        x = self.transforms(x) if self.transforms is not None else x
         return x, y
         # endregion
 
