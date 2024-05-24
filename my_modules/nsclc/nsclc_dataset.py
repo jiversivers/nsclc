@@ -1,4 +1,4 @@
-import torchvision.transforms as transforms
+import torchvision.transforms as t
 import os
 from .helper_functions import load_tiff, load_asc, load_weighted_average, load_bound_fraction, convert_mp_to_torch
 import pandas as pd
@@ -42,8 +42,9 @@ class NSCLCDataset(Dataset):
     """
 
     # region Main Dataset Methods (init, len, getitem)
-    def __init__(self, root, mode, xl_file=None, label=None, mask_on=True,
+    def __init__(self, root, mode, xl_file=None, label=None, mask_on=True, transforms=None,
                  device=(torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'))):
+        self.transforms = transforms
         self.root = root
         self.device = device
 
@@ -201,7 +202,7 @@ class NSCLCDataset(Dataset):
 
         # Crop and sub index if necessary
         if self.augmented:
-            cropper = transforms.FiveCrop((round(self.image_dims[1] / 2), round(self.image_dims[2] / 2)))
+            cropper = t.FiveCrop((round(self.image_dims[1] / 2), round(self.image_dims[2] / 2)))
             x = cropper(x)
             fov_mask = cropper(fov_mask)
             x = x[sub_index]
@@ -241,6 +242,9 @@ class NSCLCDataset(Dataset):
             self.shared_x[index] = x
             self.shared_y[index] = y
             self.index_cache[index] = index
+
+        # Apply transforms that were input (if any)
+        x = self.transforms(x)
         return x, y
         # endregion
 
@@ -293,7 +297,7 @@ class NSCLCDataset(Dataset):
     @property
     def name(self):
         self._name = (f"nsclc_{self.label}_{'+'.join(self.mode)}"
-                      f'{"_Transformed" if self.dist_transformed else ""}'
+                      f'{"_Histogram" if self.dist_transformed else ""}'
                       f'{"_Augmented" if self.augmented else ""}'
                       f'{"_Normalized" if self.normalized else ""}'
                       f'{"_Masked" if self.mask_on else ""}')
@@ -451,7 +455,7 @@ class NSCLCDataset(Dataset):
                                    labelbottom=False)
                 ax[ii].set_title(f'{self.label}: {self[index][1]}', fontsize=10)
         else:
-            transform = transforms.ToPILImage()
+            transform = t.ToPILImage()
             _, ax = plt.subplots(5, len(self.mode), figsize=(10, 10))
             for ii in range(5):
                 index = np.random.randint(0, len(self))

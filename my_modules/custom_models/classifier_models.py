@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
+import warnings
 
 
 # region MLPs
@@ -441,19 +442,13 @@ class RegularizedParallelCNNet(nn.Module):
 # endregion
 
 # region More Involved Classifiers
-class RegularizedMLPNetWithPretrainedFeatureExtractor(nn.Module):
-    def __init__(self, input_size, feature_extractor, method='features'):
-        super(RegularizedMLPNetWithPretrainedFeatureExtractor, self).__init__()
-        self.feature_extractor = feature_extractor
+class CometClassifier(nn.Module):
+    def __init__(self, input_size):
+        super().__init__()
         self.input_size = input_size
-        self.method = method
-        self.feature_map_dims = self.get_features(
-            torch.rand(1, *input_size, device=next(feature_extractor.parameters()).device)).shape
 
-        # Get average value for each feature map
-        self.GlobalAvgPool = nn.AvgPool2d(self.feature_map_dims[-2::], stride=2)
         self.flat = nn.Flatten()
-        self.fc1 = nn.Linear(self.feature_map_dims[1], 256)
+        self.fc1 = nn.Linear(self.input_size[0], 256)
         self.fc2 = nn.Linear(256, 64)
         self.fc3 = nn.Linear(64, 2)
 
@@ -464,17 +459,6 @@ class RegularizedMLPNetWithPretrainedFeatureExtractor(nn.Module):
         self.dropout2 = nn.Dropout(0.2)
 
     def forward(self, x):
-        # Force input to match device and store original to put it back from where it came
-        input_device = x.device
-
-        # Extract features
-        x = x.to(next(self.feature_extractor.parameters()).device)
-        x = self.get_features(x)
-
-        # Classify
-        x = x.to(next(self.parameters()).device)
-        x = self.GlobalAvgPool(x)
-        x = self.flat(x)
         x = self.dropout1(x)
         x = self.fc1(x)
         x = self.relu(x)
@@ -484,9 +468,62 @@ class RegularizedMLPNetWithPretrainedFeatureExtractor(nn.Module):
         x = self.dropout1(x)
         x = self.fc3(x)
         x = self.softmax(x)
+        return x
+
+
+class FeatureExtractorToClassifier(nn.Module):
+    def __init__(self, input_size, feature_extractor, classifier=CometClassifier((1536, 1, 1)), layer='avgpool_1a'):
+        super(FeatureExtractorToClassifier, self).__init__()
+        self.input_size = input_size
+        self.feature_extractor = feature_extractor
+        self.classifier = classifier
+        self.layer = [layer] if type(layer) is not list else layer
+        self._layer_for_eval = ''.join(['.' + lay for lay in self.layer])
+
+        # Check for device compatibility
+        if next(self.classifier.parameters()).device != next(self.feature_extractor.parameters()).device:
+            warnings.warn('Model classifier and feature extractor appear to be on different devices.', RuntimeWarning)
+
+        # Dry run for feature dims
+        self.feature_map_dims = self.get_features(
+            torch.rand(1, *self.input_size, device=next(feature_extractor.parameters()).device)).shape
+
+        # Get average value for each feature map
+        self.global_avg_pool = nn.AvgPool2d(self.feature_map_dims[-2::], stride=2)
+        self.flat = nn.Flatten()
+
+    def forward(self, x):
+        # Force input to match device and store original to put it back from where it came
+        input_device = x.device
+
+        # Extract features
+        x.to(next(self.feature_extractor.parameters()).device)
+        x = self.get_features(x)
+
+        # Pool and flatted feature maps
+        x = self.global_avg_pool(x)
+        x = self.flat(x)
+
+        # Classify
+        x.to(next(self.classifier.parameters()).device)
+        x = self.classifier(x)
+
         return x.to(input_device)
 
     def get_features(self, x):
-        features = eval(f'self.feature_extractor.{self.method}(x)')
-        return features
+        get = {}
+
+        # Create hook for feature extraction
+        def hook(model, input, output):
+            get['features'] = output.detach()
+
+        fh = eval(f'self.feature_extractor{self._layer_for_eval}.register_forward_hook(hook)')
+
+        # Get the features from the specified layer via the hook
+        _ = self.feature_extractor(x)
+
+        # Clean up the hook
+        fh.remove()
+        return get['features']
+
 # endregion
