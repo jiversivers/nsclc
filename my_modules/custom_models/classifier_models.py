@@ -442,13 +442,30 @@ class RegularizedParallelCNNet(nn.Module):
 
 # region More Involved Classifiers
 class RegularizedMLPNetWithPretrainedFeatureExtractor(nn.Module):
-    def __init__(self, input_size, feature_extractor, method='features'):
+    def __init__(self, input_size, feature_extractor, layer=''):
         super(RegularizedMLPNetWithPretrainedFeatureExtractor, self).__init__()
         self.feature_extractor = feature_extractor
         self.input_size = input_size
-        self.method = method
+        self.layer = layer
+
         self.feature_map_dims = self.get_features(
             torch.rand(1, *input_size, device=next(feature_extractor.parameters()).device)).shape
+
+        # get = {}
+        #
+        # def get_features():
+        #     # Create hook for feature extraction
+        #     def hook(model, input, output):
+        #         get['features'] = output.detach()
+        #
+        #     return hook
+        #
+        # eval(f'self.feature_extractor{layer}.register_forward_hook(get_features())')
+        #
+        # dry_run = feature_extractor(
+        #     torch.rand(1, *input_size, device=next(feature_extractor.parameters()).device)).shape
+        # print(dry_run)
+        # print(get['features'].shape)
 
         # Get average value for each feature map
         self.GlobalAvgPool = nn.AvgPool2d(self.feature_map_dims[-2::], stride=2)
@@ -487,6 +504,17 @@ class RegularizedMLPNetWithPretrainedFeatureExtractor(nn.Module):
         return x.to(input_device)
 
     def get_features(self, x):
-        features = eval(f'self.feature_extractor.{self.method}(x)')
-        return features
+        get = {}
+
+        # Create hook for feature extraction
+        def hook(model, input, output):
+            get['features'] = output.detach()
+
+        fh = eval(f'self.feature_extractor{self.layer}.register_forward_hook(hook)')
+
+        # Get the features from the specified layer via the hook
+        _ = self.feature_extractor(x)
+
+        fh.remove() # Clean up the hook
+        return get['features']
 # endregion
