@@ -466,12 +466,18 @@ class RegularizedMLPNetWithPretrainedFeatureExtractor(nn.Module):
     def forward(self, x):
         # Force input to match device and store original to put it back from where it came
         input_device = x.device
+        print(f'initial device at input {x.device}')
 
         # Extract features
-        x = self.get_features(x.to(next(self.feature_extractor.parameters()).device))
+        x = x.to(next(self.feature_extractor.parameters()).device)
+        print(f'device after features {x.device}')
+        x = self.get_features(x)
 
         # Classify
-        x = self.GlobalAvgPool(x.to(next(self.parameters()).device))
+        print(f'Device after features before classification: {x.device}')
+        x = x.to(next(self.parameters()).device)
+        print(x.device)
+        x = self.GlobalAvgPool(x)
         x = self.flat(x)
         x = self.dropout1(x)
         x = self.fc1(x)
