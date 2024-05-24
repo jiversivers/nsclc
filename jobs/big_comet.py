@@ -37,7 +37,7 @@ def main():
 
     # Check that shapes are as expected
     feature_extractor.to(device)
-    m = Classifier(data.shape, feature_extractor.features)
+    m = Classifier(data.shape, feature_extractor, method='features')
     out = m(data[0][0].unsqueeze(0))
     print(f'Input shape {data[0][0].unsqueeze(0)}')
     print(f'After feature extraction: {m.get_features(data[0][0].unsqueeze(0)).shape}')
