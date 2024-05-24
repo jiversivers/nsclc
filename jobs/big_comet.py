@@ -55,8 +55,8 @@ def main():
 
         # Train
         model.train()
+        running_loss.append([])
         for ep in range(epochs):
-            print(f'Epoch: {ep + 1}')
             for x, target in train_loader:
                 if torch.cuda.is_available() and not x.is_cuda:
                     x = x.cuda()
@@ -70,15 +70,20 @@ def main():
 
                 # Put 100% certainty on the class
                 for r, t in enumerate(target):
-                    y[r, t.long()] = 1
+                    y[r, t.long()] = 1.
 
                 loss = loss_fn(out, y)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                running_loss.append(loss.item())
+                running_loss[fold].append(loss.item())
+
+        # Print training loss to compare fold models
+        print(f'Inception + MLP loss for fold {fold + 1}: '
+              f'{torch.mean(torch.tensor(running_loss[fold])):.2f}%')
 
         # save trained fold
+        models.append(model)
         torch.save(model.state_dict(), f'big-comet_Fold{fold + 1}.pth')
 
         # Test
@@ -88,11 +93,9 @@ def main():
             out = model(x)
             pred = torch.argmax(out, dim=1)
             correct += torch.sum(pred == target).item()
-            accuracy.append(100 * correct / len(test_loader.sampler))
-            models.append(model)
-            print(f'Inception + MLP accuracy for fold {fold + 1}: {accuracy[-1]:.2f}%')
+        accuracy.append(100 * correct / len(test_loader.sampler))
+        print(f'Inception + MLP accuracy for fold {fold + 1}: {accuracy[-1]:.2f}%')
     print(f'>>>Inception + MLP average accuracy: {sum(accuracy) / len(accuracy):.2f}%<<<')
-
 
 if __name__ == '__main__':
     main()
