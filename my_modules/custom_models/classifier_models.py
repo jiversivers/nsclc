@@ -472,12 +472,13 @@ class CometClassifier(nn.Module):
 
 
 class FeatureExtractorToClassifier(nn.Module):
-    def __init__(self, input_size, feature_extractor, classifier=CometClassifier((1536, 1, 1)), layer=''):
+    def __init__(self, input_size, feature_extractor, classifier=CometClassifier((1536, 1, 1)), layer='avgpool_1a'):
         super(FeatureExtractorToClassifier, self).__init__()
         self.input_size = input_size
         self.feature_extractor = feature_extractor
         self.classifier = classifier
-        self.layer = layer
+        self.layer = [layer] if type(layer) is not list else layer
+        self._layer_for_eval = ''.join(['.' + lay for lay in self.layer])
 
         # Check for device compatibility
         if next(self.classifier.parameters()).device != next(self.feature_extractor.parameters()).device:
@@ -516,7 +517,7 @@ class FeatureExtractorToClassifier(nn.Module):
         def hook(model, input, output):
             get['features'] = output.detach()
 
-        fh = eval(f'self.feature_extractor{self.layer}.register_forward_hook(hook)')
+        fh = eval(f'self.feature_extractor{self._layer_for_eval}.register_forward_hook(hook)')
 
         # Get the features from the specified layer via the hook
         _ = self.feature_extractor(x)
