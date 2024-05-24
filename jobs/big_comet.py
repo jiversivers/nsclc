@@ -18,6 +18,7 @@ def main():
     # Load pretrained from download
     feature_extractor.load_state_dict(
         torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth'))
+    feature_extractor.to(device)
     for params in feature_extractor.parameters():
         params.requires_grad = False
 
@@ -34,14 +35,6 @@ def main():
     optimizer_fn = torch.optim.RMSprop
     epochs = 300
     loss_fn = torch.nn.CrossEntropyLoss()
-
-    # Check that shapes are as expected
-    feature_extractor.to(device)
-    m = Classifier(data.shape, feature_extractor, method='features')
-    out = m(data[0][0].unsqueeze(0))
-    print(f'Input shape {data[0][0].unsqueeze(0)}')
-    print(f'After feature extraction: {m.get_features(data[0][0].unsqueeze(0)).shape}')
-    print(f'After classifier: {out.shape}')
 
     models = []
     accuracy = []
