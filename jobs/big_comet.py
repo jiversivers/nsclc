@@ -77,12 +77,17 @@ def main():
                 loss.backward()
                 optimizer.step()
                 running_loss.append(loss.item())
+
+        # save trained fold
+        torch.save(model.state_dict(), f'big-comet_Fold{fold + 1}.pth')
+
         # Test
         correct = 0
+        model.eval()
         for x, target in test_loader:
             out = model(x)
-            pred = torch.argmax(out)
-            correct += 1 if pred == target.item() else 0
+            pred = torch.argmax(out, dim=1)
+            correct += torch.sum(pred == target).item()
             accuracy.append(100 * correct / len(test_loader.sampler))
             models.append(model)
             print(f'Inception + MLP accuracy for fold {fold + 1}: {accuracy[-1]:.2f}%')
