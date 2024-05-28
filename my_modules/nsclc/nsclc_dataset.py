@@ -342,13 +342,13 @@ class NSCLCDataset(Dataset):
             mode = ['orr', 'g', 's', 'photons', 'taumean', 'boundfraction']
         # Force update all attributes/properties that depend on mode
         if hasattr(self, '_mode') and mode != self.mode:
+            self._mode = mode
             self.stack_height = len(mode)
             if self.normalized:
                 self.normalized = False  # This will reset the cache
                 self.normalize_channels_to_max()
             else:
                 self.reset_cache()
-        self._mode = mode
 
     # Masking
     @property
