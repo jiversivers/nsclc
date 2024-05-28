@@ -107,6 +107,10 @@ def main():
                         correct = 0
                         model.eval()
                         for x, target in test_loader:
+                            if torch.cuda.is_available() and not x.is_cuda:
+                                x = x.cuda()
+                            if torch.cuda.is_available() and not target.is_cuda:
+                                target = target.cuda()
                             out = model(x)
                             pred = torch.argmax(out, dim=1)
                             correct += torch.sum(pred == target).item()
