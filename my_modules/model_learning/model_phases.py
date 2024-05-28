@@ -66,7 +66,8 @@ def test_model(model, loader):
 
 
 def trash_in(model, trash_heap_size=500):
-    _in = torch.rand(trash_heap_size, *model.input_size)
+    device = next(model.parameters()).device
+    _in = torch.rand(trash_heap_size, *model.input_size, device=device)
     trash_out = []
     model.eval()
     for trash in _in:
@@ -77,7 +78,7 @@ def trash_in(model, trash_heap_size=500):
 
 def fold_cross_validate(model_fn, data_folds,
                         optimizer_fn=torch.optim.SGD, loss_fn=nn.BCELoss(),
-                        epochs=125, learning_rate=0.01, batch_size=32):
+                        epochs=125, learning_rate=0.01, batch_size=32, **optim_kwargs):
     accuracy = []
     running_loss = []
     models = []
@@ -87,7 +88,7 @@ def fold_cross_validate(model_fn, data_folds,
         train_set = torch.utils.data.ConcatDataset(train_sets)
         train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True)
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False)
-        optimizer = optimizer_fn(model.parameters(), lr=learning_rate)
+        optimizer = optimizer_fn(model.parameters(), lr=learning_rate, **optim_kwargs)
 
         model.train()
         if torch.cuda.is_available() and not next(model.parameters()).is_cuda:
