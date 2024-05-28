@@ -518,6 +518,7 @@ class FeatureExtractorToClassifier(nn.Module):
             get['features'] = output.detach()
             return
 
+        # Set hook in feature extractor
         fh = eval(f'self.feature_extractor{self._layer_for_eval}.register_forward_hook(hook, always_call=True)')
 
         # Get the features from the specified layer via the hook, even if the image is "too small" for the final avg filter

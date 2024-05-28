@@ -79,7 +79,7 @@ def single_model_iterator(models, dataset, epochs, batch_size, criterion, optim_
 
 
 def fold_model_iterator(models, datasets, folds, epochs, batch_size, criterion, optim_fun, workers=(0, 0),
-                        prefetch_factor=None, **kwargs):
+                        prefetch_factor=None, **optim_kwargs):
     kfold = KFold(n_splits=folds, shuffle=True)
     k_results = {}
     results = {}
@@ -117,7 +117,7 @@ def fold_model_iterator(models, datasets, folds, epochs, batch_size, criterion, 
                 model = net(data_shape)
                 model = model.to('cuda') if torch.cuda.is_available() else model
                 model_path = f'./{model.name}_{key}_fold{fold + 1}.pth'
-                optimizer = optim_fun(model.parameters(), **kwargs)
+                optimizer = optim_fun(model.parameters(), **optim_kwargs)
 
                 for _ in range(epochs):
                     ############
