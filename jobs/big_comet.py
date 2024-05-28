@@ -66,7 +66,7 @@ def main():
                         print(f'Fold {fold + 1}\n________________________________')
                         # Make model, loaders, & optimizer for fold
                         model = FETC(data.shape, feature_extractor=feature_extractor, classifier=classifier,
-                                     layer='avgpool_1a')
+                                     layer='conv2d_7b')
                         model.to(device)
                         train_sets = [data_folds[index] for index in range(5) if index != fold]
                         train_set = torch.utils.data.ConcatDataset(train_sets)
