@@ -23,7 +23,7 @@ def train_epoch(model, loader, loss_fn, optimizer, masked_loss_fn=False):
             x = x.cuda() if x.device.type != 'cuda' else x
             target = target.cuda() if target.device.type != 'cuda' else target
         optimizer.zero_grad()
-        out = model(x)
+        out = model(x).squeeze(1)
         if masked_loss_fn:
             loss = loss_fn(out, target.float(), torch.all((~torch.isnan(x)), dim=1))
         else:
