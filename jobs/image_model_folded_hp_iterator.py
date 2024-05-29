@@ -2,7 +2,8 @@ import os
 
 import torch.nn
 
-from my_modules.custom_models import MLPNet, RegularizedParallelMLPNet, RegularizedParallelRNNet
+from my_modules.custom_models import MLPNet, RegularizedParallelMLPNet, RegularizedMLPNet, ParallelMLPNet, CNNet, \
+    RegularizedCNNet, ParallelCNNet, RegularizedParallelCNNet
 from my_modules.model_learning import fold_cross_validate, masked_loss
 from my_modules.model_learning.loader_maker import fold_augmented_data
 from my_modules.nsclc import NSCLCDataset
@@ -26,7 +27,8 @@ def main():
     optimizer = [torch.optim.SGD, {'momentum': 0.9}]
 
     # Set up models to try
-    model_fns = [MLPNet, RegularizedParallelMLPNet, RegularizedParallelRNNet]
+    model_fns = [MLPNet, RegularizedMLPNet, ParallelMLPNet, RegularizedParallelMLPNet,
+                 CNNet, RegularizedCNNet, ParallelCNNet, RegularizedParallelCNNet]
 
     # Make model save dir
     os.makedirs('models', exist_ok=True)

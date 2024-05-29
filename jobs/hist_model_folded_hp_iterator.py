@@ -2,8 +2,9 @@ import os
 
 import torch.nn
 
-from my_modules.custom_models import MLPNet, RegularizedParallelMLPNet, RegularizedParallelRNNet
-from my_modules.model_learning import fold_cross_validate, masked_loss
+from my_modules.custom_models import MLPNet, RegularizedParallelMLPNet, RegularizedParallelRNNet, RegularizedMLPNet, \
+    ParallelMLPNet, RNNet, RegularizedRNNet, ParallelRNNet
+from my_modules.model_learning import fold_cross_validate
 from my_modules.model_learning.loader_maker import fold_augmented_data
 from my_modules.nsclc import NSCLCDataset
 
@@ -27,7 +28,8 @@ def main():
     optimizer = [torch.optim.SGD, {'momentum': 0.9}]
 
     # Set up models to try
-    model_fns = [MLPNet, RegularizedParallelMLPNet, RegularizedParallelRNNet]
+    model_fns = [MLPNet, RegularizedMLPNet, ParallelMLPNet, RegularizedParallelMLPNet,
+                 RNNet, RegularizedRNNet, ParallelRNNet, RegularizedParallelRNNet]
 
     # Make model save dir
     os.makedirs('models', exist_ok=True)
@@ -37,7 +39,7 @@ def main():
             for model_fn in model_fns:
                 accuracy, running_loss, models = fold_cross_validate(model_fn, data_folds,
                                                                      learning_rate=lr, epochs=ep, batch_size=bs,
-                                                                     loss_fn=loss_fn, masked_loss_fn=True,
+                                                                     loss_fn=loss_fn,
                                                                      optimizer_fn=optimizer[0], **optimizer[1])
                 for fold, model in enumerate(models):
                     os.makedirs(f'models/{model.name}', exist_ok=True)
