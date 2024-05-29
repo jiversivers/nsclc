@@ -36,7 +36,6 @@ def loader_maker(data, batch_size=32,
         return loaders
 
 
-
 # Create folds by random sampling then multiplying samples by dataset numbers to augment without repeating slides in
 # any group
 def fold_augmented_data(data, num_folds=5, augmentation_factor=5):
