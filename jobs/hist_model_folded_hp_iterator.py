@@ -23,7 +23,7 @@ def main():
     bs = 64
     learning_rates = [0.1, 0.01, 0.001, 0.0001, 0.00001]
     epochs = [125, 250, 500, 100, 2500]
-    loss_fn = masked_loss(torch.nn.BCELoss(reduction='none'))
+    loss_fn = torch.nn.BCELoss()
     optimizer = [torch.optim.SGD, {'momentum': 0.9}]
 
     # Set up models to try
