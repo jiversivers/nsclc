@@ -4,7 +4,7 @@ from torch import nn
 
 def masked_loss(loss_fn):
     def masked_loss_fn(outputs, targets, mask):
-        loss = loss_fn(outputs.expand(mask.shape), targets.expand(mask.shape))
+        loss = loss_fn(outputs.unsqueeze(-1).expand(mask.shape), targets.unsqueeze(-1).expand(mask.shape))
         loss = loss * mask.float()
         loss = torch.sum(loss) / torch.sum(mask.float())
         return loss
@@ -23,7 +23,10 @@ def train_epoch(model, loader, loss_fn, optimizer, masked_loss_fn=False):
             target = target.cuda() if target.device.type != 'cuda' else target
         optimizer.zero_grad()
         out = model(x).squeeze(1)
-        loss = loss_fn(out, target.float(), (~torch.isnan(x))) if masked_loss_fn else loss_fn(out, target.float())
+        if masked_loss_fn:
+            loss = loss_fn(out, target.float(), torch.all((~torch.isnan(x)), dim=1))
+        else:
+            loss = loss_fn(out, target.float())
         total_loss += loss.item()
         loss.backward()
         optimizer.step()
@@ -42,7 +45,10 @@ def valid_epoch(model, loader, loss_fn, masked_loss_fn=False):
                 x = x.cuda() if x.device.type != 'cuda' else x
                 target = target.cuda() if target.device.type != 'cuda' else target
             out = model(x).squeeze(1)
-            loss = loss_fn(out, target.float(), (~torch.isnan(x))) if masked_loss_fn else loss_fn(out, target.float())
+            if masked_loss_fn:
+                loss = loss_fn(out, target.float(), torch.all((~torch.isnan(x)), dim=1))
+            else:
+                loss = loss_fn(out, target.float())
             total_loss += loss.item()
             prediction = torch.round(out)
             correct += (prediction == target).sum().item()
