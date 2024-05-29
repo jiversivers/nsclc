@@ -14,7 +14,7 @@ def main():
                         label='Metastases', mask_on=True)
     data.augment()
     data.normalize_channels_to_max()
-    data.dist_transformed()
+    data.dist_transform()
 
     # Fold dataset
     data_folds = fold_augmented_data(data, augmentation_factor=5, num_folds=5)
