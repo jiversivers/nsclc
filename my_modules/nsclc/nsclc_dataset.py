@@ -96,8 +96,8 @@ class NSCLCDataset(Dataset):
                 raise Exception(
                     'Features file not found,'
                     ' input path manually at dataset initialization using xl_file=<path_to_file>.')
-            xl_file = xl_file[0]
-        self.features = pd.read_excel(xl_file)
+            self.xl_file = xl_file[0]
+        self.features = pd.read_excel(self.xl_file)
 
         # Prepare a list of FOVs from data dir matched to slide names from the features excel file
         self.fovs_by_slide = [glob.glob(self.root + os.sep + slide + '*') for slide in
@@ -340,15 +340,26 @@ class NSCLCDataset(Dataset):
         # Set default/shortcut behavior
         if mode == ['all'] or mode == 'all' or mode is None:
             mode = ['orr', 'g', 's', 'photons', 'taumean', 'boundfraction']
-        # Force update all attributes/properties that depend on mode
+        # If this is not the __init__ run
         if hasattr(self, '_mode') and mode != self.mode:
+            # A mode update is essentially a new dataset, so we will re-init it, but we want to make all the other
+            # aspects match, so we check and store them first. Once the dataset is reinitialized, we can reset the
+            # other properties.
+            temp_aug = self.augmented
+            temp_norm = self.normalized
+            temp_dist = self.dist_transformed
+
+            # Re-init with new modes
+            self.__init__(self.root, mode, xl_file=self.xl_file, label=self.label, mask_on=self.mask_on,
+                          transforms=self.transforms, device=self.device)
+
+            # Reset properties
+            self.normalized = temp_norm
+            self.augmented = temp_aug
+            self.dist_transformed = temp_dist
+        # If this is the __init__ run
+        else:
             self._mode = mode
-            self.stack_height = len(mode)
-            if self.normalized:
-                self.normalized = False  # This will reset the cache
-                self.normalize_channels_to_max()
-            else:
-                self.reset_cache()
 
     # Masking
     @property
@@ -436,6 +447,7 @@ class NSCLCDataset(Dataset):
         # Check if the cache needs to be reset
         if normalized is not self.normalized:
             self._normalized = normalized
+            self.scalars = None
             self.reset_cache()
         # Apply the normalization requested (note: method call will set attribute if TRUE)
         if normalized:
