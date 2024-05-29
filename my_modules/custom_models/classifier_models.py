@@ -459,6 +459,7 @@ class CometClassifier(nn.Module):
         self.dropout2 = nn.Dropout(0.2)
 
     def forward(self, x):
+        x[torch.isnan(x)] = 0
         x = self.dropout1(x)
         x = self.fc1(x)
         x = self.relu(x)
@@ -495,9 +496,10 @@ class FeatureExtractorToClassifier(nn.Module):
     def forward(self, x):
         # Force input to match device and store original to put it back from where it came
         input_device = x.device
-
-        # Extract features
         x.to(next(self.feature_extractor.parameters()).device)
+
+        # Extract features with nan-masking as 0
+        x[torch.isnan(x)] = 0
         x = self.get_features(x)
 
         # Pool and flatted feature maps
