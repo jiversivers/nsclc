@@ -80,7 +80,7 @@ def main():
     for lr in learning_rates:
         # Create models
         # Individual and ensemble-averaging models
-        models = [FETC(data.shape, feature_extractor=feature_extractor, classifier=classifier, layer='conv4')
+        models = [FETC(data.shape[1:], feature_extractor=feature_extractor, classifier=classifier, layer='conv4')
                   for _ in range(len(data.mode))]
         [model.to(device) for model in models]
 
