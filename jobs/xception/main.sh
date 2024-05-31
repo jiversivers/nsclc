@@ -28,7 +28,7 @@ files=/home/jdivers/ondemand/data/sys/myjobs/projects/nsclc/data
 
 echo "Copying files..."
 rsync -avq $files /scratch/$SLURM_JOB_ID
-rsync -avq /home/jdivers/nsclc/jobs/xception_features.py /scratch/$SLURM_JOB_ID
+rsync -avq $SLURM_SUBMIT_DIR/xception_features.py /scratch/$SLURM_JOB_ID
 rsync -avq /home/jdivers/nsclc/my_modules /scratch/$SLURM_JOB_ID
 wait
 
@@ -37,8 +37,7 @@ cd /scratch/$SLURM_JOB_ID/ || exit
 echo "Python script initiating..."
 python3 xception_features.py
 
-mkdir -p $SLURM_SUBMIT_DIR/$job_name
-rsync -av -q /scratch/$SLURM_JOB_ID/ $SLURM_SUBMIT_DIR/$job_name
+rsync -avq /scratch/$SLURM_JOB_ID/outputs $SLURM_SUBMIT_DIR/$job_name
 
 # check if rsync succeeded
 if [ $? -ne 0 ]; then
