@@ -14,7 +14,7 @@ def loader_maker(data, batch_size=32,
     loader_size = [round(x) for x in len(data) * (split / np.sum(split))]
     # Adjust for possible rounding overage
     loader_size[-1] = (loader_size[-1] - 1) if np.sum(loader_size) > len(data) else loader_size[-1]
-    print(loader_size)
+
     # Determine if drop_last is necessary
     if drop_last is None:
         drop_last = ((True if int(sp * len(data)) % batch_size == 1 else False) for sp in split)
@@ -53,10 +53,43 @@ def fold_augmented_data(data, num_folds=5, augmentation_factor=5):
         end = int((fold + 1) * (len(data) / num_folds / augmentation_factor))
         # Get the parent sample indices for the first 1/num_folds samples
         main_parents = indices[start: end]
-        # Get the all (number depends on augmentation_factor) the children indices from those indices
+        # Get all (number depends on augmentation_factor) the children indices from those indices
         augmented_children = [parent_idx + child_idx for parent_idx in main_parents for child_idx in
                               range(augmentation_factor)]
 
         # Now actually subset the data
         data_folds.append(torch.utils.data.Subset(data, augmented_children))
     return data_folds
+
+
+def split_augmented_data(data, split=(0.8, 0.15, 0.05), augmentation_factor=5):
+    # Normalize split and scale to length of unaugmented data
+    subset_size = [round(x) for x in (len(data) / augmentation_factor) * (split / np.sum(split))]
+
+    # Adjust for possible rounding overage by decrementing from the last dataset
+    ii = len(split)
+    while np.sum(subset_size) > (len(data) / augmentation_factor):
+        ii -= 1
+        subset_size[ii] = (subset_size[ii] - 1)
+
+    # Randomly sample indices from augmented dataset that are _only_ indices of main images
+    subsampler = torch.utils.data.SubsetRandomSampler(range(0, len(data), augmentation_factor))
+
+    # Read the subsampler
+    indices = [i for i in subsampler]
+
+    data_splits = []
+    end = 0
+    for ii in range(len(split)):
+        # Get end indices for fold of data and set start from where last left off
+        start = end
+        end = start + subset_size[ii]
+        # Get the parent sample indices for the first 1/num_folds samples
+        main_parents = indices[start:end]
+        # Get all (number depends on augmentation_factor) the children indices from those indices
+        augmented_children = [parent_idx + child_idx for parent_idx in main_parents for child_idx in
+                              range(augmentation_factor)]
+
+        # Now actually subset the data
+        data_splits.append(torch.utils.data.Subset(data, augmented_children))
+    return data_splits

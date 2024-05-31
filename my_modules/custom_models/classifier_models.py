@@ -448,7 +448,7 @@ class CometClassifier(nn.Module):
         self.input_size = input_size
 
         self.flat = nn.Flatten()
-        self.fc1 = nn.Linear(self.input_size[0], 256)
+        self.fc1 = nn.Linear(np.prod(self.input_size[0]), 256)
         self.fc2 = nn.Linear(256, 64)
         self.fc3 = nn.Linear(64, 2)
 
@@ -472,26 +472,49 @@ class CometClassifier(nn.Module):
         return x
 
 
+class MPMShallowClassifier(nn.Module):
+    def __init__(self, input_size):
+        super().__init__()
+        self.input_size = input_size
+
+        self.fc = nn.Linear(np.prod(self.input_size), 2)
+        self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, x):
+        x[torch.isnan(x)] = 0
+        x = self.fc(x)
+        x = self.softmax(x)
+        return x
+
+
 class FeatureExtractorToClassifier(nn.Module):
-    def __init__(self, input_size, feature_extractor, classifier=CometClassifier((1536, 1, 1)), layer='avgpool_1a'):
+    def __init__(self, input_size, feature_extractor, classifier=CometClassifier, layer='conv2d_7b'):
         super(FeatureExtractorToClassifier, self).__init__()
         self.input_size = input_size
         self.feature_extractor = feature_extractor
-        self.classifier = classifier
         self.layer = [layer] if type(layer) is not list else layer
         self._layer_for_eval = ''.join(['.' + lay for lay in self.layer])
-
-        # Check for device compatibility
-        if next(self.classifier.parameters()).device != next(self.feature_extractor.parameters()).device:
-            warnings.warn('Model classifier and feature extractor appear to be on different devices.', RuntimeWarning)
 
         # Dry run for feature dims
         self.feature_map_dims = self.get_features(
             torch.rand(1, *self.input_size, device=next(feature_extractor.parameters()).device)).shape
 
         # Get average value for each feature map
-        self.global_avg_pool = nn.AvgPool2d(self.feature_map_dims[-2::], stride=2)
+        self.global_avg_pool = nn.AvgPool2d(self.feature_map_dims[-2::])
         self.flat = nn.Flatten()
+
+        # Init classifier based on size (channels) of feature maps or use pre-init'd classifier
+        if type(classifier) is type:
+            self.classifier = classifier((self.feature_map_dims[1], 1, 1))
+
+            # Put init classifier onto same device as feature extractor
+            self.classifier.to(next(self.feature_extractor.parameters()).device)
+        else:
+            self.classifier = classifier
+            # Check for device compatibility
+            if next(self.classifier.parameters()).device != next(self.feature_extractor.parameters()).device:
+                warnings.warn('Model classifier and feature extractor appear to be on different devices.',
+                              RuntimeWarning)
 
     def forward(self, x):
         # Force input to match device and store original to put it back from where it came
@@ -533,5 +556,10 @@ class FeatureExtractorToClassifier(nn.Module):
         # Clean up the hook
         fh.remove()
         return get['features']
+
+    def to(self, device):
+        self.feature_extractor.to(device)
+        self.global_avg_pool.to(device)
+        self.classifier.to(device)
 
 # endregion
