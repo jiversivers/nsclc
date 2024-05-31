@@ -505,7 +505,7 @@ class FeatureExtractorToClassifier(nn.Module):
 
         # Init classifier based on size (channels) of feature maps or use pre-init'd classifier
         if type(classifier) is type:
-            self.classifier = classifier((self.feature_map_dims[1], 1, 1))
+            self.classifier = classifier((self.feature_map_dims[1]))
 
             # Put init classifier onto same device as feature extractor
             self.classifier.to(next(self.feature_extractor.parameters()).device)
@@ -525,7 +525,7 @@ class FeatureExtractorToClassifier(nn.Module):
         x[torch.isnan(x)] = 0
         x = self.get_features(x)
 
-        # Pool and flatted feature maps
+        # Pool and flatten feature maps
         x = self.global_avg_pool(x)
         x = self.flat(x)
 
@@ -560,6 +560,7 @@ class FeatureExtractorToClassifier(nn.Module):
     def to(self, device):
         self.feature_extractor.to(device)
         self.global_avg_pool.to(device)
+        self.flat.to(device)
         self.classifier.to(device)
 
 # endregion
