@@ -117,11 +117,11 @@ def main():
                 with torch.no_grad():
                     # Get feature maps, avg, and flatten (just like in the whole model)
                     features = [model.flat(model.global_avg_pool(model.get_features(mode)))
-                                for mode, model in zip(mode, models)]
+                                for mode, model in zip(data.mode, models)]
 
                 # Get final output for each model and do backprop
                 [optimizer.zero_grad() for optimizer in optimizers]
-                outs = [model(mode) for mode, model in zip(mode, models)]
+                outs = [model(mode) for mode, model in zip(data.mode, models)]
                 losses = [loss_fn(out, target.unsqueeze()) for out in outs]
                 [loss.backward() for loss in losses]
                 for individual_loss, loss in zip(individual_losses, losses):
@@ -152,11 +152,11 @@ def main():
                     # Mode-wise models (for individual and ensemble architectures)
                     # Get feature maps, avg, and flatten (just like in the whole model)
                     features = [model.flat(model.global_avg_pool(model.get_features(mode)))
-                                for mode, model in zip(mode, models)]
+                                for mode, model in zip(data.mode, models)]
 
                     # Get final output for each model and do backprop
                     [optimizer.zero_grad() for optimizer in optimizers]
-                    outs = [model(mode) for mode, model in zip(mode, models)]
+                    outs = [model(mode) for mode, model in zip(data.mode, models)]
                     preds = [torch.round(out) for out in outs]
                     individual_corrects = [torch.sum(pred == target.unsqueeze(1)) for pred in preds]
                     losses = [loss_fn(out, target.unsqueeze()) for out in outs]
@@ -208,11 +208,11 @@ def main():
                         # Mode-wise models (for individual and ensemble architectures)
                         # Get feature maps, avg, and flatten (just like in the whole model)
                         features = [model.flat(model.global_avg_pool(model.get_features(mode)))
-                                    for mode, model in zip(mode, models)]
+                                    for mode, model in zip(data.mode, models)]
 
                         # Get final output for each model and do backprop
                         [optimizer.zero_grad() for optimizer in optimizers]
-                        outs = [model(mode) for mode, model in zip(mode, models)]
+                        outs = [model(mode) for mode, model in zip(data.mode, models)]
                         preds = [torch.round(out) for out in outs]
                         individual_corrects = [torch.sum(pred == target.unsqueeze(1)) for pred in preds]
 
