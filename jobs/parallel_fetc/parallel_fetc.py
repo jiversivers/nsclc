@@ -107,7 +107,7 @@ def main():
         individual_test_accuracies.append([])
         ensemble_test_accuracy.append([])
         parallel_test_accuracy.append([])
-        for ep in epoch:
+        for ep in range(epoch):
             # Training
             individual_losses = len(data.mode) * [0]
             parallel_loss = 0
