@@ -48,11 +48,6 @@ def main():
     # Define base classifier
     classifier = RegMLP
 
-    # Make full model
-    model = FETC(data.shape, feature_extractor=feature_extractor, classifier=classifier,
-                 layer='conv4')
-    model.to(device)
-
     # Prepare data loaders
     train_set, eval_set, test_set = split_augmented_data(data, augmentation_factor=5, split=(0.75, 0.15, 0.1))
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0,
@@ -67,6 +62,11 @@ def main():
     evaluation_accuracy = []
     testing_accuracy = []
     for lr in learning_rates:
+        # Make full model
+        model = FETC(data.shape, feature_extractor=feature_extractor, classifier=classifier,
+                     layer='conv4')
+        model.to(device)
+
         # Make optimizer at the current larning rate with only classifier parameters
         optimizer = optimizer_fns['Adam'][0](model.classifier.parameters(), lr=lr)
 
