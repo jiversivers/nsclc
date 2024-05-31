@@ -1,6 +1,9 @@
+import os
+
 import torch
 from pretrainedmodels import xception
 import torch.multiprocessing as mp
+import matplotlib.pyplot as plt
 
 from my_modules.model_learning.loader_maker import split_augmented_data
 from my_modules.nsclc import NSCLCDataset
@@ -11,6 +14,11 @@ def main():
     # Set up multiprocessing context
     mp.set_start_method('forkserver', force=True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    # Prep output dirs and files
+    os.makedirs('outputs/plots', exist_ok=True)
+    with open('outputs/results.txt', 'w') as results_file:
+        results_file.write('Results')
 
     # Define our base feature extractor and turn the gradients off -- we won't train it, just use it to feed our MLP.
     feature_extractor = xception(num_classes=1000, pretrained=False)
@@ -31,10 +39,10 @@ def main():
     data.augment()
     data.normalize_channels_to_max()
 
-    batch_size = 32
-    learning_rates = [0.1, 0.01, 0.001, 0.00001]
+    batch_size = 64
+    learning_rates = [5e-5, 1e-5, 5e-6, 1e-6]
     optimizer_fns = {'Adam': [torch.optim.Adam, {}]}
-    epochs = [125, 250, 500, 100, 2500]
+    epochs = [5, 10, 50, 125, 250, 500, 1000, 2500]
     loss_fn = torch.nn.CrossEntropyLoss()
 
     # Define base classifier
@@ -43,9 +51,6 @@ def main():
     # Make full model
     model = FETC(data.shape, feature_extractor=feature_extractor, classifier=classifier,
                  layer='conv4')
-
-    # Send all (sub)modules to device
-    feature_extractor.to(device)
     model.to(device)
 
     # Prepare data loaders
@@ -75,6 +80,7 @@ def main():
         epoch = sorted(epochs)[-1]
         for ep in range(epoch):
             # Training
+            epoch_loss = 0
             model.train()
             for x, target in train_loader:
                 if torch.cuda.is_available() and not x.is_cuda:
@@ -89,13 +95,14 @@ def main():
                     y[r, t.long()] = 1.
 
                 loss = loss_fn(out, y)
-                optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                training_loss[-1].append(loss.item())
+                epoch_loss += loss.item()
+            training_loss[-1].append(epoch_loss / len(train_set))
 
             # Validation
             model.eval()
+            eval_loss = 0
             correct = 0
             with torch.no_grad():
                 for x, target in eval_loader:
@@ -111,13 +118,16 @@ def main():
                         y[r, t.long()] = 1.
 
                     loss = loss_fn(out, y)
-                    evaluation_loss[-1].append(loss.item())
-                    pred = torch.argmax(out)
+                    eval_loss += loss.item()
+                    pred = torch.argmax(out, dim=1)
                     correct += torch.sum(pred == target).item()
+                evaluation_loss[-1].append(eval_loss / len(eval_set))
                 evaluation_accuracy[-1].append(100 * correct / len(eval_loader.sampler))
 
-            print(f'Epoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, Eval.Loss: {evaluation_loss[-1][-1]:.4f}. '
-                  f'Eval.Accu: {evaluation_accuracy[-1][-1]:.2f}%')
+            with open('outputs/results.txt', 'a') as results_file:
+                results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, '
+                                   f'Eval.Loss: {evaluation_loss[-1][-1]:.4f}.'
+                                   f'Eval.Accu: {evaluation_accuracy[-1][-1]:.2f}%')
 
             # See if we are at one of our training length checkpoints. Save and test if we are
             if ep + 1 in epochs:
@@ -138,7 +148,10 @@ def main():
                         pred = torch.argmax(out, dim=1)
                         correct += torch.sum(pred == target).item()
                     testing_accuracy[-1].append(100 * correct / len(test_loader.sampler))
-                print(f'>>>Test.accu at {ep + 1} epochs with learning rate of {lr}: {testing_accuracy[-1][-1]}<<<')
+                with open('outputs/results.txt', 'a') as results_file:
+                    results_file.write(f'\n>>>Test.accu at {ep + 1} epochs with learning rate of {lr}: '
+                                       f'{testing_accuracy[-1][-1]}<<<\n')
+
 
 if __name__ == '__main__':
     main()
