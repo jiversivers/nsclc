@@ -116,12 +116,12 @@ def main():
                 # Mode-wise models (for individual and ensemble architectures)
                 with torch.no_grad():
                     # Get feature maps, avg, and flatten (just like in the whole model)
-                    features = [model.flat(model.global_avg_pool(model.get_features(mode)))
-                                for mode, model in zip(data.mode, models)]
+                    features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
+                                for ch, model in enumerate(models)]
 
                 # Get final output for each model and do backprop
                 [optimizer.zero_grad() for optimizer in optimizers]
-                outs = [model(mode) for mode, model in zip(data.mode, models)]
+                outs = [model(x[:, ch].squeeze(1)) for ch, model in enumerate(models)]
                 losses = [loss_fn(out, target.unsqueeze()) for out in outs]
                 [loss.backward() for loss in losses]
                 for individual_loss, loss in zip(individual_losses, losses):
@@ -151,12 +151,12 @@ def main():
                 for x, target in evaluation_loader:
                     # Mode-wise models (for individual and ensemble architectures)
                     # Get feature maps, avg, and flatten (just like in the whole model)
-                    features = [model.flat(model.global_avg_pool(model.get_features(mode)))
-                                for mode, model in zip(data.mode, models)]
+                    features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
+                                for ch, model in enumerate(models)]
 
                     # Get final output for each model and do backprop
                     [optimizer.zero_grad() for optimizer in optimizers]
-                    outs = [model(mode) for mode, model in zip(data.mode, models)]
+                    outs = [model(x[:, ch].squeeze(1)) for ch, model in enumerate(models)]
                     preds = [torch.round(out) for out in outs]
                     individual_corrects = [torch.sum(pred == target.unsqueeze(1)) for pred in preds]
                     losses = [loss_fn(out, target.unsqueeze()) for out in outs]
@@ -207,12 +207,12 @@ def main():
                     for x, target in testing_loader:
                         # Mode-wise models (for individual and ensemble architectures)
                         # Get feature maps, avg, and flatten (just like in the whole model)
-                        features = [model.flat(model.global_avg_pool(model.get_features(mode)))
-                                    for mode, model in zip(data.mode, models)]
+                        features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
+                                    for ch, model in enumerate(models)]
 
                         # Get final output for each model and do backprop
                         [optimizer.zero_grad() for optimizer in optimizers]
-                        outs = [model(mode) for mode, model in zip(data.mode, models)]
+                        outs = [model(x[:, ch].squeeze(1)) for ch, model in enumerate(models)]
                         preds = [torch.round(out) for out in outs]
                         individual_corrects = [torch.sum(pred == target.unsqueeze(1)) for pred in preds]
 
@@ -246,6 +246,7 @@ def main():
                 with open('outputs/parallel_results.txt', 'a') as results_file:
                     results_file.write(
                         f'\n>>>Epoch: {ep}: Parallel Accu. {parallel_test_accuracy[-1]}<<<\n')
+
 
 if __name__ == '__main__':
     main()
