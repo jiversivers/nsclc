@@ -87,6 +87,8 @@ def main():
                     x = x.cuda()
                 if torch.cuda.is_available() and not target.is_cuda:
                     target = target.cuda()
+
+                optimizer.zero_grad()
                 out = model(x)
 
                 # Change target label from binary label to one-hot 2-bit vector

@@ -451,6 +451,11 @@ class NSCLCDataset(Dataset):
         # In order to make distributions consistent, this step will be required for dist transforms, so it will be
         # checked before performing the transform
 
+        # Temporarily turn psuedo_rgb off (if on) so we can save 2/3 memory and not ahve to worry about dim shifts for
+        # both cases
+        temp_psuedo = self.psuedo_rgb
+        self._psuedo_rgb = False
+
         # Preallocate an array. Each row is an individual image, each column is mode
         maxes = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
         for ii, (stack, _) in enumerate(self):
@@ -458,6 +463,9 @@ class NSCLCDataset(Dataset):
             maxes[ii] = torch.max(torch.max(torch.nan_to_num(stack, nan=-100000), 1).values, 1).values
         self.scalars = torch.max(maxes, 0).values
         self.scalars = self.scalars[:, None, None]
+
+        # Reset psuedo_rgb
+        self._psuedo_rgb = temp_psuedo
 
         # Set normalized to TRUE so images will be scaled to max when retrieved
         self._normalized = True
