@@ -454,7 +454,7 @@ class NSCLCDataset(Dataset):
         # Temporarily turn psuedo_rgb off (if on) so we can save 2/3 memory and not ahve to worry about dim shifts for
         # both cases
         temp_psuedo = self.psuedo_rgb
-        self._psuedo_rgb = False
+        self.psuedo_rgb = False
 
         # Preallocate an array. Each row is an individual image, each column is mode
         maxes = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
@@ -465,7 +465,7 @@ class NSCLCDataset(Dataset):
         self.scalars = self.scalars[:, None, None]
 
         # Reset psuedo_rgb
-        self._psuedo_rgb = temp_psuedo
+        self.psuedo_rgb = temp_psuedo
 
         # Set normalized to TRUE so images will be scaled to max when retrieved
         self._normalized = True
