@@ -208,6 +208,11 @@ class NSCLCDataset(Dataset):
             x = x[sub_index]
             fov_mask = fov_mask[sub_index]
 
+        # Expand dim 0 to look like an rgb image
+        if self.psuedo_rgb:
+            x = x.expand(3, -1, -1)
+
+
         # Get data label and apply mask to all channels for binary classes
         # Get features based on what slide the FOV is from
         slide_idx = [fov in slide for slide in self.fovs_by_slide].index(True)
@@ -416,6 +421,24 @@ class NSCLCDataset(Dataset):
         # If it is changing, reset and update
         if augmented is not self.augmented:
             self._augmented = augmented
+            self.reset_cache()
+
+    # endregion
+
+    # region Psuedo-RGB
+    def transform_to_psuedo_rgb(self):
+        # Update the property
+        self.psuedo_rgb = True
+
+    @property
+    def psuedo_rgb(self):
+        return self._psuedo_rgb
+
+    @psuedo_rgb.setter
+    def psuedo_rgb(self, psuedo_rgb):
+        # If it is changing, reset and update
+        if psuedo_rgb is not self.psuedo_rgbu:
+            self._psuedo_rgb = psuedo_rgb
             self.reset_cache()
 
     # endregion

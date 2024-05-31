@@ -1,13 +1,13 @@
 import os
 
 import torch
-from pretrainedmodels import inceptionresnetv2
+from pretrainedmodels import xception
 import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
 
 from my_modules.model_learning.loader_maker import split_augmented_data
 from my_modules.nsclc import NSCLCDataset
-from my_modules.custom_models import CometClassifier, FeatureExtractorToClassifier as FETC
+from my_modules.custom_models import RegularizedMLPNet as RegMLP, FeatureExtractorToClassifier as FETC
 
 
 def main():
@@ -21,11 +21,13 @@ def main():
         results_file.write('Results')
 
     # Define our base feature extractor and turn the gradients off -- we won't train it, just use it to feed our MLP.
-    feature_extractor = inceptionresnetv2(num_classes=1001, pretrained=False)
+    feature_extractor = xception(num_classes=1000, pretrained=False)
 
     # Load pretrained from download
-    feature_extractor.load_state_dict(
-        torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth'))
+    state_dict = torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/xception-43020ad28.pth')
+    state_dict['last_linear.weight'] = state_dict.pop('fc.weight')
+    state_dict['last_linear.bias'] = state_dict.pop('fc.bias')
+    feature_extractor.load_state_dict(state_dict)
     for params in feature_extractor.parameters():
         params.requires_grad = False
 
@@ -44,11 +46,11 @@ def main():
     loss_fn = torch.nn.CrossEntropyLoss()
 
     # Define base classifier
-    classifier = CometClassifier
+    classifier = RegMLP
 
     # Make full model
     model = FETC(data.shape, feature_extractor=feature_extractor, classifier=classifier,
-                 layer='conv2d_7b')
+                 layer='conv4')
     model.to(device)
 
     # Prepare data loaders
@@ -131,7 +133,12 @@ def main():
             if ep + 1 in epochs:
                 # save trained model at this many epochs
                 torch.save(model.state_dict(),
-                           f'big_comet_{ep + 1}-Epochs_{lr}-LearningRate.pth')
+                           f'xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.pth')
+
+                plt.plot(training_loss[-1])
+                plt.plot(evaluation_loss[-1])
+                plt.savefig(f'output/plots/loss_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png')
+                plt.clf()
 
                 # Test
                 correct = 0
@@ -149,6 +156,7 @@ def main():
                 with open('outputs/results.txt', 'a') as results_file:
                     results_file.write(f'\n>>>Test.accu at {ep + 1} epochs with learning rate of {lr}: '
                                        f'{testing_accuracy[-1][-1]}<<<\n')
+
 
 if __name__ == '__main__':
     main()
