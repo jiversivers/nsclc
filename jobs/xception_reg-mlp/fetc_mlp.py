@@ -63,8 +63,7 @@ def main():
     testing_accuracy = []
     for lr in learning_rates:
         # Make full model
-        model = FETC(data.shape, feature_extractor=feature_extractor, classifier=classifier,
-                     layer='conv4')
+        model = FETC(data.shape, feature_extractor=feature_extractor, classifier=classifier, layer='conv4')
         model.to(device)
 
         # Make optimizer at the current larning rate with only classifier parameters
@@ -129,7 +128,7 @@ def main():
 
                 plt.plot(training_loss[-1])
                 plt.plot(evaluation_loss[-1])
-                plt.savefig(f'output/plots/loss_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png')
+                plt.savefig(f'outputs/plots/loss_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png')
                 plt.clf()
 
                 # Test
