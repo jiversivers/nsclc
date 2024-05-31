@@ -53,6 +53,7 @@ class NSCLCDataset(Dataset):
         self._shape = None
         self._augmented = False
         self._dist_transformed = False
+        self._psuedo_rgb = False
         self._normalized = False
         self._nbins = 25
 
@@ -189,7 +190,8 @@ class NSCLCDataset(Dataset):
         fov_mask[fov_mask == 0] = float('nan')
 
         # Preallocate output tensor based on mask size
-        self.image_dims = (self.stack_height,) + tuple(fov_mask.size()[1:])
+        self.image_dims = (self.stack_height, 3) + tuple(fov_mask.size()[1:]) if self.psuedo_rgb \
+            else (self.stack_height,) + tuple(fov_mask.size()[1:])
         x = torch.empty(self.image_dims, dtype=torch.float32, device=self.device)
 
         # Load modes using load functions
@@ -210,8 +212,7 @@ class NSCLCDataset(Dataset):
 
         # Expand dim 0 to look like an rgb image
         if self.psuedo_rgb:
-            x = x.expand(3, -1, -1)
-
+            x = x.expand(-1, 3, -1, -1)
 
         # Get data label and apply mask to all channels for binary classes
         # Get features based on what slide the FOV is from
