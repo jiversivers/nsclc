@@ -16,7 +16,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Create data with psuedo-RGB stack for each mode
-    data = NSCLCDataset('E://NSCLC_data_for_ML',
+    data = NSCLCDataset('data/NSCLC_Data_for_ML',
                         mode=['orr', 'taumean', 'boundfraction'], label='M', mask_on=False, device='cpu')
     data.augment()
     data.transform_to_psuedo_rgb()
@@ -42,6 +42,7 @@ def main():
     state_dict = torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/xception-43020ad28.pth')
     state_dict['last_linear.weight'] = state_dict.pop('fc.weight')
     state_dict['last_linear.bias'] = state_dict.pop('fc.bias')
+
     feature_extractor.load_state_dict(state_dict)
     for params in feature_extractor.parameters():
         params.requires_grad = False
@@ -196,7 +197,7 @@ def main():
                     f'\nEpoch: {ep}: Parallel loss-{parallel_eval_loss[-1]}. Accu. {parallel_eval_accuracy[-1]}')
 
             # If we are at a checkpoint epoch
-            if ep in epochs:
+            if ep + 1 in epochs:
                 # Testing
                 individual_corrects = len(data.mode) * [0]
                 ensemble_correct = 0
