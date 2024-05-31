@@ -87,14 +87,11 @@ def main():
                     x = x.cuda()
                 if torch.cuda.is_available() and not target.is_cuda:
                     target = target.cuda()
+
+                optimizer.zero_grad()
                 out = model(x)
 
-                # Change target label from binary label to one-hot 2-bit vector
-                y = torch.zeros_like(out)  # Array to reform target to look like out
-                for r, t in enumerate(target):  # Put 100% certainty on the class
-                    y[r, t.long()] = 1.
-
-                loss = loss_fn(out, y)
+                loss = loss_fn(out, target.unsqueeze(1))
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss.item()
