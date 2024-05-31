@@ -111,7 +111,7 @@ def main():
 
                     loss = loss_fn(out, target.unsqueeze(1))
                     eval_loss += loss.item()
-                    pred = torch.round(out, dim=1)
+                    pred = torch.round(out)
                     correct += torch.sum(pred == target.unsqueeze(1)).item()
                 evaluation_loss[-1].append(eval_loss / len(eval_set))
                 evaluation_accuracy[-1].append(100 * correct / len(eval_loader.sampler))
