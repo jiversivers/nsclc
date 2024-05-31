@@ -438,7 +438,7 @@ class NSCLCDataset(Dataset):
     @psuedo_rgb.setter
     def psuedo_rgb(self, psuedo_rgb):
         # If it is changing, reset and update
-        if psuedo_rgb is not self.psuedo_rgbu:
+        if psuedo_rgb is not self.psuedo_rgb:
             self._psuedo_rgb = psuedo_rgb
             self.reset_cache()
 
