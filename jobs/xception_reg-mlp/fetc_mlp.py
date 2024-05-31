@@ -109,15 +109,10 @@ def main():
                         target = target.cuda()
                     out = model(x)
 
-                    # Change target label from binary label to one-hot 2-bit vector
-                    y = torch.zeros_like(out)  # Array to reform target to look like out
-                    for r, t in enumerate(target):  # Put 100% certainty on the class
-                        y[r, t.long()] = 1.
-
-                    loss = loss_fn(out, y)
+                    loss = loss_fn(out, target.unsqueeze(1))
                     eval_loss += loss.item()
-                    pred = torch.argmax(out, dim=1)
-                    correct += torch.sum(pred == target).item()
+                    pred = torch.round(out, dim=1)
+                    correct += torch.sum(pred == target.unsqueeze(1)).item()
                 evaluation_loss[-1].append(eval_loss / len(eval_set))
                 evaluation_accuracy[-1].append(100 * correct / len(eval_loader.sampler))
 
@@ -147,8 +142,8 @@ def main():
                         if torch.cuda.is_available() and not target.is_cuda:
                             target = target.cuda()
                         out = model(x)
-                        pred = torch.argmax(out, dim=1)
-                        correct += torch.sum(pred == target).item()
+                        pred = torch.round(out)
+                        correct += torch.sum(pred == target.unsqueeze(1)).item()
                     testing_accuracy[-1].append(100 * correct / len(test_loader.sampler))
                 with open('outputs/results.txt', 'a') as results_file:
                     results_file.write(f'\n>>>Test.accu at {ep + 1} epochs with learning rate of {lr}: '

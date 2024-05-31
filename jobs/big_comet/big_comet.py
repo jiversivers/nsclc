@@ -137,7 +137,7 @@ def main():
 
                 plt.plot(training_loss[-1])
                 plt.plot(evaluation_loss[-1])
-                plt.savefig(f'outputs/plot/loss_big_comet_{ep + 1}-Epochs_{lr}-LearningRate.png')
+                plt.savefig(f'outputs/plots/loss_big_comet_{ep + 1}-Epochs_{lr}-LearningRate.png')
                 plt.clf()
 
                 # Test
