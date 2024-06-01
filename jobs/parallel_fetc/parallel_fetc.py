@@ -107,6 +107,7 @@ def main():
         individual_test_accuracies.append([])
         ensemble_test_accuracy.append([])
         parallel_test_accuracy.append([])
+
         for ep in range(epoch):
             # Training
             individual_losses = len(data.mode) * [0]
@@ -122,7 +123,7 @@ def main():
                 # Get final output for each model and do backprop
                 [optimizer.zero_grad() for optimizer in optimizers]
                 outs = [model(x[:, ch].squeeze(1)) for ch, model in enumerate(models)]
-                losses = [loss_fn(out, target.unsqueeze()) for out in outs]
+                losses = [loss_fn(out, target.unsqueeze(1)) for out in outs]
                 [loss.backward() for loss in losses]
                 for individual_loss, loss in zip(individual_losses, losses):
                     individual_loss += loss.item()
@@ -131,7 +132,7 @@ def main():
                 # Feed parallel-extracted features into full classifier
                 parallel_optimizer.zero_grad()
                 out = fetc_parallel_classifier(torch.stack(features, dim=1))
-                loss = loss_fn(out, target.unsqueeze())
+                loss = loss_fn(out, target.unsqueeze(1))
                 loss.backward()
                 parallel_loss += loss.item()
                 parallel_optimizer.step()
@@ -159,7 +160,7 @@ def main():
                     outs = [model(x[:, ch].squeeze(1)) for ch, model in enumerate(models)]
                     preds = [torch.round(out) for out in outs]
                     individual_corrects = [torch.sum(pred == target.unsqueeze(1)) for pred in preds]
-                    losses = [loss_fn(out, target.unsqueeze()) for out in outs]
+                    losses = [loss_fn(out, target.unsqueeze(1)) for out in outs]
                     for individual_loss, loss in zip(individual_losses, losses):
                         individual_loss += loss.item()
 
@@ -172,7 +173,7 @@ def main():
                     out = fetc_parallel_classifier(torch.stack(features, dim=1))
                     pred = torch.round(out)
                     parallel_correct = torch.sum(pred == target.unsqueeze(1))
-                    loss = loss_fn(out, target.unsqueeze())
+                    loss = loss_fn(out, target.unsqueeze(1))
                     parallel_loss += loss.item()
 
             # Update validation checks
@@ -185,16 +186,16 @@ def main():
 
             # Write outputs
             with open('outputs/individual_results.txt', 'a') as results_file:
-                results_file.write(f'\nEpoch: {ep}:')
+                results_file.write(f'\nEpoch: {ep + 1}:')
                 for mode, loss, accu in zip(data.mode, individual_training_loss[-1], individual_eval_accuracies[-1]):
                     results_file.write(f'-- {mode}: Loss-{loss:.4f}. Accu-{accu} -- ')
 
             with open('outputs/ensemble_results.txt', 'a') as results_file:
-                results_file.write(f'\nEpoch: {ep}: Ensemble accu-{ensemble_eval_accuracy[-1]}')
+                results_file.write(f'\nEpoch: {ep + 1}: Ensemble accu-{ensemble_eval_accuracy[-1]}')
 
             with open('outputs/parallel_results.txt', 'a') as results_file:
                 results_file.write(
-                    f'\nEpoch: {ep}: Parallel loss-{parallel_eval_loss[-1]}. Accu. {parallel_eval_accuracy[-1]}')
+                    f'\nEpoch: {ep + 1}: Parallel loss-{parallel_eval_loss[-1]}. Accu. {parallel_eval_accuracy[-1]}')
 
             # If we are at a checkpoint epoch
             if ep + 1 in epochs:
@@ -225,7 +226,7 @@ def main():
                         out = fetc_parallel_classifier(torch.stack(features, dim=1))
                         pred = torch.round(out)
                         parallel_correct = torch.sum(pred == target.unsqueeze(1))
-                        loss = loss_fn(out, target.unsqueeze())
+                        loss = loss_fn(out, target.unsqueeze(1))
                         parallel_loss += loss.item()
 
                 # Update validation checks
@@ -235,18 +236,17 @@ def main():
 
                 # Write outputs
                 with open('outputs/individual_results.txt', 'a') as results_file:
-                    results_file.write(f'\n>>>Epoch: {ep}:')
+                    results_file.write(f'\n>>>Epoch: {ep + 1}:')
                     for mode, accu in zip(data.mode, individual_test_accuracies[-1]):
                         results_file.write(f'-- {mode}: Accu-{accu} -- ')
                     results_file.write(f'<<<\n')
 
                 with open('outputs/ensemble_results.txt', 'a') as results_file:
-                    results_file.write(f'\n>>>Epoch: {ep}: Ensemble accu-{ensemble_test_accuracy[-1]}<<<\n')
+                    results_file.write(f'\n>>>Epoch: {ep + 1}: Ensemble accu-{ensemble_test_accuracy[-1]}<<<\n')
 
                 with open('outputs/parallel_results.txt', 'a') as results_file:
                     results_file.write(
-                        f'\n>>>Epoch: {ep}: Parallel Accu. {parallel_test_accuracy[-1]}<<<\n')
-
+                        f'\n>>>Epoch: {ep + 1}: Parallel Accu. {parallel_test_accuracy[-1]}<<<\n')
 
 if __name__ == '__main__':
     main()
