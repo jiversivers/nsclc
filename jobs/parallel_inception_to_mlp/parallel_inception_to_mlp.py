@@ -79,8 +79,6 @@ def main():
         # Individual and ensemble-averaging models
         models = [FETC(data.shape[1:], feature_extractor=feature_extractor, classifier=classifier, layer='conv2d_7b')
                   for _ in range(len(data.mode))]
-        print(f'Data shape:{data.shape}')
-        print(f'Model init shape:{data.shape[1:]}')
         [model.to(device) for model in models]
 
         # Parallel feature extraction to single net model with input size for all models features
@@ -116,8 +114,6 @@ def main():
                 # Mode-wise models (for individual and ensemble architectures)
                 with torch.no_grad():
                     # Get feature maps, avg, and flatten (just like in the whole model)
-                    print(f'x shape: {x.shape}')
-                    print(f'individual x shape: {x[:, 0].squeeze(1)}')
                     features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
                                 for ch, model in enumerate(models)]
 
