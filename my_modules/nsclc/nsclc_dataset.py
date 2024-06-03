@@ -209,7 +209,8 @@ class NSCLCDataset(Dataset):
             x = x[sub_index]
             fov_mask = fov_mask[sub_index]
 
-        # Expand dim 0 to look like an rgb image
+        # Unsqueeze so "color" is dim 1 and expand to look like an RGB image
+        # New image dims: (M, C, H, W), where M is the mode, C is the psuedo-color channel, H and W are height and width
         if self.psuedo_rgb:
             x = x.unsqueeze(1).expand(-1, 3, -1, -1)
 
