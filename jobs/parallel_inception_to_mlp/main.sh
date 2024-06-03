@@ -29,14 +29,14 @@ files=/home/jdivers/data/NSCLC_Data_for_ML
 echo "Copying files..."
 mkdir /scratch/$SLURM_JOB_ID/data
 rsync -avq $files /scratch/$SLURM_JOB_ID/data
-rsync -avq $SLURM_SUBMIT_DIR/parallel_inception_to_MLP.py /scratch/$SLURM_JOB_ID
+rsync -avq $SLURM_SUBMIT_DIR/parallel_inception_to_mlp.py /scratch/$SLURM_JOB_ID
 rsync -avq /home/jdivers/nsclc/my_modules /scratch/$SLURM_JOB_ID
 wait
 
 cd /scratch/$SLURM_JOB_ID/ || exit
 
 echo "Python script initiating..."
-python3 parallel_inception_to_MLP.py
+python3 parallel_inception_to_mlp.py
 
 rsync -av -q /scratch/$SLURM_JOB_ID/outputs $SLURM_SUBMIT_DIR/
 
