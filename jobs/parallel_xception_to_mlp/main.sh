@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=parallel_fetc_iterator
+#SBATCH --job-name=parallel_xception_to_mlp
 #SBATCH --partition=agpu06
 #SBATCH --output=nsclc_main.txt
 #SBATCH --error=nsclc_main.err
@@ -24,20 +24,20 @@ echo $SLURM_JOB_ID
 
 cd $SLURM_SUBMIT_DIR || exit
 # input files needed for job
-files=/home/jdivers/ondemand/data/sys/myjobs/projects/nsclc/data
+files=/home/jdivers/data/NSCLC_Data_for_ML
 
 echo "Copying files..."
-rsync -avq $files /scratch/$SLURM_JOB_ID
-rsync -avq $SLURM_SUBMIT_DIR/parallel_fetc.py /scratch/$SLURM_JOB_ID
+mkdir /scratch/$SLURM_JOB_ID/data
+rsync -avq $files /scratch/$SLURM_JOB_ID/data
+rsync -avq $SLURM_SUBMIT_DIR/parallel_xception_to_mlp.py /scratch/$SLURM_JOB_ID
 rsync -avq /home/jdivers/nsclc/my_modules /scratch/$SLURM_JOB_ID
 wait
 
 cd /scratch/$SLURM_JOB_ID/ || exit
 
 echo "Python script initiating..."
-python3 parallel_fetc.py
+python3 parallel_xception_to_mlp.py
 
-mkdir -p $SLURM_SUBMIT_DIR/$job_name
 rsync -av -q /scratch/$SLURM_JOB_ID/outputs $SLURM_SUBMIT_DIR/
 
 # check if rsync succeeded
