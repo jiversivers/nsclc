@@ -179,7 +179,7 @@ class NSCLCDataset(Dataset):
         # region Load Data and Label
         # Get image path from index
         if self.augmented:
-            fov_index = int(np.floor(index / 5))  # This will give us the index for the fov
+            fov_index = int(torch.floor(index / 5))  # This will give us the index for the fov
             sub_index = index % 5  # This will give us the index for the crop within the fov
         else:
             fov_index = index
@@ -222,26 +222,25 @@ class NSCLCDataset(Dataset):
                 if self.mask_on:
                     x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
                 y = torch.tensor(1 if self.features['Status (NR/R)'].iloc[slide_idx] == 'R' else 0,
-                                 dtype=torch.float32)
+                                 dtype=torch.float32, device=self.device)
             case 'Metastases':
                 if self.mask_on:
                     x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
                 y = torch.tensor(1 if self.features['Status (Mets/NM)'].iloc[slide_idx] == 'NM' else 0,
-                                 dtype=torch.float32)
+                                 dtype=torch.float32, device=self.device)
             case 'Mask':
                 y = fov_mask
             case None:
                 y = torch.tensor(-999999,  # Placeholder for NaN label
-                                 dtype=torch.float32)
+                                 dtype=torch.float32, device=self.device)
             case _:
                 raise Exception('An unrecognized label is in use. Update label attribute of dataset and try again.')
 
         # Apply distribution transform, if called
         if self.dist_transformed:
-            x_dist = torch.empty((self.stack_height,) + (self._nbins,), dtype=torch.float32)
+            x_dist = torch.empty((self.stack_height,) + (self._nbins,), dtype=torch.float32, device=self.device)
             for ch, mode in enumerate(x):
                 x_dist[ch], _ = torch.histogram(mode.cpu(), bins=self._nbins, range=[0, 1], density=True)
-            x = x_dist.to(self.device)
 
         # Cache the sample if the caches have been opened
         if self.shared_x is not None and self.shared_y is not None:
@@ -289,6 +288,9 @@ class NSCLCDataset(Dataset):
         self.shared_x = self.shared_x.to(device)
         self.shared_y = self.shared_y.to(device)
 
+        # Move any self-held tensors to device for ops compatibility
+        self.scalars.to(device) if self.scalars is not None else None
+
         # Update device for future items
         self.device = device
 
@@ -312,7 +314,7 @@ class NSCLCDataset(Dataset):
     # Shape (cannot be changed directly)
     @property
     def shape(self):
-        self._shape = self[0][0].shape
+        self._shape = self.image_dims if not self.psuedo_rgb else (self.image_dims[0], 3) + tuple(self.image_dims[2:])
         return self._shape
 
     # Label
