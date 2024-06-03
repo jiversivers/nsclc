@@ -179,7 +179,7 @@ class NSCLCDataset(Dataset):
         # region Load Data and Label
         # Get image path from index
         if self.augmented:
-            fov_index = int(torch.floor(index / 5))  # This will give us the index for the fov
+            fov_index = int(np.floor(index / 5))  # This will give us the index for the fov
             sub_index = index % 5  # This will give us the index for the crop within the fov
         else:
             fov_index = index
