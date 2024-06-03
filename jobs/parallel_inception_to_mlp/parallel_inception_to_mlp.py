@@ -37,7 +37,7 @@ def main():
         results_file.write(f'Parallel Results')
 
     # Define our base feature extractor and turn the gradients off -- we won't train it, just use it to feed our MLP.
-    feature_extractor = inception(num_classes=1000, pretrained=False)
+    feature_extractor = inception(num_classes=1001, pretrained=False)
 
     # Load pretrained from download
     state_dict = torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth')
