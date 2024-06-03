@@ -7,12 +7,12 @@ import torch.multiprocessing as mp
 
 from my_modules.model_learning.loader_maker import split_augmented_data
 from my_modules.nsclc import NSCLCDataset
-from my_modules.custom_models import RegularizedMLPNet as RegMLP, FeatureExtractorToClassifier as FETC
+from my_modules.custom_models import MLPNet as MLP, FeatureExtractorToClassifier as FETC
 
 
 def main():
     # Set up multiprocessing context
-    mp.set_start_method('forkserver', force=True)
+    # mp.set_start_method('forkserver', force=True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Create data with psuedo-RGB stack for each mode
@@ -48,7 +48,7 @@ def main():
         params.requires_grad = False
 
     # Define classifier
-    classifier = RegMLP
+    classifier = MLP
 
     # Set up hyperparameters
     batch_size = 64
@@ -82,11 +82,13 @@ def main():
         # Individual and ensemble-averaging models
         models = [FETC(data.shape[1:], feature_extractor=feature_extractor, classifier=classifier, layer='conv4')
                   for _ in range(len(data.mode))]
+        print(f'Data shape:{data.shape}')
+        print(f'Model init shape:{data.shape[1:]}')
         [model.to(device) for model in models]
 
         # Parallel feature extraction to single net model with input size for all models features
         input_size = sum([model.feature_map_dims[1] for model in models])
-        fetc_parallel_classifier = RegMLP(input_size)
+        fetc_parallel_classifier = MLP(input_size)
 
         # Set up optimizers
         optimizers = [optim_fn(model.parameters(), lr=lr) for model in models]
@@ -117,6 +119,8 @@ def main():
                 # Mode-wise models (for individual and ensemble architectures)
                 with torch.no_grad():
                     # Get feature maps, avg, and flatten (just like in the whole model)
+                    print(f'x shape: {x.shape}')
+                    print(f'individual x shape: {x[:, 0].squeeze(1)}')
                     features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
                                 for ch, model in enumerate(models)]
 
