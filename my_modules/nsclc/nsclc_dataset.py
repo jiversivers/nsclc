@@ -199,10 +199,6 @@ class NSCLCDataset(Dataset):
 
         # Scale by the max value of normalized
         if self.normalized:
-            print(f'x device: {x.device.type}')
-            print(f'scalars device: {self.scalars.device.type}')
-            self.scalars.to(self.device)
-            x.to(self.device)
             x = x / self.scalars
 
         # Crop and sub index if necessary
@@ -294,7 +290,7 @@ class NSCLCDataset(Dataset):
         self.shared_y = self.shared_y.to(device)
 
         # Move any self-held tensors to device for ops compatibility
-        self.scalars.to(device) if self.scalars is not None else None
+        self.scalars = self.scalars.to(device) if self.scalars is not None else None
 
         # Update device for future items
         self.device = device
@@ -468,8 +464,8 @@ class NSCLCDataset(Dataset):
         maxes = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
         for ii, (stack, _) in enumerate(self):
             # Does the same as np.nanmax(stack, dim=(1,2)) but keeps the tensor on the GPU
-            maxes[ii] = torch.max(torch.max(torch.nan_to_num(stack, nan=-100000), 1).values, 1).values.to(self.device)
-        self.scalars = torch.max(maxes, 0).values.to(self.device)
+            maxes[ii] = torch.max(torch.max(torch.nan_to_num(stack, nan=-100000), 1).values, 1).values
+        self.scalars = torch.max(maxes, 0).values
         self.scalars = self.scalars.unsqueeze(1).unsqueeze(2).to(self.device)
 
         # Reset psuedo_rgb
