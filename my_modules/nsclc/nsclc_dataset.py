@@ -202,7 +202,7 @@ class NSCLCDataset(Dataset):
             print(f'x device: {x.device.type}')
             print(f'scalars device: {self.scalars.device.type}')
             self.scalars.to(self.device)
-            self.x.to(self.device)
+            x.to(self.device)
             x = x / self.scalars
 
         # Crop and sub index if necessary
@@ -468,9 +468,9 @@ class NSCLCDataset(Dataset):
         maxes = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
         for ii, (stack, _) in enumerate(self):
             # Does the same as np.nanmax(stack, dim=(1,2)) but keeps the tensor on the GPU
-            maxes[ii] = torch.max(torch.max(torch.nan_to_num(stack, nan=-100000), 1).values, 1).values
-        self.scalars = torch.max(maxes, 0).values
-        self.scalars = torch.tensor(self.scalars[:, None, None], device=self.device)
+            maxes[ii] = torch.max(torch.max(torch.nan_to_num(stack, nan=-100000), 1).values, 1).values.to(self.device)
+        self.scalars = torch.max(maxes, 0).values.to(self.device)
+        self.scalars = self.scalars.unsqueeze(1).unsqueeze(2).to(self.device)
 
         # Reset psuedo_rgb
         self.psuedo_rgb = temp_psuedo
