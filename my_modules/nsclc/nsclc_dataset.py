@@ -466,7 +466,7 @@ class NSCLCDataset(Dataset):
             # Does the same as np.nanmax(stack, dim=(1,2)) but keeps the tensor on the GPU
             maxes[ii] = torch.max(torch.max(torch.nan_to_num(stack, nan=-100000), 1).values, 1).values
         self.scalars = torch.max(maxes, 0).values
-        self.scalars = self.scalars[:, None, None]
+        self.scalars = torch.tensor(self.scalars[:, None, None], device=self.device)
 
         # Reset psuedo_rgb
         self.psuedo_rgb = temp_psuedo
