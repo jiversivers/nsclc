@@ -259,6 +259,7 @@ class NSCLCDataset(Dataset):
         self.index_cache = None
         self.shared_x = None
         self.shared_y = None
+        self._shape = None
 
         # Setup shared memory arrays (i.e. caches that are compatible with multiple workers)
         # negative initialization ensure no overlap with actual cached indices
