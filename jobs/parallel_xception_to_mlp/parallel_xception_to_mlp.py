@@ -87,7 +87,7 @@ def main():
 
         # Parallel feature extraction to single net model with input size for all models features
         input_size = sum([model.feature_map_dims[1] for model in models])
-        fetc_parallel_classifier = MLP(input_size)
+        fetc_parallel_classifier = MLP(input_size).to(device)
 
         # Set up optimizers
         optimizers = [optim_fn(model.parameters(), lr=lr) for model in models]
