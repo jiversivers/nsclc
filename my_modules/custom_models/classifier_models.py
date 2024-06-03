@@ -553,10 +553,12 @@ class FeatureExtractorToClassifier(nn.Module):
             x.to(next(self.feature_extractor.parameters()).device)
             _ = self.feature_extractor(x)
         except Exception as e:
-            # Print the first occurence of the error type
+            # Print the first occurrence of the error type
             if type(e) not in self.exception_list:
                 self.exception_list.append(type(e))
-                print(f'{''.join(traceback.format_tb(e.__traceback__))}\n Warning {type(e)} error caught during feature extraction')
+                print(f'{''.join(traceback.format_tb(e.__traceback__))}\n '
+                      f'Warning {type(e)} error caught during feature extraction\n'
+                      f'{e}')
             else:
                 pass
 
