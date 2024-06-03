@@ -494,6 +494,7 @@ class FeatureExtractorToClassifier(nn.Module):
         self.feature_extractor = feature_extractor
         self.layer = [layer] if type(layer) is not list else layer
         self._layer_for_eval = ''.join(['.' + lay for lay in self.layer])
+        self.exception_list = []
 
         # Dry run for feature dims
         self.feature_map_dims = self.get_features(
@@ -548,11 +549,15 @@ class FeatureExtractorToClassifier(nn.Module):
 
         # Get the features from the specified layer via the hook, even if the image is "too small" for the final avg filter
         try:
+            x.to(next(self.feature_extractor.parameters()).device)
             _ = self.feature_extractor(x)
         except Exception as e:
-            print(f'{type(e).__name__}: {e}')
-            # if e == RuntimeError:
-
+            # Print the first occurence of the error type
+            if type(e) not in self.exception_list:
+                self.exception_list.append(type(e))
+                print(f'{type(e).__name__}: {e}')
+            else:
+                pass
 
         # Clean up the hook
         fh.remove()
