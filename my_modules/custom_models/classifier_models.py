@@ -550,8 +550,9 @@ class FeatureExtractorToClassifier(nn.Module):
         try:
             _ = self.feature_extractor(x)
         except Exception as e:
-            if e == RuntimeError:
-                pass
+            print(f'{type(e).__name__}: {e}')
+            # if e == RuntimeError:
+
 
         # Clean up the hook
         fh.remove()
