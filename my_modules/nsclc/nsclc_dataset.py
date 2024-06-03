@@ -199,6 +199,10 @@ class NSCLCDataset(Dataset):
 
         # Scale by the max value of normalized
         if self.normalized:
+            print(f'x device: {x.device.type}')
+            print(f'scalars device: {self.scalars.device.type}')
+            self.scalars.to(self.device)
+            self.x.to(self.device)
             x = x / self.scalars
 
         # Crop and sub index if necessary
