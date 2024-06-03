@@ -12,7 +12,7 @@ from my_modules.custom_models import MLPNet as MLP, FeatureExtractorToClassifier
 
 def main():
     # Set up multiprocessing context
-    # mp.set_start_method('forkserver', force=True)
+    mp.set_start_method('forkserver', force=True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Create data with psuedo-RGB stack for each mode
@@ -21,6 +21,7 @@ def main():
     data.augment()
     data.transform_to_psuedo_rgb()
     data.normalize_channels_to_max()
+    data.to(device)
 
     # Prep output dirs and files
     os.makedirs('outputs/plots', exist_ok=True)
@@ -82,8 +83,6 @@ def main():
         # Individual and ensemble-averaging models
         models = [FETC(data.shape[1:], feature_extractor=feature_extractor, classifier=classifier, layer='conv4')
                   for _ in range(len(data.mode))]
-        print(f'Data shape:{data.shape}')
-        print(f'Model init shape:{data.shape[1:]}')
         [model.to(device) for model in models]
 
         # Parallel feature extraction to single net model with input size for all models features
@@ -119,8 +118,6 @@ def main():
                 # Mode-wise models (for individual and ensemble architectures)
                 with torch.no_grad():
                     # Get feature maps, avg, and flatten (just like in the whole model)
-                    print(f'x shape: {x.shape}')
-                    print(f'individual x shape: {x[:, 0].squeeze(1).shape}')
                     features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
                                 for ch, model in enumerate(models)]
 
@@ -154,6 +151,10 @@ def main():
             # Iterate through dataloader
             with torch.no_grad():
                 for x, target in evaluation_loader:
+                    # Put onto GPU if not
+                    if torch.cuda.is_available():
+                        x = x.cuda() if x.device.type != 'cuda' else x
+                        target = target.cuda() if target.device.type != 'cuda' else target
                     # Mode-wise models (for individual and ensemble architectures)
                     # Get feature maps, avg, and flatten (just like in the whole model)
                     features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
@@ -210,6 +211,9 @@ def main():
                 # Iterate through dataloader
                 with torch.no_grad():
                     for x, target in testing_loader:
+                        if torch.cuda.is_available():
+                            x = x.cuda() if x.device.type != 'cuda' else x
+                            target = target.cuda() if target.device.type != 'cuda' else target
                         # Mode-wise models (for individual and ensemble architectures)
                         # Get feature maps, avg, and flatten (just like in the whole model)
                         features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
