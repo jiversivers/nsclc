@@ -21,6 +21,7 @@ def main():
     data.augment()
     data.transform_to_psuedo_rgb()
     data.normalize_channels_to_max()
+    data.to(device)
 
     # Prep output dirs and files
     os.makedirs('outputs/plots', exist_ok=True)
@@ -38,7 +39,7 @@ def main():
     # Define our base feature extractor and turn the gradients off -- we won't train it, just use it to feed our MLP.
     feature_extractor = inception(num_classes=1000, pretrained=False)
 
-    # Load pretrained from download and turn off grad
+    # Load pretrained from download
     state_dict = torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth')
     feature_extractor.load_state_dict(state_dict)
     for params in feature_extractor.parameters():
@@ -83,7 +84,7 @@ def main():
 
         # Parallel feature extraction to single net model with input size for all models features
         input_size = sum([model.feature_map_dims[1] for model in models])
-        fetc_parallel_classifier = MLP(input_size)
+        fetc_parallel_classifier = MLP(input_size).to(device)
 
         # Set up optimizers
         optimizers = [optim_fn(model.parameters(), lr=lr) for model in models]
@@ -147,6 +148,10 @@ def main():
             # Iterate through dataloader
             with torch.no_grad():
                 for x, target in evaluation_loader:
+                    # Put onto GPU if not
+                    if torch.cuda.is_available():
+                        x = x.cuda() if x.device.type != 'cuda' else x
+                        target = target.cuda() if target.device.type != 'cuda' else target
                     # Mode-wise models (for individual and ensemble architectures)
                     # Get feature maps, avg, and flatten (just like in the whole model)
                     features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
@@ -203,6 +208,9 @@ def main():
                 # Iterate through dataloader
                 with torch.no_grad():
                     for x, target in testing_loader:
+                        if torch.cuda.is_available():
+                            x = x.cuda() if x.device.type != 'cuda' else x
+                            target = target.cuda() if target.device.type != 'cuda' else target
                         # Mode-wise models (for individual and ensemble architectures)
                         # Get feature maps, avg, and flatten (just like in the whole model)
                         features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
@@ -233,17 +241,17 @@ def main():
 
                 # Write outputs
                 with open('outputs/individual_results.txt', 'a') as results_file:
-                    results_file.write(f'\n>>>Epoch: {ep + 1}:')
+                    results_file.write(f'\n>>>LR: {lr} Epoch: {ep + 1}:')
                     for mode, accu in zip(data.mode, individual_test_accuracies[-1]):
                         results_file.write(f'-- {mode}: Accu-{accu} -- ')
                     results_file.write(f'<<<\n')
 
                 with open('outputs/ensemble_results.txt', 'a') as results_file:
-                    results_file.write(f'\n>>>Epoch: {ep + 1}: Ensemble accu-{ensemble_test_accuracy[-1]}<<<\n')
+                    results_file.write(f'\n>>>LR: {lr} Epoch: {ep + 1}: Ensemble accu-{ensemble_test_accuracy[-1]}<<<\n')
 
                 with open('outputs/parallel_results.txt', 'a') as results_file:
                     results_file.write(
-                        f'\n>>>Epoch: {ep + 1}: Parallel Accu. {parallel_test_accuracy[-1]}<<<\n')
+                        f'\n>>>LR: {lr} Epoch: {ep + 1}: Parallel Accu. {parallel_test_accuracy[-1]}<<<\n')
 
 if __name__ == '__main__':
     main()
