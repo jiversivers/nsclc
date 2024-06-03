@@ -550,7 +550,7 @@ class FeatureExtractorToClassifier(nn.Module):
         try:
             _ = self.feature_extractor(x)
         except Exception as e:
-            warnings.warn(e)
+            print(f'{type(e).__name__}: {e}')
             # if e == RuntimeError:
 
 
