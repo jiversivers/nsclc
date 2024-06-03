@@ -186,7 +186,7 @@ class NSCLCDataset(Dataset):
         fov = self.all_fovs[fov_index]
 
         # Load mask
-        fov_mask = self.fov_mode_dict[fov_index]['mask'][0](self.fov_mode_dict[fov_index]['mask'])
+        fov_mask = self.fov_mode_dict[fov_index]['mask'][0](self.fov_mode_dict[fov_index]['mask']).to(self.device)
         fov_mask[fov_mask == 0] = float('nan')
 
         # Preallocate output tensor based on mask size
@@ -195,7 +195,7 @@ class NSCLCDataset(Dataset):
 
         # Load modes using load functions
         for ii, mode in enumerate(self.mode):
-            x[ii] = self.fov_mode_dict[fov_index][mode][0](self.fov_mode_dict[fov_index][mode])
+            x[ii] = self.fov_mode_dict[fov_index][mode][0](self.fov_mode_dict[fov_index][mode]).to(self.device)
 
         # Scale by the max value of normalized
         if self.normalized:
@@ -314,7 +314,8 @@ class NSCLCDataset(Dataset):
     # Shape (cannot be changed directly)
     @property
     def shape(self):
-        self._shape = self.image_dims if not self.psuedo_rgb else (self.image_dims[0], 3) + tuple(self.image_dims[2:])
+        if self._shape is None:
+            self._shape = self[0][0].shape
         return self._shape
 
     # Label
