@@ -2,7 +2,7 @@ import os
 
 import torch
 from torch import nn
-from pretrainedmodels import xception
+from pretrainedmodels import inceptionresnetv2 as inception
 import torch.multiprocessing as mp
 
 from my_modules.model_learning.loader_maker import split_augmented_data
@@ -12,7 +12,7 @@ from my_modules.custom_models import MLPNet as MLP, FeatureExtractorToClassifier
 
 def main():
     # Set up multiprocessing context
-    # mp.set_start_method('forkserver', force=True)
+    mp.set_start_method('forkserver', force=True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Create data with psuedo-RGB stack for each mode
@@ -36,13 +36,10 @@ def main():
         results_file.write(f'Parallel Results')
 
     # Define our base feature extractor and turn the gradients off -- we won't train it, just use it to feed our MLP.
-    feature_extractor = xception(num_classes=1000, pretrained=False)
+    feature_extractor = inception(num_classes=1000, pretrained=False)
 
-    # Load pretrained from download
-    state_dict = torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/xception-43020ad28.pth')
-    state_dict['last_linear.weight'] = state_dict.pop('fc.weight')
-    state_dict['last_linear.bias'] = state_dict.pop('fc.bias')
-
+    # Load pretrained from download and turn off grad
+    state_dict = torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth')
     feature_extractor.load_state_dict(state_dict)
     for params in feature_extractor.parameters():
         params.requires_grad = False
@@ -80,7 +77,7 @@ def main():
     for lr in learning_rates:
         # Create models
         # Individual and ensemble-averaging models
-        models = [FETC(data.shape[1:], feature_extractor=feature_extractor, classifier=classifier, layer='conv4')
+        models = [FETC(data.shape[1:], feature_extractor=feature_extractor, classifier=classifier, layer='conv2d_7b')
                   for _ in range(len(data.mode))]
         print(f'Data shape:{data.shape}')
         print(f'Model init shape:{data.shape[1:]}')
