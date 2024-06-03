@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torch import nn
 import warnings
+import traceback
 
 
 # region MLPs
@@ -555,7 +556,7 @@ class FeatureExtractorToClassifier(nn.Module):
             # Print the first occurence of the error type
             if type(e) not in self.exception_list:
                 self.exception_list.append(type(e))
-                print(f'{type(e).__name__}: {e}')
+                print(f'{''.join(traceback.format_tb(e.__traceback__))}\n Warning {type(e)} error caught during feature extraction')
             else:
                 pass
 
