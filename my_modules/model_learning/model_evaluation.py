@@ -43,10 +43,7 @@ def calculate_auc_roc(model, loader, print_results=False, make_plot=False,
     # Optional figure creation
     if make_plot:
         # Move to host memory (if on GPU)
-        fpr = fpr.cpu()
-        tpr = tpr.cpu()
         thresholds = thresholds.cpu()
-        acc = acc.cpu()
 
         # For plot
         fig, ax1 = plt.subplots()
