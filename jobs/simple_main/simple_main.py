@@ -23,6 +23,7 @@ def main():
                         label='Metastases')
     print('Normalizing data to channel max...')
     data.normalize_channels_to_max()
+    data.to(device)
 
     # Dataloader parameters
     batch_size = 32
