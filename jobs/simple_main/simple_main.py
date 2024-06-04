@@ -101,11 +101,11 @@ def main():
                     if ep == 0 or acc > best_accu:
                         best_accu = acc
                         print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
-                        torch.save(model.state_dict(), f'raw_img_models/{data.name}__{model.name}__{lr}_{ep + 1}.pth')
+                        torch.save(model.state_dict(), f'raw_img_models/{data.name}__{model.name}__{lr}.pth')
 
                 # Test
                 if ep + 1 in epochs:
-                    model.load_state_dict(torch.load(f'raw_img_models/{data.name}__{model.name}__{lr}_{ep + 1}.pth'))
+                    model.load_state_dict(torch.load(f'raw_img_models/{data.name}__{model.name}__{lr}.pth'))
                     print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
                     auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
 
@@ -173,11 +173,11 @@ def main():
                     if ep == 0 or acc > best_accu:
                         best_accu = acc
                         print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
-                        torch.save(model.state_dict(), f'aug_img_models/{data.name}__{model.name}__{lr}_{ep + 1}.pth')
+                        torch.save(model.state_dict(), f'aug_img_models/{data.name}__{model.name}__{lr}.pth')
 
                 # Test
                 if ep + 1 in epochs:
-                    model.load_state_dict(torch.load(f'aug_img_models/{data.name}__{model.name}__{lr}_{ep + 1}.pth'))
+                    model.load_state_dict(torch.load(f'aug_img_models/{data.name}__{model.name}__{lr}.pth'))
                     print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
                     auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
 
@@ -246,11 +246,11 @@ def main():
                     if ep == 0 or acc > best_accu:
                         best_accu = acc
                         print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
-                        torch.save(model.state_dict(), f'aug_hist_models/{data.name}__{model.name}__{lr}_{ep + 1}.pth')
+                        torch.save(model.state_dict(), f'aug_hist_models/{data.name}__{model.name}__{lr}.pth')
 
                 # Test
                 if ep + 1 in epochs:
-                    model.load_state_dict(torch.load(f'aug_hist_models/{data.name}__{model.name}__{lr}_{ep + 1}.pth'))
+                    model.load_state_dict(torch.load(f'aug_hist_models/{data.name}__{model.name}__{lr}.pth'))
                     print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
                     auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
 
@@ -318,11 +318,11 @@ def main():
                     if ep == 0 or acc > best_accu:
                         best_accu = acc
                         print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
-                        torch.save(model.state_dict(), f'raw_hist_models/{data.name}__{model.name}__{lr}_{ep + 1}.pth')
+                        torch.save(model.state_dict(), f'raw_hist_models/{data.name}__{model.name}__{lr}.pth')
 
                 # Test
                 if ep + 1 in epochs:
-                    model.load_state_dict(torch.load(f'raw_hist_models/{data.name}__{model.name}__{lr}_{ep + 1}.pth'))
+                    model.load_state_dict(torch.load(f'raw_hist_models/{data.name}__{model.name}__{lr}.pth'))
                     print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
                     auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
 
