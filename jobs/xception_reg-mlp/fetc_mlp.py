@@ -129,7 +129,8 @@ def main():
                 fig.savefig(f'outputs/plots/auc_acc_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png')
                 plt.close(fig)
                 with open('outputs/results.txt', 'a') as results_file:
-                    results_file.write(f'\n>>> AUC: {auc:.2f} || ACC: {100 * acc:.2f}% at THRESH: {thresh:.2f} <<<')
+                    results_file.write(f'\n>>> Epoch {ep + 1} LR {lr} || '
+                                       f'AUC: {auc:.2f} || ACC: {100 * acc:.2f}% at THRESH: {thresh:.2f} <<<')
 
 if __name__ == '__main__':
     main()
