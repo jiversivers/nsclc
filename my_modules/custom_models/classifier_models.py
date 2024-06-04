@@ -18,7 +18,6 @@ class MLPNet(nn.Module):
         self.fc3 = nn.Linear(512, 1)
 
         self.relu = nn.ReLU()
-        self.sigm = nn.Sigmoid()
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
@@ -28,7 +27,7 @@ class MLPNet(nn.Module):
         x = self.fc2(x)
         x = self.relu(x)
         x = self.fc3(x)
-        x = self.sigm(x)
+
         return x
 
 
@@ -46,7 +45,6 @@ class RegularizedMLPNet(nn.Module):
 
         self.drop = nn.Dropout(0.25)
         self.relu = nn.ReLU()
-        self.sigm = nn.Sigmoid()
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
@@ -59,7 +57,7 @@ class RegularizedMLPNet(nn.Module):
         x = self.fc2(x)
         x = self.relu(x)
         x = self.fc3(x)
-        x = self.sigm(x)
+
         return x
 
 
@@ -78,7 +76,6 @@ class ParallelMLPNet(nn.Module):
         self.fc3 = nn.Linear(self.dims, 64)
         self.out = nn.Linear(64, 1)
         self.relu = nn.ReLU()
-        self.sigm = nn.Sigmoid()
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
@@ -94,10 +91,11 @@ class ParallelMLPNet(nn.Module):
             xii = torch.cat((xii, xi), 1)
 
         # Recombine layers in final dense layers
-        x = self.fc3(xii)
+        x = self.relu(xii)
+        x = self.fc3(x)
         x = self.relu(x)
         x = self.out(x)
-        x = self.sigm(x)
+
         return x
 
 
@@ -120,7 +118,6 @@ class RegularizedParallelMLPNet(nn.Module):
 
         self.drop = nn.Dropout(0.25)
         self.relu = nn.ReLU()
-        self.sigm = nn.Sigmoid()
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
@@ -142,11 +139,12 @@ class RegularizedParallelMLPNet(nn.Module):
             xii = torch.cat((xii, xi), 1)
 
         # Recombine layers in final dense layers
-        x = self.drop(xii)
+        x = self.relu(xii)
+        x = self.drop(x)
         x = self.fc4(x)
         x = self.relu(x)
         x = self.out(x)
-        x = self.sigm(x)
+
         return x
 
 
@@ -166,8 +164,6 @@ class RNNet(nn.Module):
                           nonlinearity='tanh')
         self.fc = nn.Linear(self.hidden_size, self.output_size)
 
-        self.sigm = nn.Sigmoid()
-
     def forward(self, x):
         x[torch.isnan(x)] = 0
         batch_size = x.size(0)
@@ -175,7 +171,7 @@ class RNNet(nn.Module):
         x = torch.reshape(x, (batch_size, self.input_size[1], self.input_size[0]))
         x, hn = self.rnn(x, hn)
         x = self.fc(x[:, -1])
-        x = self.sigm(x)
+
         return x
 
     def hidden_init(self, batch_size, device):
@@ -195,7 +191,6 @@ class RegularizedRNNet(nn.Module):
         self.rnn = nn.RNN(self.input_size[0], self.hidden_size, self.num_layers, batch_first=True,
                           nonlinearity='tanh', dropout=0.25)
         self.fc = nn.Linear(self.hidden_size, self.output_size)
-        self.sigm = nn.Sigmoid()
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
@@ -205,7 +200,7 @@ class RegularizedRNNet(nn.Module):
         x = torch.reshape(x, (batch_size, self.input_size[1], self.input_size[0]))
         x, hn = self.rnn(x, hn)
         x = self.fc(x[:, -1])
-        x = self.sigm(x)
+
         return x
 
     def hidden_init(self, batch_size, device):
@@ -230,14 +225,14 @@ class ParallelRNNet(nn.Module):
         self.fc2 = nn.Linear(64, 1)
 
         self.relu = nn.ReLU()
-        self.sigm = nn.Sigmoid()
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
         xii = torch.tensor([], device=x.device)
 
         for ii in range(self.dims):
-            xi = x[:, ii].unsqueeze(2)
+            xi = self.bn(x[:, ii].unsqueeze(2))
+            xi = xi
             xi, _ = self.rnn[ii](xi)
             xi = xi[:, -1, :]
             xii = torch.cat((xii, xi), 1)
@@ -245,7 +240,7 @@ class ParallelRNNet(nn.Module):
         x = self.fc1(xii)
         x = self.relu(x)
         x = self.fc2(x)
-        x = self.sigm(x)
+
         return x
 
 
@@ -266,7 +261,7 @@ class RegularizedParallelRNNet(nn.Module):
         self.fc2 = nn.Linear(64, 1)
 
         self.relu = nn.ReLU()
-        self.sigm = nn.Sigmoid()
+        self.drop = nn.Dropout(0.5)
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
@@ -280,8 +275,9 @@ class RegularizedParallelRNNet(nn.Module):
 
         x = self.fc1(xii)
         x = self.relu(x)
+        x = self.drop(x)
         x = self.fc2(x)
-        x = self.sigm(x)
+
         return x
 
 
@@ -301,19 +297,19 @@ class CNNet(nn.Module):
         self.fc1 = nn.Linear(64 * int(np.prod(input_size[1:]) // 16), 128)
         self.fc2 = nn.Linear(128, 1)
         self.relu = nn.ReLU()
-        self.sigm = nn.Sigmoid()
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
         x = self.conv1(x)
+        x = self.relu(x)
         x = self.pool(x)
         x = self.conv2(x)
+        x = self.relu(x)
         x = self.pool(x)
         x = self.flat(x)
         x = self.fc1(x)
-        x = self.fc2(x)
         x = self.relu(x)
-        x = self.sigm(x)
+        x = self.fc2(x)
         return x
 
 
@@ -331,15 +327,18 @@ class RegularizedCNNet(nn.Module):
         self.fc1 = nn.Linear(64 * int(np.prod(input_size[1:]) // 16), 128)
         self.fc2 = nn.Linear(128, 1)
         self.relu = nn.ReLU()
-        self.sigm = nn.Sigmoid()
+
         self.drop = nn.Dropout(0.5)
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
         x = self.bn(x)
         x = self.conv1(x)
+        x = self.relu(x)
         x = self.pool(x)
+        x = self.drop(x)
         x = self.conv2(x)
+        x = self.relu(x)
         x = self.pool(x)
         x = self.flat(x)
         x = self.drop(x)
@@ -347,7 +346,7 @@ class RegularizedCNNet(nn.Module):
         x = self.relu(x)
         x = self.drop(x)
         x = self.fc2(x)
-        x = self.sigm(x)
+
         return x
 
 
@@ -368,7 +367,6 @@ class ParallelCNNet(nn.Module):
         self.fc3 = nn.Linear(self.dims, 1)
 
         self.relu = nn.ReLU()
-        self.sigm = nn.Sigmoid()
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
@@ -387,8 +385,9 @@ class ParallelCNNet(nn.Module):
             xii = torch.cat((xii, xi), 1)
 
         # Recombine layers into final dense layer
-        x = self.fc3(xii)
-        x = self.sigm(x)
+        x = self.relu(xii)
+        x = self.fc3(x)
+
         return x
 
 
@@ -409,7 +408,6 @@ class RegularizedParallelCNNet(nn.Module):
         self.fc3 = nn.Linear(self.dims, 1)
 
         self.relu = nn.ReLU()
-        self.sigm = nn.Sigmoid()
 
         self.drop = nn.Dropout(0.25)
 
@@ -435,8 +433,9 @@ class RegularizedParallelCNNet(nn.Module):
             xii = torch.cat((xii, xi), 1)
 
         # Recombine layers into final dense layer
-        x = self.fc3(xii)
-        x = self.sigm(x)
+        x = self.relu(xii)
+        x = self.fc3(x)
+
         return x
 
 
