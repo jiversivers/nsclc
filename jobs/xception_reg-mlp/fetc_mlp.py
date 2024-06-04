@@ -112,7 +112,6 @@ def main():
                     loss = loss_fn(out, target.unsqueeze(1))
                     eval_loss += loss.item()
                     auc, acc, thresh = calculate_auc_roc(model, eval_loader)
-                    plt.close(fig)
 
             with open('outputs/results.txt', 'a') as results_file:
                 results_file.write(f'\nEpoch {ep + 1} || Loss - Train: {loss.item():4.4f} '
