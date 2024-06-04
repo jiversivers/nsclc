@@ -6,7 +6,7 @@ import numpy as np
 import os
 
 from my_modules.custom_models import *
-from my_modules.model_learning import train_epoch, valid_epoch, test_model
+from my_modules.model_learning import train_epoch, valid_epoch, test_model, masked_loss
 from my_modules.model_learning.model_evaluation import calculate_auc_roc
 from my_modules.nsclc.nsclc_dataset import NSCLCDataset
 
@@ -36,14 +36,14 @@ def main():
         workers = [round(0.75 * mp.cpu_count() * fraction) for fraction in data_split]
 
     # Set up hyperparameters
-    epochs = [125, 250, 500]
-    learning_rates = [0.1, 0.01, 0.001]
+    epochs = [125, 250, 500, 10000]
+    learning_rates = [0.01, 0.001, 0.0001, 0.00001]
 
     # Set up training functions
     optimizers = {'Adam': [optim.Adam, {}],
                   'SGD': [optim.SGD, {'momentum': 0.9}],
                   'RMSProp': [optim.RMSprop, {'momentum': 0.9}]}
-    loss_function = nn.BCEWithLogitsLoss()
+    loss_function = masked_loss(nn.BCEWithLogitsLoss())
 
     # region Raw Images
     # Make raw image dataloaders
@@ -86,11 +86,11 @@ def main():
                 for ep in range(epochs[-1]):
                     # Train
                     model.train()
-                    train_loss.append(train_epoch(model, train_loader, loss_function, optimizer))
+                    train_loss.append(train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=True))
 
                     # Validate
                     model.eval()
-                    loss, accu = valid_epoch(model, eval_loader, loss_function)
+                    loss, accu = valid_epoch(model, eval_loader, loss_function, masked_loss_fn=True)
                     eval_loss.append(loss)
                     auc, acc, _ = calculate_auc_roc(model, eval_loader)
                     print(f'\nEpoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} '
@@ -103,16 +103,17 @@ def main():
                         print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
                         torch.save(model.state_dict(), f'raw_img_models/{data.name}__{model.name}__{lr}.pth')
 
-                # Test
-                if ep + 1 in epochs:
-                    model.load_state_dict(torch.load(f'raw_img_models/{data.name}__{model.name}__{lr}.pth'))
-                    print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
-                    auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
+                    # Test
+                    if ep + 1 in epochs:
+                        model.load_state_dict(torch.load(f'raw_img_models/{data.name}__{model.name}__{lr}.pth'))
+                        print(
+                            f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
+                        auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
 
-                    with open(results_file_path, 'a') as f:
-                        f.write(
-                            f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer -- '
-                            f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
+                        with open(results_file_path, 'a') as f:
+                            f.write(
+                                f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer --'
+                                f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
 
     # endregion
 
@@ -158,7 +159,7 @@ def main():
                 for ep in range(epochs[-1]):
                     # Train
                     model.train()
-                    train_loss.append(train_epoch(model, train_loader, loss_function, optimizer))
+                    train_loss.append(train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=True))
 
                     # Validate
                     model.eval()
@@ -175,16 +176,16 @@ def main():
                         print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
                         torch.save(model.state_dict(), f'aug_img_models/{data.name}__{model.name}__{lr}.pth')
 
-                # Test
-                if ep + 1 in epochs:
-                    model.load_state_dict(torch.load(f'aug_img_models/{data.name}__{model.name}__{lr}.pth'))
-                    print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
-                    auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
+                    # Test
+                    if ep + 1 in epochs:
+                        model.load_state_dict(torch.load(f'aug_img_models/{data.name}__{model.name}__{lr}.pth'))
+                        print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
+                        auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
 
-                    with open(results_file_path, 'a') as f:
-                        f.write(
-                            f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer -- '
-                            f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
+                        with open(results_file_path, 'a') as f:
+                            f.write(
+                                f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer -- '
+                                f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
 
     # endregion
 
@@ -231,7 +232,7 @@ def main():
                 for ep in range(epochs[-1]):
                     # Train
                     model.train()
-                    train_loss.append(train_epoch(model, train_loader, loss_function, optimizer))
+                    train_loss.append(train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=True))
 
                     # Validate
                     model.eval()
@@ -248,16 +249,16 @@ def main():
                         print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
                         torch.save(model.state_dict(), f'aug_hist_models/{data.name}__{model.name}__{lr}.pth')
 
-                # Test
-                if ep + 1 in epochs:
-                    model.load_state_dict(torch.load(f'aug_hist_models/{data.name}__{model.name}__{lr}.pth'))
-                    print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
-                    auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
+                    # Test
+                    if ep + 1 in epochs:
+                        model.load_state_dict(torch.load(f'aug_hist_models/{data.name}__{model.name}__{lr}.pth'))
+                        print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
+                        auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
 
-                    with open(results_file_path, 'a') as f:
-                        f.write(
-                            f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer -- '
-                            f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
+                        with open(results_file_path, 'a') as f:
+                            f.write(
+                                f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer -- '
+                                f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
     # endregion
 
     # region Raw Histograms
@@ -303,7 +304,7 @@ def main():
                 for ep in range(epochs[-1]):
                     # Train
                     model.train()
-                    train_loss.append(train_epoch(model, train_loader, loss_function, optimizer))
+                    train_loss.append(train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=True))
 
                     # Validate
                     model.eval()
@@ -320,16 +321,16 @@ def main():
                         print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
                         torch.save(model.state_dict(), f'raw_hist_models/{data.name}__{model.name}__{lr}.pth')
 
-                # Test
-                if ep + 1 in epochs:
-                    model.load_state_dict(torch.load(f'raw_hist_models/{data.name}__{model.name}__{lr}.pth'))
-                    print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
-                    auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
+                    # Test
+                    if ep + 1 in epochs:
+                        model.load_state_dict(torch.load(f'raw_hist_models/{data.name}__{model.name}__{lr}.pth'))
+                        print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
+                        auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
 
-                    with open(results_file_path, 'a') as f:
-                        f.write(
-                            f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer -- '
-                            f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
+                        with open(results_file_path, 'a') as f:
+                            f.write(
+                                f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer -- '
+                                f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
     # endregion
 
 
