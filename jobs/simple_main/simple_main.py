@@ -7,7 +7,9 @@ import os
 
 from my_modules.custom_models import *
 from my_modules.model_learning import train_epoch, valid_epoch, test_model
+from my_modules.model_learning.model_evaluation import calculate_auc_roc
 from my_modules.nsclc.nsclc_dataset import NSCLCDataset
+
 
 def main():
     # Set up multiprocessing
@@ -38,8 +40,9 @@ def main():
 
     # Set up training functions
     optimizers = {'Adam': [optim.Adam, {}],
-                  'SGD': [optim.SGD, {'momentum': 0.9}]}
-    loss_function = nn.BCELoss()
+                  'SGD': [optim.SGD, {'momentum': 0.9}],
+                  'RMSProp': [optim.RMSprop, {'momentum': 0.9}]}
+    loss_function = nn.BCEWithLogitsLoss()
 
     # region Raw Images
     # Make raw image dataloaders
@@ -69,18 +72,17 @@ def main():
         if torch.cuda.is_available() and not next(model.parameters()).is_cuda:
             model.to(device)
         # Iterate through sets of hyperparameters
-        for epoch, lr in zip(epochs, learning_rates):
+        for lr in learning_rates:
+            # Iterate through optimizing functions
             # Iterate through optimizing functions
             for name, (optim_fn, options) in optimizers.items():
                 optimizer = optim_fn(model.parameters(), lr=lr, **options)
-                print(f'Training model {model.name} on {next(model.parameters()).device.type}')
-                print(f'{epoch} epochs with learning rate of {lr} with {name} optimizer')
+                print(f'Training model {model.name} with learning rate of {lr} with {name} optimizer')
                 print('_____________________________________________________________________________________________\n')
                 # For each epoch
                 train_loss = []
                 eval_loss = []
-                eval_accu = []
-                for ep in range(epoch):
+                for ep in range(epochs[-1]):
                     # Train
                     model.train()
                     train_loss.append(train_epoch(model, train_loader, loss_function, optimizer))
@@ -89,28 +91,27 @@ def main():
                     model.eval()
                     loss, accu = valid_epoch(model, eval_loader, loss_function)
                     eval_loss.append(loss)
-                    eval_accu.append(accu)
-
-                    print(f'Epoch: {ep + 1} -- Training loss: {train_loss[-1]:.4f} -- '
-                          f'Evaluation loss: {eval_loss[-1]:.4f} -- Evaluation accu: {eval_accu[-1]:.4f}')
+                    auc, acc, _ = calculate_auc_roc(model, eval_loader)
+                    print(f'\nEpoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} '
+                          f'Eval: {eval_loss[-1]:4.4f} '
+                          f'|| AUC: {auc:.2f} || ACC: {100 * acc:.2f}%')
 
                     # Save the model if it's better
-                    if ep == 0 or eval_accu[-1] > best_accu:
-                        best_accu = eval_accu[-1]
+                    if ep == 0 or acc > best_accu:
+                        best_accu = acc
                         print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
-                        torch.save(model.state_dict(), f'raw_img_models/{data.name}__{model.name}.pth')
+                        torch.save(model.state_dict(), f'raw_img_models/{data.name}__{model.name}__{lr}_{ep}.pth')
 
                 # Test
-                model.load_state_dict(torch.load(f'raw_img_models/{data.name}__{model.name}.pth'))
-                correct = test_model(model, test_loader)
-                print(f' =====>>> {model.name} on {next(model.parameters()).device.type} for {epoch} epochs with '
-                      f'learning rate of {lr} using {name} optimizer -- '
-                      f'Test accuracy: {correct / len(test_loader.dataset) * 100:.2f}%')
+                if ep + 1 in epochs:
+                    model.load_state_dict(torch.load(f'aug_hist_models/{data.name}__{model.name}.pth'))
+                    print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
+                    auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
 
-                with open(results_file_path, 'a') as f:
-                    f.write(f' =====>>> {model.name} on {next(model.parameters()).device.type} for {epoch} epochs with '
-                            f'learning rate of {lr} using {name} optimizer -- '
-                            f'Test accuracy: {correct / len(test_loader.dataset) * 100:.2f}%\n')
+                    with open(results_file_path, 'a') as f:
+                        f.write(
+                            f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer -- '
+                            f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
 
     # endregion
 
@@ -143,18 +144,17 @@ def main():
         if torch.cuda.is_available() and not next(model.parameters()).is_cuda:
             model.to(device)
         # Iterate through sets of hyperparameters
-        for epoch, lr in zip(epochs, learning_rates):
+        for lr in learning_rates:
+            # Iterate through optimizing functions
             # Iterate through optimizing functions
             for name, (optim_fn, options) in optimizers.items():
                 optimizer = optim_fn(model.parameters(), lr=lr, **options)
-                print(f'Training model {model.name} on {next(model.parameters()).device.type}')
-                print(f'{epoch} epochs with learning rate of {lr} with {name} optimizer')
+                print(f'Training model {model.name} with learning rate of {lr} with {name} optimizer')
                 print('_____________________________________________________________________________________________\n')
                 # For each epoch
                 train_loss = []
                 eval_loss = []
-                eval_accu = []
-                for ep in range(epoch):
+                for ep in range(epochs[-1]):
                     # Train
                     model.train()
                     train_loss.append(train_epoch(model, train_loader, loss_function, optimizer))
@@ -163,29 +163,27 @@ def main():
                     model.eval()
                     loss, accu = valid_epoch(model, eval_loader, loss_function)
                     eval_loss.append(loss)
-                    eval_accu.append(accu)
-
-                    print(f'Epoch: {ep + 1} -- Training loss: {train_loss[-1]:.4f} -- '
-                          f'Evaluation loss: {eval_loss[-1]:.4f} -- Evaluation accu: {eval_accu[-1]:.4f}')
+                    auc, acc, _ = calculate_auc_roc(model, eval_loader)
+                    print(f'\nEpoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} '
+                          f'Eval: {eval_loss[-1]:4.4f} '
+                          f'|| AUC: {auc:.2f} || ACC: {100 * acc:.2f}%')
 
                     # Save the model if it's better
-                    if ep == 0 or eval_accu[-1] > best_accu:
-                        best_accu = eval_accu[-1]
+                    if ep == 0 or acc > best_accu:
+                        best_accu = acc
                         print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
-                        torch.save(model.state_dict(), f'aug_img_models/{data.name}__{model.name}.pth')
+                        torch.save(model.state_dict(), f'raw_img_models/{data.name}__{model.name}__{lr}_{ep}.pth')
 
                 # Test
-                model.load_state_dict(torch.load(f'aug_img_models/{data.name}__{model.name}.pth'))
-                correct = test_model(model, test_loader)
-                print(f' =====>>> {model.name} on {next(model.parameters()).device.type} for {epoch} epochs with '
-                      f'learning rate of {lr} using {name} optimizer -- '
-                      f'Test accuracy: {correct / len(test_loader.dataset) * 100:.2f}%')
+                if ep + 1 in epochs:
+                    model.load_state_dict(torch.load(f'aug_hist_models/{data.name}__{model.name}.pth'))
+                    print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
+                    auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
 
-                with open(results_file_path, 'a') as f:
-                    f.write(
-                        f' =====>>> {model.name} on {next(model.parameters()).device.type} for {epoch} epochs with '
-                        f'learning rate of {lr} using {name} optimizer -- '
-                        f'Test accuracy: {correct / len(test_loader.dataset) * 100:.2f}%\n')
+                    with open(results_file_path, 'a') as f:
+                        f.write(
+                            f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer -- '
+                            f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
 
     # endregion
 
@@ -220,19 +218,16 @@ def main():
         if torch.cuda.is_available() and not next(model.parameters()).is_cuda:
             model.to(device)
         # Iterate through sets of hyperparameters
-        for epoch, lr in zip(epochs, learning_rates):
+        for lr in learning_rates:
             # Iterate through optimizing functions
             for name, (optim_fn, options) in optimizers.items():
                 optimizer = optim_fn(model.parameters(), lr=lr, **options)
-                print(f'Training model {model.name} on {next(model.parameters()).device.type}')
-                print(f'{epoch} epochs with learning rate of {lr} with {name} optimizer')
-                print(
-                    '_____________________________________________________________________________________________\n')
+                print(f'Training model {model.name} with learning rate of {lr} with {name} optimizer')
+                print('_____________________________________________________________________________________________\n')
                 # For each epoch
                 train_loss = []
                 eval_loss = []
-                eval_accu = []
-                for ep in range(epoch):
+                for ep in range(epochs[-1]):
                     # Train
                     model.train()
                     train_loss.append(train_epoch(model, train_loader, loss_function, optimizer))
@@ -241,29 +236,27 @@ def main():
                     model.eval()
                     loss, accu = valid_epoch(model, eval_loader, loss_function)
                     eval_loss.append(loss)
-                    eval_accu.append(accu)
-
-                    print(f'Epoch: {ep + 1} -- Training loss: {train_loss[-1]:.4f} -- '
-                          f'Evaluation loss: {eval_loss[-1]:.4f} -- Evaluation accu: {eval_accu[-1]:.4f}')
+                    auc, acc, _ = calculate_auc_roc(model, eval_loader)
+                    print(f'\nEpoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} '
+                          f'Eval: {eval_loss[-1]:4.4f} '
+                          f'|| AUC: {auc:.2f} || ACC: {100 * acc:.2f}%')
 
                     # Save the model if it's better
-                    if ep == 0 or eval_accu[-1] > best_accu:
-                        best_accu = eval_accu[-1]
+                    if ep == 0 or acc > best_accu:
+                        best_accu = acc
                         print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
-                        torch.save(model.state_dict(), f'aug_hist_models/{data.name}__{model.name}.pth')
+                        torch.save(model.state_dict(), f'raw_img_models/{data.name}__{model.name}__{lr}_{ep}.pth')
 
                 # Test
-                model.load_state_dict(torch.load(f'aug_hist_models/{data.name}__{model.name}.pth'))
-                correct = test_model(model, test_loader)
-                print(f' =====>>> {model.name} on {next(model.parameters()).device.type} for {epoch} epochs with '
-                      f'learning rate of {lr} using {name} optimizer -- '
-                      f'Test accuracy: {correct / len(test_loader.dataset) * 100:.2f}%')
+                if ep + 1 in epochs:
+                    model.load_state_dict(torch.load(f'aug_hist_models/{data.name}__{model.name}.pth'))
+                    print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
+                    auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
 
-                with open(results_file_path, 'a') as f:
-                    f.write(
-                        f' =====>>> {model.name} on {next(model.parameters()).device.type} for {epoch} epochs with '
-                        f'learning rate of {lr} using {name} optimizer -- '
-                        f'Test accuracy: {correct / len(test_loader.dataset) * 100:.2f}%\n')
+                    with open(results_file_path, 'a') as f:
+                        f.write(
+                            f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer -- '
+                            f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
     # endregion
 
     # region Raw Histograms
@@ -296,19 +289,17 @@ def main():
         if torch.cuda.is_available() and not next(model.parameters()).is_cuda:
             model.to(device)
         # Iterate through sets of hyperparameters
-        for epoch, lr in zip(epochs, learning_rates):
+        for lr in learning_rates:
+            # Iterate through optimizing functions
             # Iterate through optimizing functions
             for name, (optim_fn, options) in optimizers.items():
                 optimizer = optim_fn(model.parameters(), lr=lr, **options)
-                print(f'Training model {model.name} on {next(model.parameters()).device.type}')
-                print(f'{epoch} epochs with learning rate of {lr} with {name} optimizer')
-                print(
-                    '_____________________________________________________________________________________________\n')
+                print(f'Training model {model.name} with learning rate of {lr} with {name} optimizer')
+                print('_____________________________________________________________________________________________\n')
                 # For each epoch
                 train_loss = []
                 eval_loss = []
-                eval_accu = []
-                for ep in range(epoch):
+                for ep in range(epochs[-1]):
                     # Train
                     model.train()
                     train_loss.append(train_epoch(model, train_loader, loss_function, optimizer))
@@ -317,29 +308,27 @@ def main():
                     model.eval()
                     loss, accu = valid_epoch(model, eval_loader, loss_function)
                     eval_loss.append(loss)
-                    eval_accu.append(accu)
-
-                    print(f'Epoch: {ep + 1} -- Training loss: {train_loss[-1]:.4f} -- '
-                          f'Evaluation loss: {eval_loss[-1]:.4f} -- Evaluation accu: {eval_accu[-1]:.4f}')
+                    auc, acc, _ = calculate_auc_roc(model, eval_loader)
+                    print(f'\nEpoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} '
+                          f'Eval: {eval_loss[-1]:4.4f} '
+                          f'|| AUC: {auc:.2f} || ACC: {100 * acc:.2f}%')
 
                     # Save the model if it's better
-                    if ep == 0 or eval_accu[-1] > best_accu:
-                        best_accu = eval_accu[-1]
+                    if ep == 0 or acc > best_accu:
+                        best_accu = acc
                         print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
-                        torch.save(model.state_dict(), f'raw_hist_models/{data.name}__{model.name}.pth')
+                        torch.save(model.state_dict(), f'raw_img_models/{data.name}__{model.name}__{lr}_{ep}.pth')
 
                 # Test
-                model.load_state_dict(torch.load(f'raw_hist_models/{data.name}__{model.name}.pth'))
-                correct = test_model(model, test_loader)
-                print(f' =====>>> {model.name} on {next(model.parameters()).device.type} for {epoch} epochs with '
-                      f'learning rate of {lr} using {name} optimizer -- '
-                      f'Test accuracy: {correct / len(test_loader.dataset) * 100:.2f}%')
+                if ep + 1 in epochs:
+                    model.load_state_dict(torch.load(f'aug_hist_models/{data.name}__{model.name}.pth'))
+                    print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
+                    auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
 
-                with open(results_file_path, 'a') as f:
-                    f.write(
-                        f' =====>>> {model.name} on {next(model.parameters()).device.type} for {epoch} epochs with '
-                        f'learning rate of {lr} using {name} optimizer -- '
-                        f'Test accuracy: {correct / len(test_loader.dataset) * 100:.2f}%\n')
+                    with open(results_file_path, 'a') as f:
+                        f.write(
+                            f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer -- '
+                            f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
     # endregion
 
 
