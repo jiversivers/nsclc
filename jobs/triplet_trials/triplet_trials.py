@@ -116,8 +116,7 @@ def main():
                         out = model(x)
                         targets = torch.cat((targets, target), dim=0)
                         validation_loss += nn.BCEWithLogitsLoss()(out, target.unsqueeze(1))
-                    auc, acc, thresh, fig = calculate_auc_roc(model, validation_loader)
-                    plt.close(fig)
+                    auc, acc, thresh = calculate_auc_roc(model, validation_loader)
                     with open(f'outputs/{model_fn.__name__}/prints/lr{lr}_results.txt', 'a') as f:
                         f.write(f'\nEpoch {ep + 1} || Loss - Train: {loss.item():4.4f} '
                                 f'Eval: {validation_loss / len(validation_loader):4.4f} '
@@ -125,7 +124,7 @@ def main():
 
                 # Testing
                 if ep + 1 in epochs:
-                    auc, acc, thresh, fig = calculate_auc_roc(model, testing_loader)
+                    auc, acc, thresh, fig = calculate_auc_roc(model, testing_loader, make_plot=True)
                     with open(f'outputs/{model_fn.__name__}/prints/lr{lr}_results.txt', 'a') as f:
                         f.write(f'\n>>> AUC: {auc:.2f} || ACC: {100 * acc:.2f}% at THRESH: {thresh:.2f} <<<')
                     running_auc.append(auc)

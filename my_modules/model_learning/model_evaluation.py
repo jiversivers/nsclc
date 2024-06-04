@@ -2,7 +2,7 @@ import torch
 from matplotlib import pyplot as plt
 
 
-def calculate_auc_roc(model, loader, print_results=False, plot_results=False,
+def calculate_auc_roc(model, loader, print_results=False, make_plot=False,
                       device=torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')):
     model.eval()
     outs = torch.tensor([]).to(device)
@@ -40,34 +40,38 @@ def calculate_auc_roc(model, loader, print_results=False, plot_results=False,
         print(f'>>> AUC-ROC {auc:.2f} || '
               f'Best accuracy of {best_acc:.2f} at threshold of {thresh:.2f} <<<')
 
-    # Figure creation
-    # For plot
-    fig, ax1 = plt.subplots()
+    # Optional figure creation
+    if make_plot:
+        # Move to host memory (if on GPU)
+        fpr = fpr.cpu()
+        tpr = tpr.cpu()
+        thresholds = thresholds.cpu()
+        acc = acc.cpu()
 
-    # ROC
-    ax1.plot(fpr, tpr, 'r-', label='ROC')
-    ax1.set_xlabel('False Positive Rate')
-    ax1.set_ylabel('True Positive Rate')
-    ax1.set_ylim([0, 1])
-    ax1.tick_params(axis='both', labelcolor='r')
+        # For plot
+        fig, ax1 = plt.subplots()
 
-    # Accuracy
-    ax2 = ax1.twinx()
-    ax2.set_ylabel('Accuracy')
-    ax2.set_ylim([0, 1])
-    ax2.tick_params(axis='y', labelcolor='b')
-    ax2 = ax1.twiny()
-    ax2.plot(thresholds, acc, 'b-', label='Accuracy')
-    ax2.set_xlabel('Threshold')
-    ax2.tick_params(axis='x', labelcolor='b')
+        # ROC
+        ax1.plot(fpr, tpr, 'r-', label='ROC')
+        ax1.set_xlabel('False Positive Rate')
+        ax1.set_ylabel('True Positive Rate')
+        ax1.set_ylim([0, 1])
+        ax1.tick_params(axis='both', labelcolor='r')
 
-    # Legends
-    ax1.legend(loc='upper left')
-    ax2.legend(loc='lower right')
+        # Accuracy
+        ax2 = ax1.twinx()
+        ax2.set_ylabel('Accuracy')
+        ax2.set_ylim([0, 1])
+        ax2.tick_params(axis='y', labelcolor='b')
+        ax2 = ax1.twiny()
+        ax2.plot(thresholds, acc, 'b-', label='Accuracy')
+        ax2.set_xlabel('Threshold')
+        ax2.tick_params(axis='x', labelcolor='b')
 
-    # Show (optional)
-    if plot_results:
-        plt.tight_layout()
-        plt.show()
+        # Legends
+        ax1.legend(loc='upper left')
+        ax2.legend(loc='lower right')
 
-    return auc, best_acc, thresh, fig
+        return auc, best_acc, thresh, fig
+    else:
+        return auc, best_acc, thresh
