@@ -113,11 +113,6 @@ def main():
                     eval_loss += loss.item()
                     auc, acc, thresh = calculate_auc_roc(model, eval_loader)
 
-            with open('outputs/results.txt', 'a') as results_file:
-                results_file.write(f'\nEpoch {ep + 1} || Loss - Train: {loss.item():4.4f} '
-                                   f'Eval: {eval_loss / len(eval_loader):4.4f} '
-                                   f'|| AUC: {auc:.2f} || ACC: {100 * acc:.2f}%')
-
             # See if we are at one of our training length checkpoints. Save and test if we are
             if ep + 1 in epochs:
                 # save trained model at this many epochs
@@ -132,6 +127,7 @@ def main():
                 # Test
                 auc, acc, thresh, fig = calculate_auc_roc(model, test_loader, make_plot=True)
                 fig.savefig(f'outputs/plots/auc_acc_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png')
+                plt.close(fig)
                 with open('outputs/results.txt', 'a') as results_file:
                     results_file.write(f'\n>>> AUC: {auc:.2f} || ACC: {100 * acc:.2f}% at THRESH: {thresh:.2f} <<<')
 
