@@ -19,8 +19,7 @@ def main():
 
     # Create data with psuedo-RGB stack for each mode
     data = NSCLCDataset(
-        # 'data/NSCLC_Data_for_ML',
-        'E:/NSCLC_Data_for_ML',
+        'data/NSCLC_Data_for_ML',
         mode=['orr', 'taumean', 'boundfraction'], label='M', mask_on=False, device='cpu')
     data.augment()
     data.normalize_channels_to_max()
