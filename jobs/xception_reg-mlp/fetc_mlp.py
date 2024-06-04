@@ -6,6 +6,7 @@ import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
 
 from my_modules.model_learning.loader_maker import split_augmented_data
+from my_modules.model_learning.model_evaluation import calculate_auc_roc
 from my_modules.nsclc import NSCLCDataset
 from my_modules.custom_models import RegularizedMLPNet as RegMLP, FeatureExtractorToClassifier as FETC
 
@@ -38,12 +39,13 @@ def main():
     print('Normalizing data to channel max...')
     data.augment()
     data.normalize_channels_to_max()
+    data.to(device)
 
     batch_size = 64
     learning_rates = [5e-5, 1e-5, 5e-6, 1e-6]
     optimizer_fns = {'Adam': [torch.optim.Adam, {}]}
-    epochs = [5, 10, 50, 125, 250, 500, 1000, 2500]
-    loss_fn = torch.nn.CrossEntropyLoss()
+    epochs = [5, 10, 50, 125, 250, 500, 1000]
+    loss_fn = torch.nn.BCEWithLogitsLoss()
 
     # Define base classifier
     classifier = RegMLP
@@ -99,7 +101,6 @@ def main():
             # Validation
             model.eval()
             eval_loss = 0
-            correct = 0
             with torch.no_grad():
                 for x, target in eval_loader:
                     if torch.cuda.is_available() and not x.is_cuda:
@@ -110,15 +111,13 @@ def main():
 
                     loss = loss_fn(out, target.unsqueeze(1))
                     eval_loss += loss.item()
-                    pred = torch.round(out)
-                    correct += torch.sum(pred == target.unsqueeze(1)).item()
-                evaluation_loss[-1].append(eval_loss / len(eval_set))
-                evaluation_accuracy[-1].append(100 * correct / len(eval_loader.sampler))
+                    auc, acc, thresh = calculate_auc_roc(model, eval_loader)
+                    plt.close(fig)
 
             with open('outputs/results.txt', 'a') as results_file:
-                results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, '
-                                   f'Eval.Loss: {evaluation_loss[-1][-1]:.4f}.'
-                                   f'Eval.Accu: {evaluation_accuracy[-1][-1]:.2f}%')
+                results_file.write(f'\nEpoch {ep + 1} || Loss - Train: {loss.item():4.4f} '
+                                   f'Eval: {eval_loss / len(eval_loader):4.4f} '
+                                   f'|| AUC: {auc:.2f} || ACC: {100 * acc:.2f}%')
 
             # See if we are at one of our training length checkpoints. Save and test if we are
             if ep + 1 in epochs:
@@ -132,22 +131,9 @@ def main():
                 plt.clf()
 
                 # Test
-                correct = 0
-                model.eval()
-                with torch.no_grad():
-                    for x, target in test_loader:
-                        if torch.cuda.is_available() and not x.is_cuda:
-                            x = x.cuda()
-                        if torch.cuda.is_available() and not target.is_cuda:
-                            target = target.cuda()
-                        out = model(x)
-                        pred = torch.round(out)
-                        correct += torch.sum(pred == target.unsqueeze(1)).item()
-                    testing_accuracy[-1].append(100 * correct / len(test_loader.sampler))
+                auc, acc, thresh, fig = calculate_auc_roc(model, test_loader, make_plot=True)
                 with open('outputs/results.txt', 'a') as results_file:
-                    results_file.write(f'\n>>>Test.accu at {ep + 1} epochs with learning rate of {lr}: '
-                                       f'{testing_accuracy[-1][-1]}<<<\n')
-
+                    results_file.write(f'\n>>> AUC: {auc:.2f} || ACC: {100 * acc:.2f}% at THRESH: {thresh:.2f} <<<')
 
 if __name__ == '__main__':
     main()
