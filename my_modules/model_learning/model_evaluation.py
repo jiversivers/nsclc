@@ -24,7 +24,7 @@ def calculate_auc_roc(model, loader, print_results=False, make_plot=False,
             false_negatives = torch.logical_and(~positive_preds, sorted_targets == 1)
             tpr.append((torch.sum(true_positives) / (torch.sum(sorted_targets == 1))).item())
             fpr.append((torch.sum(false_positives) / (torch.sum(sorted_targets == 0))).item())
-            acc.append((torch.sum(true_positives) + torch.sum(true_negatives)) / len(sorted_targets))
+            acc.append(((torch.sum(true_positives) + torch.sum(true_negatives)) / len(sorted_targets)).item())
         tpr.append(0.0)
         fpr.append(0.0)
         d_fpr = [f1 - f0 for f1, f0 in zip(fpr[:-1], fpr[1:])]
