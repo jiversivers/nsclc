@@ -140,7 +140,7 @@ def main():
 
                 # Get ensemble output and do backprop
                 ensemble_optimizer.zero_grad()
-                out = ensemble_combiner(torch.cat(outs, dim=1))
+                out = ensemble_combiner(torch.cat(outs, dim=1).detach())
                 loss = loss_fn(out, target.unsqueeze(1))
                 loss.backward()
                 ensemble_loss += loss.item()
@@ -148,7 +148,7 @@ def main():
 
                 # Feed parallel-extracted features into full classifier
                 parallel_optimizer.zero_grad()
-                out = fetc_parallel_classifier(torch.stack(features, dim=1))
+                out = fetc_parallel_classifier(torch.stack(features, dim=1).detach())
                 loss = loss_fn(out, target.unsqueeze(1))
                 loss.backward()
                 parallel_loss += loss.item()
@@ -178,7 +178,7 @@ def main():
                     # Get feature maps, avg, and flatten (just like in the whole model)
                     features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
                                 for ch, model in enumerate(models)]
-                    feature_loader.append((torch.cat(features, dim=1), target))
+                    feature_loader.append((torch.cat(features, dim=1).detach(), target))
 
                     # Get final output for each model
                     [optimizer.zero_grad() for optimizer in optimizers]
@@ -193,17 +193,17 @@ def main():
                         individual_loss += loss.item()
 
                     # Make output loader for ensemble model
-                    individual_output_loader.append((torch.cat(outs, dim=1), target))
+                    individual_output_loader.append((torch.cat(outs, dim=1).detach(), target))
 
                     # Determine ensemble out
                     ensemble_optimizer.zero_grad()
-                    out = ensemble_combiner(torch.cat(outs, dim=1))
+                    out = ensemble_combiner(torch.cat(outs, dim=1).detach())
                     loss = loss_fn(out, target.unsqueeze(1))
                     ensemble_loss += loss.item()
 
                     # Feed parallel-extracted features into full classifier
                     parallel_optimizer.zero_grad()
-                    out = fetc_parallel_classifier(torch.stack(features, dim=1))
+                    out = fetc_parallel_classifier(torch.stack(features, dim=1).detach())
                     loss = loss_fn(out, target.unsqueeze(1))
                     parallel_loss += loss.item()
 
@@ -257,7 +257,7 @@ def main():
                         # Get feature maps, avg, and flatten (just like in the whole model)
                         features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
                                     for ch, model in enumerate(models)]
-                        feature_loader.append((torch.cat(features, dim=1), target))
+                        feature_loader.append((torch.cat(features.detach(), dim=1), target))
 
                         # Get final output for each model
                         [optimizer.zero_grad() for optimizer in optimizers]
@@ -268,7 +268,7 @@ def main():
                             pl.append((x[:, ch].squeeze(1), target))
 
                         # Make output loader for ensemble model
-                        individual_output_loader.append((torch.cat(outs, dim=1), target))
+                        individual_output_loader.append((torch.cat(outs.detach(), dim=1), target))
 
                 # Update testing scores
                 for score, model, loader in zip(individual_test_scores[-1], models, psuedo_loaders):
