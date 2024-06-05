@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=triplet_base
+#SBATCH --job-name=triplet_image
 #SBATCH --partition=agpu06
 #SBATCH --output=nsclc_main.txt
 #SBATCH --error=nsclc_main.err
@@ -29,14 +29,14 @@ files=/home/jdivers/data/NSCLC_Data_for_ML
 echo "Copying files..."
 mkdir /scratch/$SLURM_JOB_ID/data
 rsync -avq $files /scratch/$SLURM_JOB_ID/data
-rsync -avq $SLURM_SUBMIT_DIR/triplet_trials.py /scratch/$SLURM_JOB_ID
+rsync -avq $SLURM_SUBMIT_DIR/triplet_image_trials.py /scratch/$SLURM_JOB_ID
 rsync -avq /home/jdivers/nsclc/my_modules /scratch/$SLURM_JOB_ID
 wait
 
 cd /scratch/$SLURM_JOB_ID/ || exit
 
 echo "Python script initiating..."
-python3 triplet_trials.py
+python3 triplet_image_trials.py
 
 rsync -av -q /scratch/$SLURM_JOB_ID/outputs $SLURM_SUBMIT_DIR/
 

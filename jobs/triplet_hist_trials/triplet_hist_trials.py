@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from torch import nn
 
 from my_modules.custom_models import MLPNet, RegularizedParallelMLPNet, RegularizedMLPNet, \
-    ParallelMLPNet, CNNet, RegularizedCNNet, ParallelCNNet, RegularizedParallelCNNet
+    ParallelMLPNet, RNNet, RegularizedRNNet, ParallelRNNet, RegularizedParallelRNNet
 from my_modules.model_learning.loader_maker import split_augmented_data
 from my_modules.model_learning.model_metrics import calculate_auc_roc, score_model
 from my_modules.nsclc import NSCLCDataset
@@ -23,6 +23,7 @@ def main():
         mode=['orr', 'taumean', 'boundfraction'], label='M', mask_on=False, device='cpu')
     data.augment()
     data.normalize_channels_to_max()
+    data.dist_transform(nbins=25)
     data.to(device)
 
     # Set up hyperparameters
@@ -45,7 +46,7 @@ def main():
 
     # Set up models to try
     model_fns = [MLPNet, RegularizedMLPNet, ParallelMLPNet, RegularizedParallelMLPNet,
-                 CNNet, RegularizedCNNet, ParallelCNNet, RegularizedParallelCNNet]
+                 RNNet, RegularizedRNNet, ParallelRNNet, RegularizedParallelRNNet]
 
     # Make model save dir
     os.makedirs('outputs/', exist_ok=True)
@@ -110,7 +111,7 @@ def main():
                     with open(f'outputs/{model_fn.__name__}/prints/lr{lr}_results.txt', 'a') as f:
                         for key, item in scores.items():
                             if 'Confusion' not in key:
-                                f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
+                                f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
 
                 # Testing
                 if ep + 1 in epochs:
