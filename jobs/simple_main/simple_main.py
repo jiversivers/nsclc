@@ -2,12 +2,11 @@
 import torch.optim as optim
 import torch.multiprocessing as mp
 import torch.utils.data
-import numpy as np
 import os
 
 from my_modules.custom_models import *
-from my_modules.model_learning import train_epoch, valid_epoch, test_model, masked_loss
-from my_modules.model_learning.model_evaluation import calculate_auc_roc
+from my_modules.model_learning import train_epoch, valid_epoch, masked_loss
+from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc.nsclc_dataset import NSCLCDataset
 
 
@@ -36,12 +35,11 @@ def main():
         workers = [round(0.75 * mp.cpu_count() * fraction) for fraction in data_split]
 
     # Set up hyperparameters
-    epochs = [125, 250, 500, 10000]
+    epochs = [125, 250, 500, 1000]
     learning_rates = [0.01, 0.001, 0.0001, 0.00001]
 
     # Set up training functions
     optimizers = {'Adam': [optim.Adam, {}],
-                  'SGD': [optim.SGD, {'momentum': 0.9}],
                   'RMSProp': [optim.RMSprop, {'momentum': 0.9}]}
     loss_function = masked_loss(nn.BCEWithLogitsLoss())
 
@@ -92,36 +90,29 @@ def main():
                     model.eval()
                     loss, accu = valid_epoch(model, eval_loader, loss_function, masked_loss_fn=True)
                     eval_loss.append(loss)
-                    auc, acc, _ = calculate_auc_roc(model, eval_loader)
-                    print(f'\nEpoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} '
-                          f'Eval: {eval_loss[-1]:4.4f} '
-                          f'|| AUC: {auc:.2f} || ACC: {100 * acc:.2f}%')
-
-                    # Save the model if it's better
-                    if ep == 0 or acc > best_accu:
-                        best_accu = acc
-                        print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
-                        torch.save(model.state_dict(), f'raw_img_models/{data.name}__{model.name}__{lr}.pth')
+                    print(f'Epoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} Eval: {eval_loss[-1]:4.4f}')
+                    score_model(model, eval_loader, print_results=True)
 
                     # Test
                     if ep + 1 in epochs:
-                        model.load_state_dict(torch.load(f'raw_img_models/{data.name}__{model.name}__{lr}.pth'))
+                        torch.save(model.state_dict(), f'raw_img_models/{data.name}__{model.name}__{lr}_{ep}.pth')
                         print(
                             f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
-                        auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
+                        scores, figs = score_model(model, test_loader, print_results=True, make_plot=True)
 
                         with open(results_file_path, 'a') as f:
-                            f.write(
-                                f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer --'
-                                f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
+                            f.write('\n_____________________________________________________')
+                            for key, item in scores.items():
+                                if 'Confusion' not in key:
+                                    f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
+                            f.write('_____________________________________________________\n')
 
     # endregion
 
     # region Augmented Images
     # Augment and recreated the dataloaders
-    train_set.dataset.augment()
-    eval_set.dataset.augment()
-    test_set.dataset.augment()
+    data.augment()
+    train_set, eval_set, test_set = torch.utils.data.random_split(dataset=data, lengths=set_lengths)
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True,
                                                num_workers=workers[0],
                                                drop_last=(True if len(train_set) % batch_size == 1 else False))
@@ -129,6 +120,8 @@ def main():
                                               drop_last=(True if len(eval_set) % batch_size == 1 else False))
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=True, num_workers=workers[2],
                                               drop_last=(True if len(test_set) % batch_size == 1 else False))
+
+
 
     # Prep results file
     with open(results_file_path, 'a') as results_file:
@@ -163,37 +156,31 @@ def main():
 
                     # Validate
                     model.eval()
-                    loss, accu = valid_epoch(model, eval_loader, loss_function)
+                    loss, accu = valid_epoch(model, eval_loader, loss_function, masked_loss_fn=True)
                     eval_loss.append(loss)
-                    auc, acc, _ = calculate_auc_roc(model, eval_loader)
-                    print(f'\nEpoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} '
-                          f'Eval: {eval_loss[-1]:4.4f} '
-                          f'|| AUC: {auc:.2f} || ACC: {100 * acc:.2f}%')
-
-                    # Save the model if it's better
-                    if ep == 0 or acc > best_accu:
-                        best_accu = acc
-                        print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
-                        torch.save(model.state_dict(), f'aug_img_models/{data.name}__{model.name}__{lr}.pth')
+                    print(f'Epoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} Eval: {eval_loss[-1]:4.4f}')
+                    score_model(model, eval_loader, print_results=True)
 
                     # Test
                     if ep + 1 in epochs:
-                        model.load_state_dict(torch.load(f'aug_img_models/{data.name}__{model.name}__{lr}.pth'))
-                        print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
-                        auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
+                        torch.save(model.state_dict(), f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.pth')
+                        print(
+                            f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
+                        scores, figs = score_model(model, test_loader, print_results=True, make_plot=True)
 
                         with open(results_file_path, 'a') as f:
-                            f.write(
-                                f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer -- '
-                                f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
+                            f.write('\n_____________________________________________________')
+                            for key, item in scores.items():
+                                if 'Confusion' not in key:
+                                    f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
+                            f.write('_____________________________________________________\n')
 
     # endregion
 
     # region Augmented Histograms
     # Transform and create the dataloaders
-    train_set.dataset.dist_transform()
-    eval_set.dataset.dist_transform()
-    test_set.dataset.dist_transform()
+    data.dist_transform(nbins=25)
+    train_set, eval_set, test_set = torch.utils.data.random_split(dataset=data, lengths=set_lengths)
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True,
                                                num_workers=workers[0],
                                                drop_last=(True if len(train_set) % batch_size == 1 else False))
@@ -236,36 +223,30 @@ def main():
 
                     # Validate
                     model.eval()
-                    loss, accu = valid_epoch(model, eval_loader, loss_function)
+                    loss, accu = valid_epoch(model, eval_loader, loss_function, masked_loss_fn=True)
                     eval_loss.append(loss)
-                    auc, acc, _ = calculate_auc_roc(model, eval_loader)
-                    print(f'\nEpoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} '
-                          f'Eval: {eval_loss[-1]:4.4f} '
-                          f'|| AUC: {auc:.2f} || ACC: {100 * acc:.2f}%')
-
-                    # Save the model if it's better
-                    if ep == 0 or acc > best_accu:
-                        best_accu = acc
-                        print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
-                        torch.save(model.state_dict(), f'aug_hist_models/{data.name}__{model.name}__{lr}.pth')
+                    print(f'Epoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} Eval: {eval_loss[-1]:4.4f}')
+                    score_model(model, eval_loader, print_results=True)
 
                     # Test
                     if ep + 1 in epochs:
-                        model.load_state_dict(torch.load(f'aug_hist_models/{data.name}__{model.name}__{lr}.pth'))
-                        print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
-                        auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
+                        torch.save(model.state_dict(), f'aug_hist_models/{data.name}__{model.name}__{lr}_{ep}.pth')
+                        print(
+                            f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
+                        scores, figs = score_model(model, test_loader, print_results=True, make_plot=True)
 
                         with open(results_file_path, 'a') as f:
-                            f.write(
-                                f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer -- '
-                                f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
+                            f.write('\n_____________________________________________________')
+                            for key, item in scores.items():
+                                if 'Confusion' not in key:
+                                    f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
+                            f.write('_____________________________________________________\n')
     # endregion
 
     # region Raw Histograms
     # Transform and create the dataloaders
-    train_set.dataset.augmented = False
-    eval_set.dataset.augmented = False
-    test_set.dataset.augmented = False
+    data.augmented = False
+    train_set, eval_set, test_set = torch.utils.data.random_split(dataset=data, lengths=set_lengths)
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True,
                                                num_workers=workers[0],
                                                drop_last=(True if len(train_set) % batch_size == 1 else False))
@@ -308,31 +289,25 @@ def main():
 
                     # Validate
                     model.eval()
-                    loss, accu = valid_epoch(model, eval_loader, loss_function)
+                    loss, accu = valid_epoch(model, eval_loader, loss_function, masked_loss_fn=True)
                     eval_loss.append(loss)
-                    auc, acc, _ = calculate_auc_roc(model, eval_loader)
-                    print(f'\nEpoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} '
-                          f'Eval: {eval_loss[-1]:4.4f} '
-                          f'|| AUC: {auc:.2f} || ACC: {100 * acc:.2f}%')
-
-                    # Save the model if it's better
-                    if ep == 0 or acc > best_accu:
-                        best_accu = acc
-                        print(f' =====>>> Saving new best model! -- Evaluation accuracy: {best_accu * 100:.2f}%')
-                        torch.save(model.state_dict(), f'raw_hist_models/{data.name}__{model.name}__{lr}.pth')
+                    print(f'Epoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} Eval: {eval_loss[-1]:4.4f}')
+                    score_model(model, eval_loader, print_results=True)
 
                     # Test
                     if ep + 1 in epochs:
-                        model.load_state_dict(torch.load(f'raw_hist_models/{data.name}__{model.name}__{lr}.pth'))
-                        print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
-                        auc, acc, thresh = calculate_auc_roc(model, test_loader, print_results=True)
+                        torch.save(model.state_dict(), f'raw_hist_models/{data.name}__{model.name}__{lr}_{ep}.pth')
+                        print(
+                            f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
+                        scores, figs = score_model(model, test_loader, print_results=True, make_plot=True)
 
                         with open(results_file_path, 'a') as f:
-                            f.write(
-                                f'\n{model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer -- '
-                                f'Acc: {acc * 100:.2f}% || AUC: {auc:.2f} || Thresh: {thresh:.4f}')
+                            f.write('\n_____________________________________________________')
+                            for key, item in scores.items():
+                                if 'Confusion' not in key:
+                                    f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
+                            f.write('_____________________________________________________\n')
     # endregion
-
 
 # Run
 if __name__ == '__main__':
