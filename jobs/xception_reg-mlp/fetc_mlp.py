@@ -6,9 +6,9 @@ import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
 
 from my_modules.model_learning.loader_maker import split_augmented_data
-from my_modules.model_learning.model_evaluation import calculate_auc_roc
+from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import NSCLCDataset
-from my_modules.custom_models import RegularizedMLPNet as RegMLP, FeatureExtractorToClassifier as FETC
+from my_modules.custom_models import MLPNet as MLP, FeatureExtractorToClassifier as FETC
 
 
 def main():
@@ -18,8 +18,8 @@ def main():
 
     # Prep output dirs and files
     os.makedirs('outputs/plots', exist_ok=True)
-    with open('outputs/results.txt', 'w') as results_file:
-        results_file.write('Results')
+    with open('outputs/results.txt', 'w') as f:
+        f.write('Results')
 
     # Define our base feature extractor and turn the gradients off -- we won't train it, just use it to feed our MLP.
     feature_extractor = xception(num_classes=1000, pretrained=False)
@@ -48,7 +48,7 @@ def main():
     loss_fn = torch.nn.BCEWithLogitsLoss()
 
     # Define base classifier
-    classifier = RegMLP
+    classifier = MLP
 
     # Prepare data loaders
     train_set, eval_set, test_set = split_augmented_data(data, augmentation_factor=5, split=(0.75, 0.15, 0.1))
@@ -61,6 +61,7 @@ def main():
 
     training_loss = []
     evaluation_loss = []
+    evaluation_threshold = []
     evaluation_accuracy = []
     testing_accuracy = []
     for lr in learning_rates:
@@ -73,6 +74,7 @@ def main():
 
         # Nest iteration lists for tracking model learning
         training_loss.append([])
+        evaluation_threshold.append([])
         evaluation_accuracy.append([])
         evaluation_loss.append([])
         testing_accuracy.append([])
@@ -111,7 +113,9 @@ def main():
 
                     loss = loss_fn(out, target.unsqueeze(1))
                     eval_loss += loss.item()
-                    auc, acc, thresh = calculate_auc_roc(model, eval_loader)
+                    scores = score_model(model, eval_loader)
+                    evaluation_threshold[-1].append(scores['Optimal Threshold from ROC'])
+                    evaluation_accuracy[-1].append(scores['Accuracy at ROC Threshold'])
 
             # See if we are at one of our training length checkpoints. Save and test if we are
             if ep + 1 in epochs:
@@ -119,18 +123,29 @@ def main():
                 torch.save(model.state_dict(),
                            f'xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.pth')
 
-                plt.plot(training_loss[-1])
-                plt.plot(evaluation_loss[-1])
-                plt.savefig(f'outputs/plots/loss_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png')
-                plt.close()
-
                 # Test
-                auc, acc, thresh, fig = calculate_auc_roc(model, test_loader, make_plot=True)
-                fig.savefig(f'outputs/plots/auc_acc_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png')
-                plt.close(fig)
-                with open('outputs/results.txt', 'a') as results_file:
-                    results_file.write(f'\n>>> Epoch {ep + 1} LR {lr} || '
-                                       f'AUC: {auc:.2f} || ACC: {100 * acc:.2f}% at THRESH: {thresh:.2f} <<<')
+                scores, figs = score_model(model, test_loader, make_plot=True)
+                for key, fig in figs.items():
+                    fig.savefig(
+                        f'outputs/plots/auc_acc_xception_features_to_regMLP_{key}_{ep + 1}-Epochs_{lr}-LearningRate.png')
+                    plt.close(fig)
+                with open('outputs/results.txt', 'a') as f:
+                    f.write('_____________________________________________________')
+                    for key, item in scores.items():
+                        if 'Confusion' not in key:
+                            f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
+                    f.write('_____________________________________________________')
+
+        plt.plot(range(1, 1 + ep), training_loss[-1])
+        plt.plot(range(1, 1 + ep), evaluation_loss[-1])
+        plt.savefig(f'outputs/plots/loss_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png')
+        plt.close()
+        plt.plot(range(1, 1 + ep), evaluation_accuracy[-1])
+        plt.savefig(f'outputs/plots/roc_thresh_acc_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png')
+        plt.close()
+        plt.plot(range(1, 1 + ep), evaluation_threshold[-1])
+        plt.savefig(plt.savefig(f'outputs/plots/roc_thresh_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png'))
+
 
 if __name__ == '__main__':
     main()
