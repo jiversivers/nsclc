@@ -136,14 +136,14 @@ def main():
                             f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
                     f.write('_____________________________________________________')
 
-        plt.plot(range(1, 1 + ep), training_loss[-1])
-        plt.plot(range(1, 1 + ep), evaluation_loss[-1])
+        plt.plot(range(1, 1 + epoch), training_loss[-1])
+        plt.plot(range(1, 1 + epoch), evaluation_loss[-1])
         plt.savefig(f'outputs/plots/loss_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png')
         plt.close()
-        plt.plot(range(1, 1 + ep), evaluation_accuracy[-1])
+        plt.plot(range(1, 1 + epoch), evaluation_accuracy[-1])
         plt.savefig(f'outputs/plots/roc_thresh_acc_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png')
         plt.close()
-        plt.plot(range(1, 1 + ep), evaluation_threshold[-1])
+        plt.plot(range(1, 1 + epoch), evaluation_threshold[-1])
         plt.savefig(plt.savefig(f'outputs/plots/roc_thresh_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png'))
 
 
