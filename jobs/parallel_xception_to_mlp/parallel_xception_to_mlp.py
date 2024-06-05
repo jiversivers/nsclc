@@ -87,7 +87,7 @@ def main():
         models = [FETC(data.shape[1:], feature_extractor=feature_extractor, classifier=classifier, layer='conv4')
                   for _ in range(data.stack_height)]
         [model.to(device) for model in models]
-        ensemble_combiner = nn.Linear(data.stack_height, 1)  # Learnable linear combination of logits
+        ensemble_combiner = nn.Linear(data.stack_height, 1).to(device)  # Learnable linear combination of logits
 
         # Parallel feature extraction to single net model with input size for all models features
         input_size = sum([model.feature_map_dims[1] for model in models])
