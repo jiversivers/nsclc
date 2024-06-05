@@ -116,11 +116,11 @@ def main():
                 if ep + 1 in epochs:
                     scores, fig = score_model(model, testing_loader, make_plot=True, threshold_type='ROC')
                     with open(f'outputs/{model_fn.__name__}/prints/lr{lr}_results.txt', 'a') as f:
-                        f.write('\n_____________________________________________________')
+                        f.write('\n_____________________________________________________\n')
                         for key, item in scores.items():
                             if 'Confusion' not in key:
-                                f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
-                        f.write('_____________________________________________________\n')
+                                f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
+                        f.write('\n_____________________________________________________\n')
                     running_auc.append(scores['ROC-AUC'])
                     running_accuracy.append(scores['Balanced Accuracy at Threshold'])
                     running_figs.append(fig)
