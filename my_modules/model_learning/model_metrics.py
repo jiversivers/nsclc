@@ -9,12 +9,12 @@ from sklearn.metrics import precision_recall_curve, PrecisionRecallDisplay, aver
 def calculate_auc_roc(model, loader, print_results=False, make_plot=False,
                       device=torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')):
     model.eval()
-    outs = torch.tensor([]).to(device)
-    targets = torch.tensor([]).to(device)
+    outs = []
+    targets = []
     with torch.no_grad():
         for x, target in loader:
-            outs = torch.cat((outs, model(x)), dim=0)
-            targets = torch.cat((targets, target), dim=0)
+            outs.append(model(x).item())
+            targets.append(target.item())
         thresholds, idx = torch.sort(outs.detach().squeeze())
         sorted_targets = targets[idx]
         tpr = []
@@ -78,8 +78,7 @@ def calculate_auc_roc(model, loader, print_results=False, make_plot=False,
         return auc, best_acc, thresh
 
 
-def score_model(model, loader, print_results=False, make_plot=False, threshold_type='none',
-                device=torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')):
+def score_model(model, loader, print_results=False, make_plot=False, threshold_type='none'):
     def make_the_plots():
         fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 5))
         RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=scores['ROC-AUC']).plot(ax=ax1)
@@ -93,12 +92,12 @@ def score_model(model, loader, print_results=False, make_plot=False, threshold_t
 
     scores = OrderedDict()
     model.eval()
-    outs = torch.tensor([]).to(device)
-    targets = torch.tensor([]).to(device)
+    outs = []
+    targets = []
     with torch.no_grad():
         for x, target in loader:
-            outs = torch.cat((outs, model(x)), dim=0)
-            targets = torch.cat((targets, target), dim=0)
+            outs.append(model(x).item())
+            targets.append(target.item())
     # ROC
     fpr, tpr, thresholds = roc_curve(targets, outs, pos_label=1)
     scores['ROC-AUC'] = auc(fpr, tpr)
