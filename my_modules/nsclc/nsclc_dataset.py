@@ -244,15 +244,16 @@ class NSCLCDataset(Dataset):
                 x_dist[ch], _ = torch.histogram(mode.cpu(), bins=self._nbins, range=[0, 1], density=True)
             x = x_dist
 
+        # Apply transforms that were input (if any)
+        x = self.transforms(x) if self.transforms is not None else x
+
         # Cache the sample if the caches have been opened
         if self.index_cache is None:
             self._open_cache(x, y)
         self.shared_x[index] = x.to(self.device)
         self.shared_y[index] = y.to(self.device)
-        self.index_cache[index] = index
+        self.index_cache[index] = index.to(self.device)
 
-        # Apply transforms that were input (if any)
-        x = self.transforms(x) if self.transforms is not None else x
         return x, y
         # endregion
 
@@ -274,7 +275,7 @@ class NSCLCDataset(Dataset):
         match self.label:
             case 'Response' | 'Metastases' | None:
                 shared_y_base = mp.Array(ctypes.c_float, len(self) * [-1])
-                y_shape = (1,)
+                y_shape = ()
             case 'Mask':
                 shared_y_base = mp.Array(ctypes.c_float, int(len(self) * np.prod(y.shape)))
                 y_shape = tuple(y.shape)
