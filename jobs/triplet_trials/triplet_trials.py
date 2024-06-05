@@ -8,13 +8,13 @@ from torch import nn
 from my_modules.custom_models import MLPNet, RegularizedParallelMLPNet, RegularizedMLPNet, \
     ParallelMLPNet, CNNet, RegularizedCNNet, ParallelCNNet, RegularizedParallelCNNet
 from my_modules.model_learning.loader_maker import split_augmented_data
-from my_modules.model_learning.model_evaluation import calculate_auc_roc
+from my_modules.model_learning.model_metrics import calculate_auc_roc, score_model
 from my_modules.nsclc import NSCLCDataset
 
 
 def main():
     # Set up multiprocessing context
-    # mp.set_start_method('forkserver', force=True)
+    mp.set_start_method('forkserver', force=True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Create data with psuedo-RGB stack for each mode
@@ -51,16 +51,6 @@ def main():
     os.makedirs('outputs/', exist_ok=True)
     with open('outputs/overview_results.txt', 'w') as f:
         f.write('Overview of Model Performance\n')
-
-    # Make model save dir
-    os.makedirs('outputs/', exist_ok=True)
-    with open('outputs/overview_results.txt', 'w') as f:
-        f.write('Overview of Model Performance')
-
-    # Make model save dir
-    os.makedirs('outputs/', exist_ok=True)
-    with open('outputs/overview_results.txt', 'w') as f:
-        f.write('Overview of Model Performance')
 
     for model_fn in model_fns:
         os.makedirs(f'outputs/{model_fn.__name__}/plots', exist_ok=True)
@@ -116,20 +106,36 @@ def main():
                         out = model(x)
                         targets = torch.cat((targets, target), dim=0)
                         validation_loss += nn.BCEWithLogitsLoss()(out, target.unsqueeze(1))
-                    auc, acc, thresh = calculate_auc_roc(model, validation_loader)
+                    scores = score_model(model, validation_loader)
                     with open(f'outputs/{model_fn.__name__}/prints/lr{lr}_results.txt', 'a') as f:
-                        f.write(f'\nEpoch {ep + 1} || Loss - Train: {loss.item():4.4f} '
-                                f'Eval: {validation_loss / len(validation_loader):4.4f} '
-                                f'|| AUC: {auc:.2f} || ACC: {100 * acc:.2f}%')
+                        for key, item in scores.items():
+                            if 'Confusion' not in key:
+                                f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
 
                 # Testing
                 if ep + 1 in epochs:
-                    auc, acc, thresh, fig = calculate_auc_roc(model, testing_loader, make_plot=True)
+                    scores, fig = score_model(model, testing_loader, make_plot=True, threshold_type='ROC')
                     with open(f'outputs/{model_fn.__name__}/prints/lr{lr}_results.txt', 'a') as f:
-                        f.write(f'\n>>> AUC: {auc:.2f} || ACC: {100 * acc:.2f}% at THRESH: {thresh:.2f} <<<')
-                    running_auc.append(auc)
-                    running_accuracy.append(acc)
+                        f.write('\n_____________________________________________________')
+                        for key, item in scores.items():
+                            if 'Confusion' not in key:
+                                f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
+                        f.write('_____________________________________________________\n')
+                    running_auc.append(scores['ROC-AUC'])
+                    running_accuracy.append(scores['Balanced Accuracy at Threshold'])
                     running_figs.append(fig)
+
+            # Determine the best performance first by auc, then acc if there are ties
+            best_auc = max(running_auc)
+            max_auc_loc = [a == best_auc for a in running_auc]  # Find where the max auc(s) is/are
+            accs_for_best_auc = [running_accuracy[idx] for idx, mal in enumerate(max_auc_loc) if
+                                 mal]  # Find the AUC at those
+            running_figs[running_auc.index(max(accs_for_best_auc))].savefig(  # Save fig from that time
+                f'outputs/{model_fn.__name__}/plots/best_auc_acc{lr}.png')
+            for fig in running_figs:
+                plt.close(fig)
+            best_acc = max(accs_for_best_auc)
+            best_epoch = epochs[running_auc.index(best_auc)]
 
             # Plot training metrics over testing ranges
             fig, ax1 = plt.subplots()
@@ -140,7 +146,7 @@ def main():
             ax1.tick_params(axis='both', labelcolor='r')
 
             ax2 = ax1.twinx()
-            ax2.plot(epochs, running_accuracy, 'b-', label='Best Accuracy')
+            ax2.plot(epochs, running_accuracy, 'b-', label='Best Balanced Accuracy')
             ax2.set_ylabel('Accuracy')
             ax2.set_ylim([0, 1])
             ax2.tick_params(axis='y', labelcolor='b')
@@ -152,21 +158,9 @@ def main():
             fig.savefig(f'outputs/{model_fn.__name__}/plots/test_metrics_lr{lr}.png')
             plt.close(fig)
 
-            # Determine the best performance first by accuracy, then auc if there are ties
-            best_acc = max(running_accuracy)
-            max_acc_loc = [a == best_acc for a in running_accuracy]  # Find where the max accuracy is/are
-            aucs_for_best_acc = [running_auc[idx] for idx, mal in enumerate(max_acc_loc) if
-                                 mal]  # Find the AUC at those
-            running_figs[running_auc.index(max(aucs_for_best_acc))].savefig(  # Save fig from that time
-                f'outputs/{model_fn.__name__}/plots/best_auc_acc{lr}.png')
-            for fig in running_figs:
-                plt.close(fig)
-            best_auc = max(aucs_for_best_acc)
-            best_epoch = epochs[running_auc.index(best_auc)]
-
             with open('outputs/overview_results.txt', 'a') as f:
-                f.write(f'\n{model.name} Best accuracy of {100 * best_acc}% and best AUC of {best_auc} '
-                        f'achieved at epoch {best_epoch} with learning rate of {lr}')
+                f.write(f'\n{model.name} Best balanced accuracy of {100 * best_acc:.2f}% and best AUC of {best_auc:.2f}'
+                        f' achieved at epoch {best_epoch} with learning rate of {lr}')
 
             # Hard clear cache to try to keep memory clear on GPU
             torch.cuda.empty_cache()
