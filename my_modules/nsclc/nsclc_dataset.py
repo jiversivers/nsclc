@@ -14,7 +14,10 @@ from torch.utils.data import Dataset
 
 class NSCLCDataset(Dataset):
     """
-    NSCLC dataset class to load NSCLC images from root dir (arg).
+    NSCLC dataset class to load NSCLC images from root dir (arg). When __getitem__ is used, the dataset will return a
+    tuple with the fov stack of modes (ordered by the input, or default order with 'all') at index (arg) and the binary
+    label of the sample, or the mask if 'mask' is set for the label. IN the binary classes, the label will be 0 for
+    non-responders or positive metastases and 1 otherwise. As a shorthand, a positive class (1) is the positive outcome.
 
     Image modes are specified at creation and can include any typical MPM image modes available from the dataset and
     derived modes (bound fraction and mean lifetime).
@@ -67,7 +70,7 @@ class NSCLCDataset(Dataset):
         self.image_dims = None
         self.scalars = None
 
-        # Init placeholder cache arrays (actual arrays are set at end of __init__ using reset_cache method)
+        # Init placeholder cache arrays
         self.index_cache = None
         self.shared_x = None
         self.shared_y = None
@@ -157,8 +160,6 @@ class NSCLCDataset(Dataset):
                             self.all_fovs.remove(fov_lut[mode][0])
                             self.fov_mode_dict.remove(fov_lut)
                             break
-        # Init shared memory arrays
-        self.reset_cache()
 
     def __len__(self):
         if self.augmented:
@@ -241,12 +242,14 @@ class NSCLCDataset(Dataset):
             x_dist = torch.empty((self.stack_height,) + (self._nbins,), dtype=torch.float32, device=self.device)
             for ch, mode in enumerate(x):
                 x_dist[ch], _ = torch.histogram(mode.cpu(), bins=self._nbins, range=[0, 1], density=True)
+            x = x_dist
 
         # Cache the sample if the caches have been opened
-        if self.shared_x is not None and self.shared_y is not None:
-            self.shared_x[index] = x.to(self.device)
-            self.shared_y[index] = y.to(self.device)
-            self.index_cache[index] = index
+        if self.index_cache is None:
+            self._open_cache(x, y)
+        self.shared_x[index] = x.to(self.device)
+        self.shared_y[index] = y.to(self.device)
+        self.index_cache[index] = index
 
         # Apply transforms that were input (if any)
         x = self.transforms(x) if self.transforms is not None else x
@@ -261,27 +264,29 @@ class NSCLCDataset(Dataset):
         self.shared_y = None
         self._shape = None
 
+    def _open_cache(self, x, y):
         # Setup shared memory arrays (i.e. caches that are compatible with multiple workers)
         # negative initialization ensure no overlap with actual cached indices
         index_cache_base = mp.Array(ctypes.c_int, len(self) * [-1])
-        shared_x_base = mp.Array(ctypes.c_float, int(len(self) * np.prod(self.shape)))
+        shared_x_base = mp.Array(ctypes.c_float, int(len(self) * np.prod(x.shape)))
 
         # Label-size determines cache size, so if no label is set, we will fill cache with -999999 at __getitem__
         match self.label:
             case 'Response' | 'Metastases' | None:
                 shared_y_base = mp.Array(ctypes.c_float, len(self) * [-1])
-                y_shape = (len(self),)
+                y_shape = (1,)
             case 'Mask':
-                shared_y_base = mp.Array(ctypes.c_float, int(len(self) * np.prod(self.shape[-2:])))
-                y_shape = (len(self),) + self.shape[-2:]
+                shared_y_base = mp.Array(ctypes.c_float, int(len(self) * np.prod(y.shape)))
+                y_shape = tuple(y.shape)
             case _:
                 raise Exception('An unrecognized label is in use that is blocking the cache from initializing. '
                                 'Update label attribute of dataset and try again.')
 
         # Convert all arrays to desired data structure
         self.index_cache = convert_mp_to_torch(index_cache_base, (len(self),), device=self.device)
-        self.shared_x = convert_mp_to_torch(shared_x_base, (len(self),) + self.shape, device=self.device)
-        self.shared_y = convert_mp_to_torch(shared_y_base, y_shape, device=self.device)
+        self.shared_x = convert_mp_to_torch(shared_x_base, (len(self),) + x.shape, device=self.device)
+        self.shared_y = convert_mp_to_torch(shared_y_base, (len(self),) + y_shape, device=self.device)
+        print('Cache opened')
 
     def to(self, device):
         # Move caches to device
