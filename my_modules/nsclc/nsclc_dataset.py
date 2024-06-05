@@ -290,15 +290,16 @@ class NSCLCDataset(Dataset):
 
     def to(self, device):
         # Move caches to device
-        self.index_cache = self.index_cache.to(device)
-        for i, idx in enumerate(self.index_cache):
-            self.index_cache[i] = idx.to(device)
-        self.shared_x = self.shared_x.to(device)
-        for i, x in enumerate(self.shared_x):
-            self.shared_x[i] = x.to(device)
-        self.shared_y = self.shared_y.to(device)
-        for i, y in enumerate(self.shared_y):
-            self.shared_y[i] = y.to(device)
+        if self.index_cache is not None:
+            self.index_cache = self.index_cache.to(device)
+            for i, idx in enumerate(self.index_cache):
+                self.index_cache[i] = idx.to(device)
+            self.shared_x = self.shared_x.to(device)
+            for i, x in enumerate(self.shared_x):
+                self.shared_x[i] = x.to(device)
+            self.shared_y = self.shared_y.to(device)
+            for i, y in enumerate(self.shared_y):
+                self.shared_y[i] = y.to(device)
 
         # Move any self-held tensors to device for ops compatibility
         self.scalars = self.scalars.to(device) if self.scalars is not None else None
