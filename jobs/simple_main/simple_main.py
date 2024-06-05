@@ -6,6 +6,7 @@ import os
 
 from my_modules.custom_models import *
 from my_modules.model_learning import train_epoch, valid_epoch, masked_loss
+from my_modules.model_learning.loader_maker import split_augmented_data
 from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc.nsclc_dataset import NSCLCDataset
 
@@ -112,7 +113,7 @@ def main():
     # region Augmented Images
     # Augment and recreated the dataloaders
     data.augment()
-    train_set, eval_set, test_set = torch.utils.data.random_split(dataset=data, lengths=set_lengths)
+    train_set, eval_set, test_set = split_augmented_data(data, split=data_split)
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True,
                                                num_workers=workers[0],
                                                drop_last=(True if len(train_set) % batch_size == 1 else False))
@@ -180,7 +181,7 @@ def main():
     # region Augmented Histograms
     # Transform and create the dataloaders
     data.dist_transform(nbins=25)
-    train_set, eval_set, test_set = torch.utils.data.random_split(dataset=data, lengths=set_lengths)
+    train_set, eval_set, test_set = split_augmented_data(data, split=data_split)
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True,
                                                num_workers=workers[0],
                                                drop_last=(True if len(train_set) % batch_size == 1 else False))
