@@ -130,7 +130,7 @@ def main():
             max_auc_loc = [a == best_auc for a in running_auc]  # Find where the max auc(s) is/are
             accs_for_best_auc = [running_accuracy[idx] for idx, mal in enumerate(max_auc_loc) if
                                  mal]  # Find the AUC at those
-            running_figs[running_auc.index(max(accs_for_best_auc))].savefig(  # Save fig from that time
+            running_figs[running_accuracy.index(max(accs_for_best_auc))].savefig(  # Save fig from that time
                 f'outputs/{model_fn.__name__}/plots/best_auc_acc{lr}.png')
             for fig in running_figs:
                 plt.close(fig)
