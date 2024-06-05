@@ -38,12 +38,10 @@ def main():
         f.write(f'Parallel Results')
 
     # Define our base feature extractor and turn the gradients off -- we won't train it, just use it to feed our MLP.
-    feature_extractor = inception(num_classes=1000, pretrained=False)
+    feature_extractor = inception(num_classes=1001, pretrained=False)
 
     # Load pretrained from download
-    state_dict = torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/xception-43020ad28.pth')
-    state_dict['last_linear.weight'] = state_dict.pop('fc.weight')
-    state_dict['last_linear.bias'] = state_dict.pop('fc.bias')
+    state_dict = torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth')
 
     feature_extractor.load_state_dict(state_dict)
     for params in feature_extractor.parameters():
