@@ -145,7 +145,8 @@ def main():
         plt.savefig(f'outputs/plots/roc_thresh_acc_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png')
         plt.close()
         plt.plot(range(1, 1 + epoch), evaluation_threshold[-1])
-        plt.savefig(plt.savefig(f'outputs/plots/roc_thresh_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png'))
+        plt.savefig(f'outputs/plots/roc_thresh_xception_features_to_regMLP_{ep + 1}-Epochs_{lr}-LearningRate.png')
+        plt.close()
 
 
 if __name__ == '__main__':
