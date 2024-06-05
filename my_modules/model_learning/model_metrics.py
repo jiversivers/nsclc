@@ -13,8 +13,8 @@ def calculate_auc_roc(model, loader, print_results=False, make_plot=False,
     targets = []
     with torch.no_grad():
         for x, target in loader:
-            outs.append(model(x).tolist())
-            targets.append(target.tolist())
+            outs.append(model(x).cpu().detach())
+            targets.append(target.cpu().detach())
         thresholds, idx = torch.sort(outs.detach().squeeze())
         sorted_targets = targets[idx]
         tpr = []
@@ -46,9 +46,6 @@ def calculate_auc_roc(model, loader, print_results=False, make_plot=False,
 
     # Optional figure creation
     if make_plot:
-        # Move to host memory (if on GPU)
-        thresholds = thresholds.cpu()
-
         # For plot
         fig, ax1 = plt.subplots()
 
@@ -83,7 +80,6 @@ def score_model(model, loader, print_results=False, make_plot=False, threshold_t
         fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 5))
         RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=scores['ROC-AUC']).plot(ax=ax1)
         ax1.set_title('ROC')
-        precision, recall, _ = precision_recall_curve(targets, outs)
         PrecisionRecallDisplay.from_predictions(targets, outs).plot(ax=ax2)
         ax2.set_title('Precision Recall Curve')
         ConfusionMatrixDisplay.from_predictions(targets, preds).plot(ax=ax3)
@@ -96,8 +92,8 @@ def score_model(model, loader, print_results=False, make_plot=False, threshold_t
     targets = []
     with torch.no_grad():
         for x, target in loader:
-            outs.append(model(x).tolist())
-            targets.append(target.tolist())
+            outs.append(model(x).cpu().detach())
+            targets.append(target.cpu().detach())
     # ROC
     fpr, tpr, thresholds = roc_curve(targets, outs, pos_label=1)
     scores['ROC-AUC'] = auc(fpr, tpr)
