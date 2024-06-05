@@ -114,8 +114,9 @@ def main():
                     loss = loss_fn(out, target.unsqueeze(1))
                     eval_loss += loss.item()
                     scores = score_model(model, eval_loader)
-                    evaluation_threshold[-1].append(scores['Optimal Threshold from ROC'])
-                    evaluation_accuracy[-1].append(scores['Accuracy at ROC Threshold'])
+                evaluation_loss[-1].append(eval_loss / len(eval_set))
+                evaluation_threshold[-1].append(scores['Optimal Threshold from ROC'])
+                evaluation_accuracy[-1].append(scores['Accuracy at ROC Threshold'])
 
             # See if we are at one of our training length checkpoints. Save and test if we are
             if ep + 1 in epochs:
@@ -130,11 +131,11 @@ def main():
                         f'outputs/plots/auc_acc_xception_features_to_regMLP_{key}_{ep + 1}-Epochs_{lr}-LearningRate.png')
                     plt.close(fig)
                 with open('outputs/results.txt', 'a') as f:
-                    f.write('_____________________________________________________')
+                    f.write('\n_____________________________________________________\n')
                     for key, item in scores.items():
                         if 'Confusion' not in key:
-                            f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
-                    f.write('_____________________________________________________')
+                            f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
+                    f.write('_____________________________________________________\n')
 
         plt.plot(range(1, 1 + epoch), training_loss[-1])
         plt.plot(range(1, 1 + epoch), evaluation_loss[-1])
