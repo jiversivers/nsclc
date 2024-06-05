@@ -13,8 +13,8 @@ def calculate_auc_roc(model, loader, print_results=False, make_plot=False,
     targets = []
     with torch.no_grad():
         for x, target in loader:
-            outs.append(model(x).item())
-            targets.append(target.item())
+            outs.append(model(x).tolist())
+            targets.append(target.tolist())
         thresholds, idx = torch.sort(outs.detach().squeeze())
         sorted_targets = targets[idx]
         tpr = []
@@ -96,8 +96,8 @@ def score_model(model, loader, print_results=False, make_plot=False, threshold_t
     targets = []
     with torch.no_grad():
         for x, target in loader:
-            outs.append(model(x).item())
-            targets.append(target.item())
+            outs.append(model(x).tolist())
+            targets.append(target.tolist())
     # ROC
     fpr, tpr, thresholds = roc_curve(targets, outs, pos_label=1)
     scores['ROC-AUC'] = auc(fpr, tpr)
