@@ -97,15 +97,13 @@ def main():
                     # Test
                     if ep + 1 in epochs:
                         torch.save(model.state_dict(), f'raw_img_models/{data.name}__{model.name}__{lr}_{ep}.pth')
-                        print(
-                            f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
                         scores, figs = score_model(model, test_loader, print_results=True, make_plot=True)
 
                         with open(results_file_path, 'a') as f:
-                            f.write('\n_____________________________________________________')
+                            f.write(f'\n>>> {model.name} for {ep + 1} epochs with learning rate of {lr}\n')
                             for key, item in scores.items():
                                 if 'Confusion' not in key:
-                                    f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
+                                    f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
                             f.write('_____________________________________________________\n')
 
     # endregion
