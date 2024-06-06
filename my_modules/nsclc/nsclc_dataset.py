@@ -252,7 +252,7 @@ class NSCLCDataset(Dataset):
             self._open_cache(x, y)
         self.shared_x[index] = x.to(self.device)
         self.shared_y[index] = y.to(self.device)
-        self.index_cache[index] = index.to(self.device)
+        self.index_cache[index] = index
 
         return x, y
         # endregion
