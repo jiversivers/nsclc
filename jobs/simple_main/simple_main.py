@@ -40,8 +40,7 @@ def main():
     learning_rates = [0.01, 0.001, 0.0001, 0.00001]
 
     # Set up training functions
-    optimizers = {'Adam': [optim.Adam, {}],
-                  'RMSProp': [optim.RMSprop, {'momentum': 0.9}]}
+    optimizers = {'Adam': [optim.Adam, {}]}
     loss_function = masked_loss(nn.BCEWithLogitsLoss())
 
     # region Raw Images

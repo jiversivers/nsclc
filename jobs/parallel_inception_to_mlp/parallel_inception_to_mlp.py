@@ -220,9 +220,9 @@ def main():
             # Write outputs
             with open('outputs/individual_results.txt', 'a') as f:
                 f.write(f'LR: {lr} - Epoch: {ep + 1}')
-                for mode, score in zip(data.mode, individual_test_scores[-1]):
+                for mode, score in zip(data.mode, individual_eval_scores[-1]):
                     f.write(f'\n{mode}')
-                    for key, item in score.items():
+                    for key, item in score[-1].items():
                         if 'Confusion' not in key:
                             f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
 
@@ -279,7 +279,7 @@ def main():
                     f.write(f'\n>>>LR: {lr} - Epoch: {ep + 1}')
                     for mode, score in zip(data.mode, individual_test_scores[-1]):
                         f.write(f'\n{mode}______________________________________________\n')
-                        for key, item in score.items():
+                        for key, item in score[-1].items():
                             if 'Confusion' not in key:
                                 f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
                         f.write('_____________________________________________________\n')
