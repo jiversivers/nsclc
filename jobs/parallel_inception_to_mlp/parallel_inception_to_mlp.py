@@ -181,7 +181,7 @@ def main():
                     # Get final output for each model
                     [optimizer.zero_grad() for optimizer in optimizers]
                     outs = []
-                    for ch, model, pl in enumerate(zip(models, psuedo_loaders)):
+                    for ch, (model, pl) in enumerate(zip(models, psuedo_loaders)):
                         outs.append(model(x[:, ch].squeeze(1)))
                         # Make a psuedo-loader for each model to use for scoring
                         pl.append((x[:, ch].squeeze(1), target))
@@ -260,7 +260,7 @@ def main():
                         # Get final output for each model
                         [optimizer.zero_grad() for optimizer in optimizers]
                         outs = []
-                        for ch, model, pl in enumerate(zip(models, psuedo_loaders)):
+                        for ch, (model, pl) in enumerate(zip(models, psuedo_loaders)):
                             outs.append(model(x[:, ch].squeeze(1)))
                             # Make a psuedo-loader for each model to use for scoring
                             pl.append((x[:, ch].squeeze(1), target))
