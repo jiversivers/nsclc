@@ -228,13 +228,13 @@ def main():
 
             with open('outputs/ensemble_results.txt', 'a') as f:
                 f.write(f'LR: {lr} - Epoch: {ep + 1}\n')
-                for key, item in ensemble_eval_scores[-1].items():
+                for key, item in ensemble_eval_scores[-1][-1].items():
                     if 'Confusion' not in key:
                         f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
 
             with open('outputs/parallel_results.txt', 'a') as f:
                 f.write(f'LR: {lr} - Epoch: {ep + 1}\n')
-                for key, item in parallel_eval_scores[-1].items():
+                for key, item in parallel_eval_scores[-1][-1].items():
                     if 'Confusion' not in key:
                         f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
 
@@ -288,7 +288,7 @@ def main():
                 with open('outputs/ensemble_results.txt', 'a') as f:
                     f.write(f'\n>>>LR: {lr} - Epoch: {ep + 1}')
                     f.write('_____________________________________________________\n')
-                    for key, item in ensemble_test_scores[-1].items():
+                    for key, item in ensemble_test_scores[-1][-1].items():
                         if 'Confusion' not in key:
                             f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
                     f.write('_____________________________________________________\n')
@@ -296,7 +296,7 @@ def main():
                 with open('outputs/parallel_results.txt', 'a') as f:
                     f.write(f'\n>>>LR: {lr} - Epoch: {ep + 1}')
                     f.write('_____________________________________________________\n')
-                    for key, item in parallel_test_scores[-1].items():
+                    for key, item in parallel_test_scores[-1][-1].items():
                         if 'Confusion' not in key:
                             f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
                     f.write('_____________________________________________________\n')
