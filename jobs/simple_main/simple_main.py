@@ -194,6 +194,10 @@ def main():
 
     # Update Model zoo for histograms
     models = [MLPNet, RegularizedMLPNet, RegularizedParallelMLPNet, RNNet, RegularizedRNNet, RegularizedParallelRNNet]
+
+    # Update loss function (no need for masked loss)
+    loss_function = nn.BCEWithLogitsLoss()
+
     try:
         os.mkdir('aug_hist_models')
     except FileExistsError:
