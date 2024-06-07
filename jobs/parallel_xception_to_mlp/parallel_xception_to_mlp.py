@@ -156,7 +156,7 @@ def main():
 
             # Update training checks
             for il, itl in zip(individual_losses, individual_training_loss[-1]):
-                individual_training_loss.append(il / len(train_set))
+                itl.append(il / len(train_set))
             ensemble_training_loss[-1].append(ensemble_loss / len(train_set))
             parallel_training_loss[-1].append(parallel_loss / len(train_set))
 
