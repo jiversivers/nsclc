@@ -224,8 +224,7 @@ class NSCLCDataset(Dataset):
                             if fov_lut[mode][1] is None:
                                 self.all_fovs.remove(fov_lut[mode][0])
                                 self.fov_mode_dict.remove(fov_lut)
-                                break
-        print(self.index_cache)
+
     def __len__(self):
         if self._use_atlas:
             if self.chunk_atlas:
