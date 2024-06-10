@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name=parallel_inception_to_mlp
-#SBATCH --partition=agpu06
+#SBATCH --partition=agpu72
 #SBATCH --output=nsclc_main.txt
 #SBATCH --error=nsclc_main.err
 #SBATCH --mail-type=ALL
@@ -9,7 +9,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=64
 #SBATCH --cpus-per-task=1
-#SBATCH --time=06:00:00
+#SBATCH --time=72:00:00
 #SBATCH --qos=gpu
 
 export OMP_NUM_THREADS=64
