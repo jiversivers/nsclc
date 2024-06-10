@@ -167,10 +167,10 @@ def main():
                         scores, figs = score_model(model, test_loader, print_results=True, make_plot=True)
 
                         with open(results_file_path, 'a') as f:
-                            f.write('\n_____________________________________________________')
+                            f.write(f'\n>>> {model.name} for {ep + 1} epochs with learning rate of {lr}\n')
                             for key, item in scores.items():
                                 if 'Confusion' not in key:
-                                    f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
+                                    f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
                             f.write('_____________________________________________________\n')
 
     # endregion
@@ -221,11 +221,11 @@ def main():
                 for ep in range(epochs[-1]):
                     # Train
                     model.train()
-                    train_loss.append(train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=True))
+                    train_loss.append(train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=False))
 
                     # Validate
                     model.eval()
-                    loss, accu = valid_epoch(model, eval_loader, loss_function, masked_loss_fn=True)
+                    loss, accu = valid_epoch(model, eval_loader, loss_function, masked_loss_fn=False)
                     eval_loss.append(loss)
                     print(f'Epoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} Eval: {eval_loss[-1]:4.4f}')
                     score_model(model, eval_loader, print_results=True)
@@ -238,10 +238,10 @@ def main():
                         scores, figs = score_model(model, test_loader, print_results=True, make_plot=True)
 
                         with open(results_file_path, 'a') as f:
-                            f.write('\n_____________________________________________________')
+                            f.write(f'\n>>> {model.name} for {ep + 1} epochs with learning rate of {lr}\n')
                             for key, item in scores.items():
                                 if 'Confusion' not in key:
-                                    f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
+                                    f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
                             f.write('_____________________________________________________\n')
     # endregion
 
@@ -287,11 +287,11 @@ def main():
                 for ep in range(epochs[-1]):
                     # Train
                     model.train()
-                    train_loss.append(train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=True))
+                    train_loss.append(train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=False))
 
                     # Validate
                     model.eval()
-                    loss, accu = valid_epoch(model, eval_loader, loss_function, masked_loss_fn=True)
+                    loss, accu = valid_epoch(model, eval_loader, loss_function, masked_loss_fn=False)
                     eval_loss.append(loss)
                     print(f'Epoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} Eval: {eval_loss[-1]:4.4f}')
                     score_model(model, eval_loader, print_results=True)
@@ -304,10 +304,10 @@ def main():
                         scores, figs = score_model(model, test_loader, print_results=True, make_plot=True)
 
                         with open(results_file_path, 'a') as f:
-                            f.write('\n_____________________________________________________')
+                            f.write(f'\n>>> {model.name} for {ep + 1} epochs with learning rate of {lr}\n')
                             for key, item in scores.items():
                                 if 'Confusion' not in key:
-                                    f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
+                                    f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
                             f.write('_____________________________________________________\n')
     # endregion
 
