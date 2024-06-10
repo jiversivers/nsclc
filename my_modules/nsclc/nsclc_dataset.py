@@ -1,5 +1,10 @@
 import torchvision.transforms as t
 import os
+import bisect
+
+from PIL import Image
+Image.MAX_IMAGE_PIXELS = None
+
 from .helper_functions import load_tiff, load_asc, load_weighted_average, load_bound_fraction, convert_mp_to_torch
 import pandas as pd
 import numpy as np
@@ -11,6 +16,7 @@ import multiprocessing as mp
 import ctypes
 from torch.utils.data import Dataset
 
+import traceback as tb
 
 class NSCLCDataset(Dataset):
     """
@@ -45,11 +51,16 @@ class NSCLCDataset(Dataset):
     """
 
     # region Main Dataset Methods (init, len, getitem)
-    def __init__(self, root, mode, xl_file=None, label=None, mask_on=True, transforms=None,
+    def __init__(self, root, mode, xl_file=None, label=None, mask_on=True, transforms=None, use_atlas=False,
+                 chunk_atlas=True, use_cache=True,
                  device=(torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'))):
+        super().__init__()
         self.transforms = transforms
         self.root = root
         self.device = device
+        self._use_atlas = use_atlas
+        self.use_cache = use_cache
+        self.chunk_atlas = chunk_atlas if self._use_atlas else False
 
         # Set hidden property defaults
         self._name = 'nsclc_'
@@ -61,9 +72,9 @@ class NSCLCDataset(Dataset):
         self._nbins = 25
 
         # Set defaults
-        self.mode = mode
+        self.mode = mode if type(mode) is list else [mode]
         self.label = label
-        self.mask_on = mask_on
+        self.mask_on = False if self._use_atlas else mask_on
 
         # Set data descriptors
         self.stack_height = len(self.mode)
@@ -81,7 +92,7 @@ class NSCLCDataset(Dataset):
                    'weighted_average': load_weighted_average,
                    'ratio': load_bound_fraction}
 
-        # Define a mode dict that matches call to load functions and filename regex
+        # Define a mode dict that matches appropriate load functions and filename regex to mode
         self.mode_dict = {'mask': [load_fn['tiff'], rf'.*?(\\|/)Redox(\\|/)ROI_mask\.(tiff|TIFF)'],
                           'orr': [load_fn['tiff'], rf'.*?(\\|/)Redox(\\|/)RawRedoxMap\.(tiff|TIFF)'],
                           'g': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_phasor_G\.(asc|ASC)'],
@@ -91,6 +102,7 @@ class NSCLCDataset(Dataset):
                           'tau2': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_t2\.(asc|ASC)'],
                           'alpha1': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_a1\.(asc|ASC)'],
                           'alpha2': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_a2\.(asc|ASC)']}
+        # Compile regexes
         self.mode_dict = {key: [item[0], re.compile(item[1])] for key, item in self.mode_dict.items()}
 
         # Find and load features spreadsheet (or load directly if path provided)
@@ -103,104 +115,224 @@ class NSCLCDataset(Dataset):
             self.xl_file = xl_file[0]
         self.features = pd.read_excel(self.xl_file)
 
-        # Prepare a list of FOVs from data dir matched to slide names from the features excel file
-        self.fovs_by_slide = [glob.glob(self.root + os.sep + slide + '*') for slide in
-                              self.features['Slide Name']]  # This gives a list of lists of fovs sorted by slide
-        self.all_fovs = [fov for slide_fovs in self.fovs_by_slide for fov in
-                         slide_fovs]  # This will give a list of all fovs (still ordered, but now not nested,
-        # making it simple for indexing in __getitem__)
+        """
+        - atlases_by_sample and fovs_by_slide are lists of lists. The inner lists correspond to the images within a 
+        given sample or slide and the outer lists match the index of the slide to the features. In other words, the 
+        index of a given slide in the features file will also match a list of all images from that slide in the list of 
+        lists.
+        - all_atlases and all_fovs maintain the order, but un-nest the lists so they can easily be indexed into 
+        to actually use the paths to get items.  
+        - atlas_mode_dict and fov_mode_dict are lists of dicts. Each dict matches the index of the all_... lists, but 
+        also includes functions and paths for individual modes. They are of the form:
+            ..._mode_dict[<image_index_from_all_list>] = {<mode name>: [<specific load function for mode's file type>,
+                                                                        <path for specific mode of indexed image and>]
+                                                           ...}
+           In the case of atlases, this mode dict is trivial because there is only one load function (since only 'orr' 
+           is available), but it is still produced to easily match loading at __getitem__ for both data types.
+           
+           Whichever data type will be used is added as simply img_... variables to easily pass to __getitem__ 
+           regardless of datatype. After __init__ this should make the behavior the same (with the exception of cropping
+           and __len__ for atlases).      
+        """
+        # Prepare a list of images from data dir matched to slide names from the features excel file
+        if self._use_atlas:
+            # Track number of individual 512x512 chunks available within each atlas
+            self.atlas_chunk_dims = []
 
-        # Make and indexed FOV-LUT dict list of loaders and files
-        self.fov_mode_dict = [{} for _ in range(len(self.all_fovs))]
-        # Iterate through all FOVs
-        for index, fov in enumerate(self.all_fovs):
-            # Iterate through all base modes (from mode_dict)
-            for mode, (load_fn, file_pattern) in self.mode_dict.items():
-                matched = []
-                # Iterate through the current FOV tree
-                for trunk, dirs, files in os.walk(fov):
-                    # Check if any file in the tree matches the pattern for the mode from the base LUT (mode_dict)
-                    for file in files:
-                        matched.append(re.match(file_pattern, os.path.join(trunk, file)))
-                # If exactly one file matched, then add it to the FOV-LUT dict
-                if sum(t is not None for t in matched) == 1:
-                    for match in matched:
-                        if match:
-                            self.fov_mode_dict[index][mode] = [load_fn, match.string]
-                # Else, add <None> for later removal and move on to next FOV
-                else:
-                    self.fov_mode_dict[index][mode] = [fov, None]
+            # Track running total of chunks through each index for sub-indexing later
+            total_chunks_through_index = 0
+            self.atlas_sub_index_map = []
 
-            # Add derived modes
-            self.fov_mode_dict[index]['boundfraction'] = [load_bound_fraction, [self.fov_mode_dict[index]['alpha1'],
-                                                                                self.fov_mode_dict[index]['alpha2']]]
-            self.fov_mode_dict[index]['taumean'] = [load_weighted_average,
-                                                    [self.fov_mode_dict[index]['alpha1'],
-                                                     self.fov_mode_dict[index]['tau1'],
-                                                     self.fov_mode_dict[index]['alpha2'],
-                                                     self.fov_mode_dict[index]['tau2']]]
-        # Remove items that are missing a called mode
-        # Note the [:] makes a copy of the list so indices don't change on removal
-        for ii, fov_lut in enumerate(self.fov_mode_dict[:]):
-            for mode in self.mode:
-                match mode.lower():
-                    case 'taumean':
-                        if not all([fov_lut['alpha1'][1], fov_lut['tau1'][1],
-                                    fov_lut['alpha2'][1], fov_lut['tau2'][1]]):
-                            self.all_fovs.remove(fov_lut['alpha1'][0])
-                            self.fov_mode_dict.remove(fov_lut)
-                            break
-                    case 'boundfraction':
-                        if not all([fov_lut['alpha1'][1], fov_lut['alpha2'][1]]):
-                            self.all_fovs.remove(fov_lut['alpha1'][0])
-                            self.fov_mode_dict.remove(fov_lut)
-                            break
-                    case _:
-                        if fov_lut[mode][1] is None:
-                            self.all_fovs.remove(fov_lut[mode][0])
-                            self.fov_mode_dict.remove(fov_lut)
-                            break
+            # Nested list of atlas locations nested by sample (for label indexing)
+            self.atlases_by_sample = []
 
-    def __len__(self):
-        if self.augmented:
-            return 5 * len(self.all_fovs)
+            # A "mode_dict" that looks the same as the fov_mode_dict (though this one is trivial)
+            self.atlas_mode_dict = []
+            for subject in self.features['Sample ID']:
+                sample_dir = os.path.join(self.root, 'Atlas_Images', subject)
+                self.atlases_by_sample.append([])
+                for trunk, dirs, files in os.walk(sample_dir):
+                    for f in files:
+                        if 'rawredoxmap.tiff' == f.lower():
+                            im_path = os.path.join(trunk, f)
+                            self.atlases_by_sample[-1].append(trunk)
+                            self.atlas_mode_dict.append({'orr': [load_tiff, im_path]})
+                            with Image.open(im_path) as im:
+                                height, width = im.size
+                                rm_height, rm_width = height % 512, width % 512
+                                height, width = height - rm_height, width - rm_width  # "crop" to be a perfect fit
+                                self.atlas_chunk_dims.append((height / 512, width / 512))
+                                total_chunks_through_index += np.prod(self.atlas_chunk_dims[-1])
+                                self.atlas_sub_index_map.append(total_chunks_through_index)
+
+            # Un-nest list (still ordered, but now easily indexable)
+            self.all_atlases = [atlas for sample_atlases in self.atlases_by_sample for atlas in sample_atlases]
         else:
-            return len(self.all_fovs)
+            self.fovs_by_slide = [glob.glob(self.root + os.sep + slide + '*') for slide in
+                                  self.features['Slide Name']]  # This gives a list of lists of fovs sorted by slide
+            self.all_fovs = [fov for slide_fovs in self.fovs_by_slide for fov in
+                             slide_fovs]  # This will give a list of all fovs (still ordered, but now not nested,
+            # making it simple for indexing in __getitem__)
+
+            # Make an indexed FOV-LUT dict list of loaders and files
+            self.fov_mode_dict = [{} for _ in range(len(self.all_fovs))]
+            # Iterate through all FOVs
+            for index, fov in enumerate(self.all_fovs):
+                # Iterate through all base modes (from mode_dict)
+                for mode, (load_fn, file_pattern) in self.mode_dict.items():
+                    matched = []
+                    # Iterate through the current FOV tree
+                    for trunk, dirs, files in os.walk(fov):
+                        # Check if any file in the tree matches the pattern for the mode from the base LUT (mode_dict)
+                        for file in files:
+                            matched.append(re.match(file_pattern, os.path.join(trunk, file)))
+                    # If exactly one file matched, then add it to the FOV-LUT dict
+                    if sum(t is not None for t in matched) == 1:
+                        for match in matched:
+                            if match:
+                                self.fov_mode_dict[index][mode] = [load_fn, match.string]
+                    # Else, add <None> for later removal and move on to next FOV
+                    else:
+                        self.fov_mode_dict[index][mode] = [fov, None]
+
+                # Add derived modes
+                self.fov_mode_dict[index]['boundfraction'] = [load_bound_fraction, [self.fov_mode_dict[index]['alpha1'],
+                                                                                    self.fov_mode_dict[index][
+                                                                                        'alpha2']]]
+                self.fov_mode_dict[index]['taumean'] = [load_weighted_average,
+                                                        [self.fov_mode_dict[index]['alpha1'],
+                                                         self.fov_mode_dict[index]['tau1'],
+                                                         self.fov_mode_dict[index]['alpha2'],
+                                                         self.fov_mode_dict[index]['tau2']]]
+            # Remove items that are missing a called mode
+            # Note the [:] makes a copy of the list so indices don't change on removal
+            for ii, fov_lut in enumerate(self.fov_mode_dict[:]):
+                for mode in self.mode:
+                    match mode.lower():
+                        case 'taumean':
+                            if not all([fov_lut['alpha1'][1], fov_lut['tau1'][1],
+                                        fov_lut['alpha2'][1], fov_lut['tau2'][1]]):
+                                self.all_fovs.remove(fov_lut['alpha1'][0])
+                                self.fov_mode_dict.remove(fov_lut)
+                                break
+                        case 'boundfraction':
+                            if not all([fov_lut['alpha1'][1], fov_lut['alpha2'][1]]):
+                                self.all_fovs.remove(fov_lut['alpha1'][0])
+                                self.fov_mode_dict.remove(fov_lut)
+                                break
+                        case _:
+                            if fov_lut[mode][1] is None:
+                                self.all_fovs.remove(fov_lut[mode][0])
+                                self.fov_mode_dict.remove(fov_lut)
+                                break
+        print(self.index_cache)
+    def __len__(self):
+        if self._use_atlas:
+            if self.chunk_atlas:
+                atlas_len = int(self.atlas_sub_index_map[-1])
+            else:
+                atlas_len = len(self.all_atlases)
+            if self.augmented:
+                return 5 * atlas_len
+            else:
+                return atlas_len
+        else:
+            if self.augmented:
+                return 5 * len(self.all_fovs)
+            else:
+                return len(self.all_fovs)
 
     def __getitem__(self, index):
-        # Check if indexed sample is in cache (by checking for index in index_cache)...
-        # if it is, pull it from the cache;
-        if (all(cache_arr is not None for cache_arr in [self.index_cache, self.shared_x, self.shared_y])
-                and index in self.index_cache):
-            x = self.shared_x[index]
-            y = self.shared_y[index]
-            return x, y
-
-        # load the sample, and cache the sample (if cache is open)
-        # region Load Data and Label
+        # Parse the index
         # Get image path from index
         if self.augmented:
-            fov_index = int(np.floor(index / 5))  # This will give us the index for the fov
-            sub_index = index % 5  # This will give us the index for the crop within the fov
+            img_index = int(index // 5)  # This will give us the index for the base img
+            sub_index = index % 5  # This gives the index of the crop
         else:
-            fov_index = index
-        fov = self.all_fovs[fov_index]
+            img_index = index
+        if self._use_atlas:
+            # Find where the index is <= than the number of chunks
+            atlas_index = bisect.bisect_right(self.atlas_sub_index_map, img_index - 1)
+            img_path = self.all_atlases[atlas_index]
+            chunk_index = int(index - self.atlas_sub_index_map[max(atlas_index - 1, 0)])
+            load_dict = self.atlas_mode_dict
+            lists_of_paths = self.atlases_by_sample
+        elif self._use_atlas:
+            img_path = self.all_fovs[img_index]
+            load_dict = self.atlas_mode_dict
+            lists_of_paths = self.fovs_by_slide
 
-        # Load mask
-        fov_mask = self.fov_mode_dict[fov_index]['mask'][0](self.fov_mode_dict[fov_index]['mask']).to(self.device)
-        fov_mask[fov_mask == 0] = float('nan')
+        # Check if indexed sample is in cache (by checking for index in index_cache)...
+        # if it is, pull it from the cache;
+        # Get base image and label from cache
+        if self.index_cache is not None and img_index in self.index_cache:
+            x = self.shared_x[img_index]
+            y = self.shared_y[img_index]
+        # Load base image and label into cache
+        else:
+            # load the sample, and cache the sample (if cache is open)
+            # region Load Data and Label
 
-        # Preallocate output tensor based on mask size
-        self.image_dims = (self.stack_height,) + tuple(fov_mask.size()[1:])
-        x = torch.empty(self.image_dims, dtype=torch.float32, device=self.device)
+            # Preallocate output tensor based on mask size
+            # self.image_dims = (self.stack_height,) + tuple(fov_mask.size()[1:])
+            # x = torch.empty(self.image_dims, dtype=torch.float32, device=self.device)
 
-        # Load modes using load functions
-        for ii, mode in enumerate(self.mode):
-            x[ii] = self.fov_mode_dict[fov_index][mode][0](self.fov_mode_dict[fov_index][mode]).to(self.device)
+            # Load modes using load functions
+            for ii, mode in enumerate(self.mode):
+                # Pre-allocate on first pass
+                mode_load = load_dict[img_index][mode][0](load_dict[img_index][mode]).to(self.device)
+                if ii == 0:
+                    self.image_dims = (self.stack_height,) + tuple(mode_load.size()[1:])
+                    x = torch.empty(self.image_dims, dtype=torch.float32, device=self.device)
+                x[ii] = mode_load
+
+            # Get data label
+            # Get index of nested list that contains the image path based on what slide the FOV is from. This index will
+            # coincide with the index of the features file to get the label of the sample/slide the image is from.
+            slide_idx = [img_path in paths for paths in lists_of_paths].index(True)
+            match self.label:
+                case 'Response':
+                    y = torch.tensor(1 if self.features['Status (NR/R)'].iloc[slide_idx] == 'R' else 0,
+                                     dtype=torch.float32, device=self.device)
+                case 'Metastases':
+                    y = torch.tensor(1 if self.features['Status (Mets/NM)'].iloc[slide_idx] == 'NM' else 0,
+                                     dtype=torch.float32, device=self.device)
+                case 'Mask':
+                    # Load mask (if on or label)
+                    fov_mask = load_dict[img_index]['mask'][0](load_dict[img_index]['mask']).to(self.device)
+                    fov_mask[fov_mask == 0] = float('nan')
+                    y = fov_mask
+                case None:
+                    y = torch.tensor(-999999,  # Placeholder for NaN label
+                                     dtype=torch.float32, device=self.device)
+                case _:
+                    raise Exception(
+                        'An unrecognized label is in use. Update label attribute of dataset and try again.')
+
+            # Add the loaded image data to the cache (open and add, if it's not open)
+            if self.index_cache is None and self.use_cache:
+                self._open_cache(x, y)
+            if self.use_cache:
+                self.shared_x[img_index] = x
+                self.shared_y[img_index] = y
+                self.index_cache[img_index] = img_index
+
+        # Perform all data augmentations, transformations, etc. on base image
+        # Chunk the atlas into individual images
+        if self.chunk_atlas:
+            x = x[:, 0:int(self.atlas_chunk_dims[img_index][0] * 512), 0:int(self.atlas_chunk_dims[img_index][1] * 512)]
+            x = x.unfold(1, 512, 512).unfold(2, 512, 512)
+            x = x.reshape(self.stack_height, -1, 512, 512)
+            x = x[:, chunk_index, :, :]
 
         # Scale by the max value of normalized
         if self.normalized:
             x = x / self.scalars
+
+        # Load mask (if on or label)
+        if self.mask_on:
+            fov_mask = load_dict[img_index]['mask'][0](load_dict[img_index]['mask']).to(self.device)
+            fov_mask[fov_mask == 0] = float('nan')
 
         # Crop and sub index if necessary
         if self.augmented:
@@ -209,33 +341,13 @@ class NSCLCDataset(Dataset):
             fov_mask = cropper(fov_mask)
             x = x[sub_index]
             fov_mask = fov_mask[sub_index]
+            if self.mask_on:
+                x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
 
         # Unsqueeze so "color" is dim 1 and expand to look like an RGB image
         # New image dims: (M, C, H, W), where M is the mode, C is the psuedo-color channel, H and W are height and width
         if self.psuedo_rgb:
             x = x.unsqueeze(1).expand(-1, 3, -1, -1)
-
-        # Get data label and apply mask to all channels for binary classes
-        # Get features based on what slide the FOV is from
-        slide_idx = [fov in slide for slide in self.fovs_by_slide].index(True)
-        match self.label:
-            case 'Response':
-                if self.mask_on:
-                    x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
-                y = torch.tensor(1 if self.features['Status (NR/R)'].iloc[slide_idx] == 'R' else 0,
-                                 dtype=torch.float32, device=self.device)
-            case 'Metastases':
-                if self.mask_on:
-                    x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
-                y = torch.tensor(1 if self.features['Status (Mets/NM)'].iloc[slide_idx] == 'NM' else 0,
-                                 dtype=torch.float32, device=self.device)
-            case 'Mask':
-                y = fov_mask
-            case None:
-                y = torch.tensor(-999999,  # Placeholder for NaN label
-                                 dtype=torch.float32, device=self.device)
-            case _:
-                raise Exception('An unrecognized label is in use. Update label attribute of dataset and try again.')
 
         # Apply distribution transform, if called
         if self.dist_transformed:
@@ -247,29 +359,14 @@ class NSCLCDataset(Dataset):
         # Apply transforms that were input (if any)
         x = self.transforms(x) if self.transforms is not None else x
 
-        # Cache the sample if the caches have been opened
-        if self.index_cache is None:
-            self._open_cache(x, y)
-        self.shared_x[index] = x.to(self.device)
-        self.shared_y[index] = y.to(self.device)
-        self.index_cache[index] = index
-
         return x, y
         # endregion
-
-    def reset_cache(self):
-        print('Cache reset')
-        # Hard reset
-        self.index_cache = None
-        self.shared_x = None
-        self.shared_y = None
-        self._shape = None
 
     def _open_cache(self, x, y):
         # Setup shared memory arrays (i.e. caches that are compatible with multiple workers)
         # negative initialization ensure no overlap with actual cached indices
         index_cache_base = mp.Array(ctypes.c_int, len(self) * [-1])
-        shared_x_base = mp.Array(ctypes.c_float, int(len(self) * np.prod(x.shape)))
+        shared_x_base = len(self) * [mp.Array(ctypes.c_float, 0)]
 
         # Label-size determines cache size, so if no label is set, we will fill cache with -999999 at __getitem__
         match self.label:
@@ -285,9 +382,9 @@ class NSCLCDataset(Dataset):
 
         # Convert all arrays to desired data structure
         self.index_cache = convert_mp_to_torch(index_cache_base, (len(self),), device=self.device)
-        self.shared_x = convert_mp_to_torch(shared_x_base, (len(self),) + x.shape, device=self.device)
+        self.shared_x = [convert_mp_to_torch(x_base, 0, device=self.device) for x_base in shared_x_base]
         self.shared_y = convert_mp_to_torch(shared_y_base, (len(self),) + y_shape, device=self.device)
-        print('Cache opened')
+        print('Cache opened.')
 
     def to(self, device):
         # Move caches to device
@@ -295,9 +392,9 @@ class NSCLCDataset(Dataset):
             self.index_cache = self.index_cache.to(device)
             for i, idx in enumerate(self.index_cache):
                 self.index_cache[i] = idx.to(device)
-            self.shared_x = self.shared_x.to(device)
-            for i, x in enumerate(self.shared_x):
-                self.shared_x[i] = x.to(device)
+            self.shared_x = [x.to(device) for x in self.shared_x.to(device)]
+            for i, x_cache in enumerate(self.shared_x):
+                self.shared_x[i] = [x.to(device) for x in x_cache]
             self.shared_y = self.shared_y.to(device)
             for i, y in enumerate(self.shared_y):
                 self.shared_y[i] = y.to(device)
@@ -328,8 +425,11 @@ class NSCLCDataset(Dataset):
     # Shape (cannot be changed directly)
     @property
     def shape(self):
+        temp_cache_setting = self.use_cache
+        self.use_cache = False
         if self._shape is None:
             self._shape = self[0][0].shape
+        self.use_cache = temp_cache_setting
         return self._shape
 
     # Label
@@ -339,6 +439,7 @@ class NSCLCDataset(Dataset):
 
     @label.setter
     def label(self, label):
+        assert label is not None, 'Label must be provided.'
         match label.lower():
             case 'response' | 'r':
                 label = 'Response'
@@ -349,8 +450,8 @@ class NSCLCDataset(Dataset):
                 self.mask_on = False
             case _:
                 raise Exception('Invalid data label entered. Allowed labels are "RESPONSE", "METASTASES", and "MASK".')
-        if hasattr(self, '_label') and label != self.label:
-            self.reset_cache()
+        # if hasattr(self, '_label') and label != self.label:
+        #     self.reset_cache()
         self._label = label
 
     # Modes
@@ -361,7 +462,9 @@ class NSCLCDataset(Dataset):
     @mode.setter
     def mode(self, mode):
         # Set default/shortcut behavior
-        if mode == ['all'] or mode == 'all' or mode is None:
+        if mode is None:
+            mode = ['orr'] if self._use_atlas else 'all'
+        if mode == ['all'] or mode == 'all':
             mode = ['orr', 'g', 's', 'photons', 'taumean', 'boundfraction']
         # If this is not the __init__ run
         if hasattr(self, '_mode') and mode != self.mode:
@@ -382,7 +485,7 @@ class NSCLCDataset(Dataset):
             self.dist_transformed = temp_dist
         # If this is the __init__ run
         else:
-            self._mode = mode
+            self._mode = mode if type(mode) is list else [mode]
 
     # Masking
     @property
@@ -391,8 +494,8 @@ class NSCLCDataset(Dataset):
 
     @mask_on.setter
     def mask_on(self, mask_on):
-        if hasattr(self, '_mask_on') and mask_on != self.mask_on:
-            self.reset_cache()
+        # if hasattr(self, '_mask_on') and mask_on != self.mask_on:
+        #     self.reset_cache()
         self._mask_on = mask_on
 
     # endregion
@@ -404,7 +507,7 @@ class NSCLCDataset(Dataset):
             pass
         # If something is changed, reset and update
         else:
-            self.reset_cache()
+            # self.reset_cache()
             self._nbins = nbins
             if not self.normalized:
                 print(
@@ -422,7 +525,7 @@ class NSCLCDataset(Dataset):
         # If it is changing, reset and update
         if dist_transformed is not self.dist_transformed:
             self._dist_transformed = dist_transformed
-            self.reset_cache()
+            # self.reset_cache()
 
     # endregion
 
@@ -439,7 +542,7 @@ class NSCLCDataset(Dataset):
         # If it is changing, reset and update
         if augmented is not self.augmented:
             self._augmented = augmented
-            self.reset_cache()
+            # self.reset_cache()
 
     # endregion
 
@@ -457,7 +560,7 @@ class NSCLCDataset(Dataset):
         # If it is changing, reset and update
         if psuedo_rgb is not self.psuedo_rgb:
             self._psuedo_rgb = psuedo_rgb
-            self.reset_cache()
+            # self.reset_cache()
 
     # endregion
 
@@ -497,7 +600,7 @@ class NSCLCDataset(Dataset):
         if normalized is not self.normalized:
             self._normalized = normalized
             self.scalars = None
-            self.reset_cache()
+            # self.reset_cache()
         # Apply the normalization requested (note: method call will set attribute if TRUE)
         if normalized:
             self.normalize_channels_to_max()
