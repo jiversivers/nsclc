@@ -29,7 +29,7 @@ files=/home/jdivers/data/NSCLC_Data_for_ML
 echo "Copying files..."
 mkdir /scratch/$SLURM_JOB_ID/data
 rsync -avq $files /scratch/$SLURM_JOB_ID/data
-rsync -avq /home/jdivers/nsclc/jobs/simple_main/simple_main_atlases.py /scratch/$SLURM_JOB_ID
+rsync -avq $SLURM_SUBMIT_DIR/simple_main_atlases.py /scratch/$SLURM_JOB_ID
 rsync -avq /home/jdivers/nsclc/my_modules /scratch/$SLURM_JOB_ID
 wait
 
