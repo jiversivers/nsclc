@@ -52,7 +52,7 @@ def main():
 
     # Set up hyperparameters
     batch_size = 64
-    learning_rates = [5e-5, 1e-5, 5e-6, 1e-6]
+    learning_rates = [5e-5, 5e-6, 1e-6, 5e-7]
     epochs = [125, 250, 500, 1000, 2500]
     optim_fn = torch.optim.Adam
     loss_fn = nn.BCEWithLogitsLoss()
