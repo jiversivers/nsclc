@@ -391,7 +391,7 @@ class NSCLCDataset(Dataset):
             self.index_cache = self.index_cache.to(device)
             for i, idx in enumerate(self.index_cache):
                 self.index_cache[i] = idx.to(device)
-            self.shared_x = [x.to(device) for x in self.shared_x.to(device)]
+            self.shared_x = [x_cache.to(device) for x_cache in self.shared_x]
             for i, x_cache in enumerate(self.shared_x):
                 self.shared_x[i] = [x.to(device) for x in x_cache]
             self.shared_y = self.shared_y.to(device)
