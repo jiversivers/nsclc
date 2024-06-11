@@ -266,7 +266,7 @@ class NSCLCDataset(Dataset):
         else:
             path_index = base_index
             img_path = self.all_fovs[path_index]
-            load_dict = self.atlas_mode_dict
+            load_dict = self.fov_mode_dict
             lists_of_paths = self.fovs_by_slide
 
         # Check if indexed sample is in cache (by checking for index in index_cache)...
@@ -345,10 +345,10 @@ class NSCLCDataset(Dataset):
         if self.augmented:
             cropper = t.FiveCrop((round(self.image_dims[1] / 2), round(self.image_dims[2] / 2)))
             x = cropper(x)
-            fov_mask = cropper(fov_mask)
             x = x[sub_index]
-            fov_mask = fov_mask[sub_index]
             if self.mask_on:
+                fov_mask = cropper(fov_mask)
+                fov_mask = fov_mask[sub_index]
                 x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
 
         # Unsqueeze so "color" is dim 1 and expand to look like an RGB image
