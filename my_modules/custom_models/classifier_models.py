@@ -449,7 +449,7 @@ class CometClassifier(nn.Module):
         self.input_size = input_size
 
         self.flat = nn.Flatten()
-        self.fc1 = nn.Linear(np.prod(self.input_size[0]), 256)
+        self.fc1 = nn.Linear(np.prod(self.input_size), 256)
         self.fc2 = nn.Linear(256, 64)
         self.fc3 = nn.Linear(64, 2)
 
@@ -473,22 +473,38 @@ class CometClassifier(nn.Module):
         return x
 
 
-class MPMShallowClassifier(nn.Module):
+class CometClassifierWithBinaryOutput(nn.Module):
     def __init__(self, input_size):
         super().__init__()
-        self.name = 'MPM Shallow Classifier'
+        self.name = 'Comet Classifier'
         self.input_size = input_size
 
-        self.fc = nn.Linear(np.prod(self.input_size), 2)
-        self.softmax = nn.Softmax(dim=1)
+        self.flat = nn.Flatten()
+        self.fc1 = nn.Linear(np.prod(self.input_size), 256)
+        self.fc2 = nn.Linear(256, 64)
+        self.fc3 = nn.Linear(64, 1)
+
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+        self.dropout1 = nn.Dropout(0.1)
+        self.dropout2 = nn.Dropout(0.2)
 
     def forward(self, x):
         x[torch.isnan(x)] = 0
-        x = self.fc(x)
-        x = self.softmax(x)
+        x = self.dropout1(x)
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.dropout2(x)
+        x = self.fc2(x)
+        x = self.relu(x)
+        x = self.dropout1(x)
+        x = self.fc3(x)
+        x = self.sigmoid(x)
         return x
 
-class MPMShallowClassifierwithModifiedOutput(nn.Module):
+
+class MPMShallowClassifier(nn.Module):
     def __init__(self, input_size):
         super().__init__()
         self.name = 'MPM Shallow Classifier'
@@ -506,7 +522,7 @@ class MPMShallowClassifierwithModifiedOutput(nn.Module):
 
 class FeatureExtractorToClassifier(nn.Module):
     def __init__(self, input_size, feature_extractor, classifier=CometClassifier, layer='conv2d_7b'):
-        super(FeatureExtractorToClassifier, self).__init__()
+        super().__init__()
         self.input_size = input_size
         self.feature_extractor = feature_extractor
         self.layer = [layer] if type(layer) is not list else layer
