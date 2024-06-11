@@ -319,7 +319,7 @@ class NSCLCDataset(Dataset):
         # Perform all data augmentations, transformations, etc. on base image
         # Chunk the atlas into individual images
         if self.chunk_atlas:
-            x = x[:, 0:int(self.atlas_chunk_dims[img_index][0] * 512), 0:int(self.atlas_chunk_dims[img_index][1] * 512)]
+            x = x[:, :int(self.atlas_chunk_dims[img_index][0] * 512), :int(self.atlas_chunk_dims[img_index][1] * 512)]
             x = x.unfold(1, 512, 512).unfold(2, 512, 512)
             x = x.reshape(self.stack_height, -1, 512, 512)
             x = x[:, chunk_index, :, :]
