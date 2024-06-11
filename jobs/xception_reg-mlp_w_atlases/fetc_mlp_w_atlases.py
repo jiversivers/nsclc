@@ -38,7 +38,6 @@ def main():
                         label='Metastases', mask_on=False, use_atlas=True, chunk_atlas=True)
     print('Normalizing data to channel max...')
     data.augment()
-    data.normalize_channels_to_max()
     data.transform_to_psuedo_rgb()
     data.transforms = torch.squeeze()
     data.to(device)
