@@ -39,6 +39,7 @@ def main():
     print('Normalizing data to channel max...')
     data.augment()
     data.normalize_channels_to_max()
+    data.to(device)
 
     batch_size = 64
     learning_rates = [5e-5, 1e-5, 5e-6, 1e-6]
