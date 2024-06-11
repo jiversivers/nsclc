@@ -445,6 +445,7 @@ class RegularizedParallelCNNet(nn.Module):
 class CometClassifier(nn.Module):
     def __init__(self, input_size):
         super().__init__()
+        self.name = 'Comet Classifier'
         self.input_size = input_size
 
         self.flat = nn.Flatten()
@@ -475,6 +476,22 @@ class CometClassifier(nn.Module):
 class MPMShallowClassifier(nn.Module):
     def __init__(self, input_size):
         super().__init__()
+        self.name = 'MPM Shallow Classifier'
+        self.input_size = input_size
+
+        self.fc = nn.Linear(np.prod(self.input_size), 2)
+        self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, x):
+        x[torch.isnan(x)] = 0
+        x = self.fc(x)
+        x = self.softmax(x)
+        return x
+
+class MPMShallowClassifierwithModifiedOutput(nn.Module):
+    def __init__(self, input_size):
+        super().__init__()
+        self.name = 'MPM Shallow Classifier'
         self.input_size = input_size
 
         self.fc = nn.Linear(np.prod(self.input_size), 2)
@@ -516,6 +533,8 @@ class FeatureExtractorToClassifier(nn.Module):
             if next(self.classifier.parameters()).device != next(self.feature_extractor.parameters()).device:
                 warnings.warn('Model classifier and feature extractor appear to be on different devices.',
                               RuntimeWarning)
+
+        self.name = f'{type(feature_extractor).__name__} Features to {type(classifier).__name__} Classifier'
 
     def forward(self, x):
         # Force input to match device and store original to put it back from where it came
