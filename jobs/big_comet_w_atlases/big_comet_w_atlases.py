@@ -1,14 +1,14 @@
 import os
 
 import torch
-from pretrainedmodels import xception
+from pretrainedmodels import inceptionresnetv2
 import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
 
 from my_modules.model_learning.loader_maker import split_augmented_data
 from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import NSCLCDataset
-from my_modules.custom_models import MLPNet as MLP, FeatureExtractorToClassifier as FETC
+from my_modules.custom_models import CometClassifierWithBinaryOutput, FeatureExtractorToClassifier as FETC
 
 
 def main():
@@ -22,13 +22,11 @@ def main():
         f.write('Results')
 
     # Define our base feature extractor and turn the gradients off -- we won't train it, just use it to feed our MLP.
-    feature_extractor = xception(num_classes=1000, pretrained=False)
+    feature_extractor = inceptionresnetv2(num_classes=1001, pretrained=False)
 
     # Load pretrained from download
-    state_dict = torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/xception-43020ad28.pth')
-    state_dict['last_linear.weight'] = state_dict.pop('fc.weight')
-    state_dict['last_linear.bias'] = state_dict.pop('fc.bias')
-    feature_extractor.load_state_dict(state_dict)
+    feature_extractor.load_state_dict(
+        torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth'))
     for params in feature_extractor.parameters():
         params.requires_grad = False
 
@@ -50,7 +48,7 @@ def main():
     loss_fn = torch.nn.BCEWithLogitsLoss()
 
     # Define base classifier
-    classifier = MLP
+    classifier = CometClassifierWithBinaryOutput
 
     # Prepare data loaders
     train_set, eval_set, test_set = split_augmented_data(data, augmentation_factor=5, split=(0.75, 0.15, 0.1))
@@ -68,7 +66,7 @@ def main():
     testing_accuracy = []
     for lr in learning_rates:
         # Make full model
-        model = FETC(data.shape, feature_extractor=feature_extractor, classifier=classifier, layer='conv4')
+        model = FETC(data.shape, feature_extractor=feature_extractor, classifier=classifier, layer='conv2d_7b')
         model.to(device)
 
         # Make optimizer at the current larning rate with only classifier parameters
@@ -95,7 +93,6 @@ def main():
 
                 optimizer.zero_grad()
                 out = model(x)
-
                 loss = loss_fn(out, target.unsqueeze(1))
                 loss.backward()
                 optimizer.step()
@@ -112,7 +109,6 @@ def main():
                     if torch.cuda.is_available() and not target.is_cuda:
                         target = target.cuda()
                     out = model(x)
-
                     loss = loss_fn(out, target.unsqueeze(1))
                     eval_loss += loss.item()
                     scores = score_model(model, eval_loader)
@@ -124,13 +120,13 @@ def main():
             if ep + 1 in epochs:
                 # save trained model at this many epochs
                 torch.save(model.state_dict(),
-                           f'xception_to_mlp_w_atlas_{ep + 1}-Epochs_{lr}-LearningRate.pth')
+                           f'big_comet_w_atlas_{ep + 1}-Epochs_{lr}-LearningRate.pth')
 
                 # Test
                 scores, figs = score_model(model, test_loader, make_plot=True)
                 for key, fig in figs.items():
                     fig.savefig(
-                        f'outputs/plots/auc_acc_xception_to_mlp_w_atlas_{key}_{ep + 1}-Epochs_{lr}-LearningRate.png')
+                        f'outputs/plots/auc_acc_big_comet_w_atlas_{key}_{ep + 1}-Epochs_{lr}-LearningRate.png')
                     plt.close(fig)
                 with open('outputs/results.txt', 'a') as f:
                     f.write('\n_____________________________________________________\n')
@@ -141,13 +137,13 @@ def main():
 
         plt.plot(range(1, 1 + epoch), training_loss[-1])
         plt.plot(range(1, 1 + epoch), evaluation_loss[-1])
-        plt.savefig(f'outputs/plots/loss_xception_to_mlp_w_atlas_{ep + 1}-Epochs_{lr}-LearningRate.png')
+        plt.savefig(f'outputs/plots/loss_big_comet_w_atlas_{ep + 1}-Epochs_{lr}-LearningRate.png')
         plt.close()
         plt.plot(range(1, 1 + epoch), evaluation_accuracy[-1])
-        plt.savefig(f'outputs/plots/roc_thresh_acc_xception_to_mlp_w_atlas_{ep + 1}-Epochs_{lr}-LearningRate.png')
+        plt.savefig(f'outputs/plots/roc_thresh_acc_big_comet_w_atlas_{ep + 1}-Epochs_{lr}-LearningRate.png')
         plt.close()
         plt.plot(range(1, 1 + epoch), evaluation_threshold[-1])
-        plt.savefig(f'outputs/plots/roc_thresh_xception_to_mlp_w_atlas_{ep + 1}-Epochs_{lr}-LearningRate.png')
+        plt.savefig(f'outputs/plots/roc_thresh_big_comet_w_atlas_{ep + 1}-Epochs_{lr}-LearningRate.png')
         plt.close()
 
 
