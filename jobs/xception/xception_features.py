@@ -6,6 +6,7 @@ import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
 
 from my_modules.model_learning.loader_maker import split_augmented_data
+from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import NSCLCDataset
 from my_modules.custom_models import MPMShallowClassifier, FeatureExtractorToClassifier as FETC
 
@@ -43,10 +44,10 @@ def main():
     learning_rates = [5e-5, 1e-5, 5e-6, 1e-6]
     optimizer_fns = {'Adam': [torch.optim.Adam, {}]}
     epochs = [5, 10, 50, 125, 250, 500, 1000, 2500]
-    loss_fn = torch.nn.CrossEntropyLoss()
+    loss_fn = torch.nn.BCELoss()
 
     # Define base classifier
-    classifier = MPMShallowClassifier
+    classifier = torch.nn.Sequential(torch.nn.Linear(2048, 1), torch.nn.Sigmoid())
 
     # Prepare data loaders
     train_set, eval_set, test_set = split_augmented_data(data, augmentation_factor=5, split=(0.75, 0.15, 0.1))
@@ -59,9 +60,11 @@ def main():
 
     training_loss = []
     evaluation_loss = []
-    evaluation_accuracy = []
     testing_accuracy = []
+
     for lr in learning_rates:
+        with open('outputs/results.txt', 'a') as results_file:
+            results_file.write(f'\nLearning Rate {lr}\n__________________________________________\n')
         # Make full model
         model = FETC(data.shape, feature_extractor=feature_extractor, classifier=classifier,
                      layer='conv4')
@@ -72,7 +75,6 @@ def main():
 
         # Nest iteration lists for tracking model learning
         training_loss.append([])
-        evaluation_accuracy.append([])
         evaluation_loss.append([])
         testing_accuracy.append([])
 
@@ -90,13 +92,7 @@ def main():
 
                 optimizer.zero_grad()
                 out = model(x)
-
-                # Change target label from binary label to one-hot 2-bit vector
-                y = torch.zeros_like(out)  # Array to reform target to look like out
-                for r, t in enumerate(target):  # Put 100% certainty on the class
-                    y[r, t.long()] = 1.
-
-                loss = loss_fn(out, y)
+                loss = loss_fn(out, target.unsqueeze(1))
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss.item()
@@ -105,7 +101,6 @@ def main():
             # Validation
             model.eval()
             eval_loss = 0
-            correct = 0
             with torch.no_grad():
                 for x, target in eval_loader:
                     if torch.cuda.is_available() and not x.is_cuda:
@@ -113,51 +108,27 @@ def main():
                     if torch.cuda.is_available() and not target.is_cuda:
                         target = target.cuda()
                     out = model(x)
-
-                    # Change target label from binary label to one-hot 2-bit vector
-                    y = torch.zeros_like(out)  # Array to reform target to look like out
-                    for r, t in enumerate(target):  # Put 100% certainty on the class
-                        y[r, t.long()] = 1.
-
-                    loss = loss_fn(out, y)
+                    loss = loss_fn(out, target.unsqueeze(1))
                     eval_loss += loss.item()
-                    pred = torch.argmax(out, dim=1)
-                    correct += torch.sum(pred == target).item()
+                    score_model(model, eval_loader, print_results=True)
                 evaluation_loss[-1].append(eval_loss / len(eval_set))
-                evaluation_accuracy[-1].append(100 * correct / len(eval_loader.sampler))
 
             with open('outputs/results.txt', 'a') as results_file:
                 results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, '
-                                   f'Eval.Loss: {evaluation_loss[-1][-1]:.4f}.'
-                                   f'Eval.Accu: {evaluation_accuracy[-1][-1]:.2f}%')
+                                   f'Eval.Loss: {evaluation_loss[-1][-1]:.4f}%')
 
             # See if we are at one of our training length checkpoints. Save and test if we are
             if ep + 1 in epochs:
-                # save trained model at this many epochs
-                torch.save(model.state_dict(),
-                           f'xception_features_{ep + 1}-Epochs_{lr}-LearningRate.pth')
+                torch.save(model.state_dict(), f'raw_hist_models/{data.name}__{model.name}__{lr}_{ep}.pth')
+                print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr}...')
+                scores = score_model(model, test_loader, print_results=True, make_plot=False)
 
-                plt.plot(training_loss[-1])
-                plt.plot(evaluation_loss[-1])
-                plt.savefig(f'outputs/plots/loss_xception_{ep + 1}-Epochs_{lr}-LearningRate.png')
-                plt.clf()
-
-                # Test
-                correct = 0
-                model.eval()
-                with torch.no_grad():
-                    for x, target in test_loader:
-                        if torch.cuda.is_available() and not x.is_cuda:
-                            x = x.cuda()
-                        if torch.cuda.is_available() and not target.is_cuda:
-                            target = target.cuda()
-                        out = model(x)
-                        pred = torch.argmax(out, dim=1)
-                        correct += torch.sum(pred == target).item()
-                    testing_accuracy[-1].append(100 * correct / len(test_loader.sampler))
-                with open('outputs/results.txt', 'a') as results_file:
-                    results_file.write(f'\n>>>Test.accu at {ep + 1} epochs with learning rate of {lr}: '
-                                       f'{testing_accuracy[-1][-1]}<<<\n')
+                with open('outputs/results.txt', 'a') as f:
+                    f.write(f'\n>>> {model.name} for {ep + 1} epochs with learning rate of {lr}\n')
+                    for key, item in scores.items():
+                        if 'Confusion' not in key:
+                            f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
+                    f.write('_____________________________________________________\n')
 
 
 if __name__ == '__main__':
