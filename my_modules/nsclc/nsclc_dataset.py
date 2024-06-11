@@ -1,3 +1,5 @@
+import warnings
+
 import torchvision.transforms as t
 import os
 import bisect
@@ -141,7 +143,7 @@ class NSCLCDataset(Dataset):
 
             # Track running total of chunks through each index for sub-indexing later
             total_chunks_through_index = 0
-            self.atlas_sub_index_map = []
+            self.atlas_sub_index_map = [0]
 
             # Nested list of atlas locations nested by sample (for label indexing)
             self.atlases_by_sample = []
@@ -158,9 +160,9 @@ class NSCLCDataset(Dataset):
                             self.atlases_by_sample[-1].append(trunk)
                             self.atlas_mode_dict.append({'orr': [load_tiff, im_path]})
                             with Image.open(im_path) as im:
-                                height, width = im.size
-                                rm_height, rm_width = height % 512, width % 512
-                                height, width = height - rm_height, width - rm_width  # "crop" to be a perfect fit
+                                width, height = im.size
+                                rm_width, rm_height = width % 512, height % 512
+                                width, height = width - rm_width, height - rm_height  # "crop" to be a perfect fit
                                 self.atlas_chunk_dims.append((height / 512, width / 512))
                                 total_chunks_through_index += np.prod(self.atlas_chunk_dims[-1])
                                 self.atlas_sub_index_map.append(total_chunks_through_index)
@@ -245,28 +247,34 @@ class NSCLCDataset(Dataset):
         # Parse the index
         # Get image path from index
         if self.augmented:
-            img_index = int(index // 5)  # This will give us the index for the base img
+            base_index = int(index // 5)  # This will give us the index for the base img
             sub_index = index % 5  # This gives the index of the crop
         else:
-            img_index = index
+            base_index = index
         if self._use_atlas:
             # Find where the index is <= than the number of chunks
-            atlas_index = bisect.bisect_right(self.atlas_sub_index_map, img_index - 1)
-            img_path = self.all_atlases[atlas_index]
-            chunk_index = int(index - self.atlas_sub_index_map[max(atlas_index - 1, 0)])
+            if self.chunk_atlas:
+                path_index = 0
+                while self.atlas_sub_index_map[path_index + 1] <= base_index:
+                    path_index += 1
+                chunk_index = int(base_index - self.atlas_sub_index_map[path_index])
+            else:
+                path_index = base_index
+            img_path = self.all_atlases[path_index]
             load_dict = self.atlas_mode_dict
             lists_of_paths = self.atlases_by_sample
-        elif self._use_atlas:
-            img_path = self.all_fovs[img_index]
-            load_dict = self.atlas_mode_dict
+        else:
+            path_index = base_index
+            img_path = self.all_fovs[path_index]
+            load_dict = self.fov_mode_dict
             lists_of_paths = self.fovs_by_slide
 
         # Check if indexed sample is in cache (by checking for index in index_cache)...
         # if it is, pull it from the cache;
         # Get base image and label from cache
-        if self.index_cache is not None and img_index in self.index_cache:
-            x = self.shared_x[img_index]
-            y = self.shared_y[img_index]
+        if self.index_cache is not None and path_index in self.index_cache:
+            x = self.shared_x[path_index]
+            y = self.shared_y[path_index]
         # Load base image and label into cache
         else:
             # load the sample, and cache the sample (if cache is open)
@@ -279,7 +287,7 @@ class NSCLCDataset(Dataset):
             # Load modes using load functions
             for ii, mode in enumerate(self.mode):
                 # Pre-allocate on first pass
-                mode_load = load_dict[img_index][mode][0](load_dict[img_index][mode]).to(self.device)
+                mode_load = load_dict[path_index][mode][0](load_dict[path_index][mode]).to(self.device)
                 if ii == 0:
                     self.image_dims = (self.stack_height,) + tuple(mode_load.size()[1:])
                     x = torch.empty(self.image_dims, dtype=torch.float32, device=self.device)
@@ -298,7 +306,7 @@ class NSCLCDataset(Dataset):
                                      dtype=torch.float32, device=self.device)
                 case 'Mask':
                     # Load mask (if on or label)
-                    fov_mask = load_dict[img_index]['mask'][0](load_dict[img_index]['mask']).to(self.device)
+                    fov_mask = load_dict[path_index]['mask'][0](load_dict[path_index]['mask']).to(self.device)
                     fov_mask[fov_mask == 0] = float('nan')
                     y = fov_mask
                 case None:
@@ -312,35 +320,35 @@ class NSCLCDataset(Dataset):
             if self.index_cache is None and self.use_cache:
                 self._open_cache(x, y)
             if self.use_cache:
-                self.shared_x[img_index] = x
-                self.shared_y[img_index] = y
-                self.index_cache[img_index] = img_index
+                self.shared_x[path_index] = x
+                self.shared_y[path_index] = y
+                self.index_cache[path_index] = path_index
 
         # Perform all data augmentations, transformations, etc. on base image
         # Chunk the atlas into individual images
         if self.chunk_atlas:
-            x = x[:, :int(self.atlas_chunk_dims[img_index][0] * 512), :int(self.atlas_chunk_dims[img_index][1] * 512)]
+            x = x[:, :int(self.atlas_chunk_dims[path_index][0] * 512), :int(self.atlas_chunk_dims[path_index][1] * 512)]
             x = x.unfold(1, 512, 512).unfold(2, 512, 512)
             x = x.reshape(self.stack_height, -1, 512, 512)
             x = x[:, chunk_index, :, :]
 
-        # Scale by the max value of normalized
+        # Scale by the max value if normalized
         if self.normalized:
             x = x / self.scalars
 
         # Load mask (if on or label)
         if self.mask_on:
-            fov_mask = load_dict[img_index]['mask'][0](load_dict[img_index]['mask']).to(self.device)
+            fov_mask = load_dict[path_index]['mask'][0](load_dict[path_index]['mask']).to(self.device)
             fov_mask[fov_mask == 0] = float('nan')
 
         # Crop and sub index if necessary
         if self.augmented:
             cropper = t.FiveCrop((round(self.image_dims[1] / 2), round(self.image_dims[2] / 2)))
             x = cropper(x)
-            fov_mask = cropper(fov_mask)
             x = x[sub_index]
-            fov_mask = fov_mask[sub_index]
             if self.mask_on:
+                fov_mask = cropper(fov_mask)
+                fov_mask = fov_mask[sub_index]
                 x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
 
         # Unsqueeze so "color" is dim 1 and expand to look like an RGB image
@@ -364,25 +372,26 @@ class NSCLCDataset(Dataset):
     def _open_cache(self, x, y):
         # Setup shared memory arrays (i.e. caches that are compatible with multiple workers)
         # negative initialization ensure no overlap with actual cached indices
-        index_cache_base = mp.Array(ctypes.c_int, len(self) * [-1])
-        shared_x_base = len(self) * [mp.Array(ctypes.c_float, 0)]
+        cache_len = len(self.all_atlases) if self._use_atlas else len(self.all_fovs)
+        index_cache_base = mp.Array(ctypes.c_int, cache_len * [-1])
+        shared_x_base = cache_len * [mp.Array(ctypes.c_float, 0)]
 
         # Label-size determines cache size, so if no label is set, we will fill cache with -999999 at __getitem__
         match self.label:
             case 'Response' | 'Metastases' | None:
-                shared_y_base = mp.Array(ctypes.c_float, len(self) * [-1])
+                shared_y_base = mp.Array(ctypes.c_float, cache_len * [-1])
                 y_shape = ()
             case 'Mask':
-                shared_y_base = mp.Array(ctypes.c_float, int(len(self) * np.prod(y.shape)))
+                shared_y_base = mp.Array(ctypes.c_float, int(cache_len * np.prod(y.shape)))
                 y_shape = tuple(y.shape)
             case _:
                 raise Exception('An unrecognized label is in use that is blocking the cache from initializing. '
                                 'Update label attribute of dataset and try again.')
 
         # Convert all arrays to desired data structure
-        self.index_cache = convert_mp_to_torch(index_cache_base, (len(self),), device=self.device)
+        self.index_cache = convert_mp_to_torch(index_cache_base, (cache_len,), device=self.device)
         self.shared_x = [convert_mp_to_torch(x_base, 0, device=self.device) for x_base in shared_x_base]
-        self.shared_y = convert_mp_to_torch(shared_y_base, (len(self),) + y_shape, device=self.device)
+        self.shared_y = convert_mp_to_torch(shared_y_base, (cache_len,) + y_shape, device=self.device)
         print('Cache opened.')
 
     def to(self, device):
@@ -391,9 +400,8 @@ class NSCLCDataset(Dataset):
             self.index_cache = self.index_cache.to(device)
             for i, idx in enumerate(self.index_cache):
                 self.index_cache[i] = idx.to(device)
-            self.shared_x = [x_cache.to(device) for x_cache in self.shared_x]
             for i, x_cache in enumerate(self.shared_x):
-                self.shared_x[i] = [x.to(device) for x in x_cache]
+                self.shared_x[i] = x_cache.to(device)
             self.shared_y = self.shared_y.to(device)
             for i, y in enumerate(self.shared_y):
                 self.shared_y[i] = y.to(device)
@@ -424,11 +432,9 @@ class NSCLCDataset(Dataset):
     # Shape (cannot be changed directly)
     @property
     def shape(self):
-        temp_cache_setting = self.use_cache
-        self.use_cache = False
-        if self._shape is None:
-            self._shape = self[0][0].shape
-        self.use_cache = temp_cache_setting
+        if self._use_atlas and not self.chunk_atlas:
+            warnings.warn('`shape` is ambiguous when using non-chunked atlases.')
+        self._shape = self[0][0].shape
         return self._shape
 
     # Label
@@ -570,10 +576,13 @@ class NSCLCDataset(Dataset):
         # In order to make distributions consistent, this step will be required for dist transforms, so it will be
         # checked before performing the transform
 
-        # Temporarily turn psuedo_rgb off (if on) so we can save 2/3 memory and not ahve to worry about dim shifts for
-        # both cases
+        # Temporarily turn psuedo_rgb off (if on) so we can save 2/3 memory and not have to worry about dim shifts for
+        # both cases. Temporarily turn off chunking so we can save all the additional ops and just load straight from
+        # once
         temp_psuedo = self.psuedo_rgb
         self.psuedo_rgb = False
+        temp_chunk = self.chunk_atlas
+        self.chunk_atlas = False
 
         # Preallocate an array. Each row is an individual image, each column is mode
         maxes = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
@@ -583,8 +592,9 @@ class NSCLCDataset(Dataset):
         self.scalars = torch.max(maxes, 0).values
         self.scalars = self.scalars.unsqueeze(1).unsqueeze(2).to(self.device)
 
-        # Reset psuedo_rgb
+        # Reset psuedo_rgb and chunking
         self.psuedo_rgb = temp_psuedo
+        self.chunk_atlas = temp_chunk
 
         # Set normalized to TRUE so images will be scaled to max when retrieved
         self._normalized = True
