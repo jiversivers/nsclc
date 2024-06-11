@@ -18,6 +18,7 @@ def main():
 
     # Prep output dirs and files
     os.makedirs('outputs/plots', exist_ok=True)
+    os.makedirs('outputs/models', exist_ok=True)
     with open('outputs/results.txt', 'w') as results_file:
         results_file.write('Results')
 
@@ -120,7 +121,7 @@ def main():
 
             # See if we are at one of our training length checkpoints. Save and test if we are
             if ep + 1 in epochs:
-                torch.save(model.state_dict(), f'raw_hist_models/{data.name}__{model.name}__{lr}_{ep}.pth')
+                torch.save(model.state_dict(), f'outputs/models/{data.name}__{model.name}__{lr}_{ep}.pth')
                 print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr}...')
                 scores = score_model(model, test_loader, print_results=True, make_plot=False)
 
