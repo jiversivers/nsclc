@@ -1,4 +1,5 @@
 import warnings
+from collections import OrderedDict
 
 import torchvision.transforms as t
 import os
@@ -132,7 +133,7 @@ class NSCLCDataset(Dataset):
                     ' input path manually at dataset initialization using xl_file=<path_to_file>.')
             self.xl_file = xl_file[0]
         self.features = pd.read_excel(self.xl_file)
-
+        self.patient_count = len(self.features)
         """
         - atlases_by_sample and fovs_by_slide are lists of lists. The inner lists correspond to the images within a 
         given sample or slide and the outer lists match the index of the slide to the features. In other words, the 
@@ -438,8 +439,41 @@ class NSCLCDataset(Dataset):
         self.device = device
 
     def get_patient_subset(self, pt_index):
-        subject_id = self.features.at[pt_index, 'Subject ID']
+        # Get actual index from input index (to handle negatives)
+        pt_index = list(range(len(self.features)))[pt_index]
+        pt_id = self.features.at[pt_index, 'Sample ID'] if self._use_atlas else self.features.at[pt_index, 'Slide Name']
+        indices = [i for i, path_str in enumerate(self.all_fovs) if pt_id in path_str]
 
+        # If using atlas patches, we have to determine how many patches come before this patient
+        if self.use_patches:
+            pass
+
+        # We also have to determine how many patches belong to this patient
+
+        # If using augmenting, each base image results in 5 sequential daughter images
+        if self.augmented:
+            indices = [5 * idx + i for idx in indices for i in range(5)]
+
+        return indices
+
+    def get_patient_label(self, pt_index):
+        match self.label:
+            case 'Response':
+                y = torch.tensor(1 if self.features.at[pt_index, 'Status (NR/R)'] == 'R' else 0,
+                                 dtype=torch.float32, device=self.device)
+            case 'Metastases':
+                y = torch.tensor(1 if self.features.at[pt_index, 'Status (Mets/NM)'] == 'NM' else 0,
+                                 dtype=torch.float32, device=self.device)
+            case 'Mask':
+                # Load mask (if on or label)
+                pass
+            case None:
+                y = torch.tensor(-999999,  # Placeholder for NaN label
+                                 dtype=torch.float32, device=self.device)
+            case _:
+                raise Exception(
+                    'An unrecognized label is in use. Update label attribute of dataset and try again.')
+        return y
 
     # endregion
 
