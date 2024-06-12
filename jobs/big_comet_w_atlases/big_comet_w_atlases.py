@@ -33,12 +33,10 @@ def main():
     # Set up the dataset for this model
     # Images, no mask (feature extractor will hopefully handle this), normalized (already is),
     data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr'], device='cpu',
-                        label='Metastases', mask_on=False, use_atlas=True, chunk_atlas=True)
+                        label='Metastases', mask_on=False, use_atlas=True, use_patches=True, patch_size=(256, 256))
     print('Normalizing data to channel max...')
-    data.augment()
-    data.normalize_channels_to_max()
     data.transform_to_psuedo_rgb()
-    data.transforms = torch.squeeze()
+    data.transforms = torch.squeeze
     data.to(device)
 
     batch_size = 64
