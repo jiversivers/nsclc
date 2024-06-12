@@ -121,9 +121,9 @@ def main():
             if ep + 1 in epochs:
                 torch.save(model.state_dict(), f'outputs/models/{data.name}__{model.name}__{lr}_{ep + 1}.pth')
                 print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr}...')
-                scores, figs = score_model(model, test_loader, print_results=True, make_plot=True)
-                figs.savefig(f'outputs/plots/{data.name}__{model.name}__{lr}_{ep + 1}.png')
-                plt.close(figs)
+                scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
+                fig.savefig(f'outputs/plots/auc_acc_big-comet_{ep + 1}-Epochs_{lr}-LearningRate.png')
+                plt.close(fig)
                 with open('outputs/results.txt', 'a') as f:
                     f.write(f'\n>>> {model.name} for {ep + 1} epochs with learning rate of {lr}\n')
                     for key, item in scores.items():
