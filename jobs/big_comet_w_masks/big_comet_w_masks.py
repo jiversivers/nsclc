@@ -35,7 +35,7 @@ def main():
     # Set up the dataset for this model
     # Images, no mask (feature extractor will hopefully handle this), normalized (already is),
     data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr', 'taumean', 'boundfraction'], device='cpu',
-                        label='Metastases', mask_on=False)
+                        label='Metastases', mask_on=True)
     print('Normalizing data to channel max...')
     data.augment()
     data.normalize_channels_to_max()
@@ -119,9 +119,9 @@ def main():
 
             # See if we are at one of our training length checkpoints. Save and test if we are
             if ep + 1 in epochs:
-                torch.save(model.state_dict(), f'outputs/models/{data.name}__{model.name}__{lr}_{ep}.pth')
+                torch.save(model.state_dict(), f'outputs/models/{data.name}__{model.name}__{lr}_{ep + 1}.pth')
                 print(f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr}...')
-                scores, figs = score_model(model, test_loader, print_results=True,  make_plot=True)
+                scores, figs = score_model(model, test_loader, print_results=True, make_plot=True)
                 figs.savefig(f'outputs/plots/{data.name}__{model.name}__{lr}_{ep + 1}.png')
                 plt.close(figs)
                 with open('outputs/results.txt', 'a') as f:
