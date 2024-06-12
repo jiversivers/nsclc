@@ -49,7 +49,8 @@ def main():
     classifier = CometClassifierWithBinaryOutput
 
     # Prepare data loaders
-    train_set, eval_set, test_set = split_augmented_data(data, augmentation_factor=5, split=(0.75, 0.15, 0.1))
+    # train_set, eval_set, test_set = split_augmented_data(data, augmentation_factor=5, split=(0.75, 0.15, 0.1))
+    train_set, eval_set, test_set = torch.utils.data.random_split(data, (0.75, 0.15, 0.1))
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0,
                                                drop_last=(True if len(train_set) % batch_size == 1 else False))
     eval_loader = torch.utils.data.DataLoader(eval_set, batch_size=batch_size, shuffle=False, num_workers=0,
