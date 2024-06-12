@@ -45,7 +45,7 @@ class NSCLCDataset(Dataset):
         - augment (callable): Applies image augmentation to dataset using FiveCrop augmentation
         - augmented (bool): Returns whether dataset is augmented
         - normalize_channels_to_max (callable): Applies normalization to image stack channel-wise
-        - normalized (bool): Returns whether image stack is normalized
+        - normalized_to_max (bool): Returns whether image stack is normalized_to_max
         - show_random (callable): Shows 5 random samples from dataset
         - device (str or torch.device): Device type or device ID
         - to (callable): Move any currently cached items to DEVICE from input argument in call and return all future
@@ -60,24 +60,25 @@ class NSCLCDataset(Dataset):
         self.transforms = transforms
         self.root = root
         self.device = device
+        self.label = label
         self._use_atlas = use_atlas
+        self.mode = mode if type(mode) is list else [mode]
+        self.mask_on = False if self._use_atlas else mask_on
         self.use_cache = use_cache
         self.use_patches = use_patches if self._use_atlas else False
         self.patch_size = patch_size
 
-        # Set hidden property defaults
+        # Set attribute and property defaults
+        self.saturate = False
+        self.augmented = False
+        self.dist_transformed = False
+        self.psuedo_rgb = False
         self._name = 'nsclc_'
         self._shape = None
-        self._augmented = False
-        self._dist_transformed = False
-        self._psuedo_rgb = False
+        self._normalized_to_max = False
+        self._normalized_to_preset = False
         self._normalized = False
         self._nbins = 25
-
-        # Set defaults
-        self.mode = mode if type(mode) is list else [mode]
-        self.label = label
-        self.mask_on = False if self._use_atlas else mask_on
 
         # Set data descriptors
         self.stack_height = len(self.mode)
@@ -107,6 +108,20 @@ class NSCLCDataset(Dataset):
                           'alpha2': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_a2\.(asc|ASC)']}
         # Compile regexes
         self.mode_dict = {key: [item[0], re.compile(item[1])] for key, item in self.mode_dict.items()}
+
+        # Set max value presets for normalization and/or saturation
+        self._preset_values = {'orr': 1,
+                               'g': 1,
+                               's': 1,
+                               'photons': 1000,
+                               'tau1': 1200,
+                               'tau2': 4000,
+                               'alpha1': 1,
+                               'alpha2': 1,
+                               'taumean': 3500,
+                               'boundfraction': 1,
+                               'averageintensity': 255,
+                               }
 
         # Find and load features spreadsheet (or load directly if path provided)
         if xl_file is None:
@@ -337,8 +352,13 @@ class NSCLCDataset(Dataset):
             x = x.reshape(self.stack_height, -1, self.patch_size[0], self.patch_size[1])
             x = x[:, patch_index, :, :]
 
-        # Scale by the max value if normalized
-        if self.normalized:
+        # Cutoff at saturation thresholds
+        if self.saturate:
+            for ch, mode in enumerate(self.mode):
+                x[x[ch > self._preset_values[mode]]] = self._preset_values[mode]
+
+        # Scale by the scalars from normalization method
+        if self._normalized:
             x = x / self.scalars
 
         # Load mask (if on or label)
@@ -348,7 +368,7 @@ class NSCLCDataset(Dataset):
 
         # Crop and sub index if necessary
         if self.augmented:
-            cropper = t.FiveCrop((int(x.shape[0] / 2), int(x.shape[1] / 2)))
+            cropper = t.FiveCrop((int(x.shape[1] / 2), int(x.shape[2] / 2)))
             x = cropper(x)
             x = x[sub_index]
             if self.mask_on:
@@ -417,6 +437,10 @@ class NSCLCDataset(Dataset):
         # Update device for future items
         self.device = device
 
+    def get_patient_subset(self, pt_index):
+        subject_id = self.features.at[pt_index, 'Subject ID']
+
+
     # endregion
 
     # region Properties
@@ -424,17 +448,17 @@ class NSCLCDataset(Dataset):
     # Use of property (instead of simple attribute) to define ensures automatic updates with latest data setup and/or
     # appropriate clearing of the cache
 
-    # Name (cannot be changed directly)
+    # Name
     @property
     def name(self):
         self._name = (f"nsclc_{self.label}_{'+'.join(self.mode)}"
                       f'{"_Histogram" if self.dist_transformed else ""}'
                       f'{"_Augmented" if self.augmented else ""}'
-                      f'{"_Normalized" if self.normalized else ""}'
+                      f'{"_Normalized" if self._normalized else ""}'
                       f'{"_Masked" if self.mask_on else ""}')
         return self._name
 
-    # Shape (cannot be changed directly)
+    # Shape
     @property
     def shape(self):
         if self._use_atlas and not self.use_patches:
@@ -460,8 +484,8 @@ class NSCLCDataset(Dataset):
                 self.mask_on = False
             case _:
                 raise Exception('Invalid data label entered. Allowed labels are "RESPONSE", "METASTASES", and "MASK".')
-        # if hasattr(self, '_label') and label != self.label:
-        #     self.reset_cache()
+        if hasattr(self, '_label') and label != self.label:
+            self._open_cache(*self[0])
         self._label = label
 
     # Modes
@@ -486,7 +510,8 @@ class NSCLCDataset(Dataset):
             # aspects match, so we check and store them first. Once the dataset is reinitialized, we can reset the
             # other properties.
             temp_aug = self.augmented
-            temp_norm = self.normalized
+            temp_norm_max = self.normalized_to_max
+            temp_norm_preset = self.normalized_to_preset
             temp_dist = self.dist_transformed
 
             # Re-init with new modes
@@ -494,27 +519,17 @@ class NSCLCDataset(Dataset):
                           transforms=self.transforms, device=self.device)
 
             # Reset properties
-            self.normalized = temp_norm
             self.augmented = temp_aug
+            self.normalized_to_max = temp_norm_max
+            self.normalized_to_preset = temp_norm_preset
             self.dist_transformed = temp_dist
         # If this is the __init__ run
         else:
             self._mode = mode
 
-    # Masking
-    @property
-    def mask_on(self):
-        return self._mask_on
-
-    @mask_on.setter
-    def mask_on(self, mask_on):
-        # if hasattr(self, '_mask_on') and mask_on != self.mask_on:
-        #     self.reset_cache()
-        self._mask_on = mask_on
-
     # endregion
 
-    # region Distribution transform
+    # region Transforms and Augmentations
     def dist_transform(self, nbins=25):
         # If it is already transformed to the same bin number, leave it alone
         if self.dist_transformed and nbins == self._nbins:
@@ -525,104 +540,80 @@ class NSCLCDataset(Dataset):
             self._nbins = nbins
             if not self.normalized:
                 print(
-                    'Normalization is automatically applied for the distribution transform.\n     '
-                    'This can be manually overwritten by setting the NORMALIZED attribute to False')
-                self.normalize_channels_to_max()
+                    'Normalization to presets is automatically applied for the distribution transform.\n     '
+                    'This can be manually overwritten by setting the NORMALIZED attribute to False after transforming. '
+                    "To use max normalization, use normalize_channels('max') before transforming.")
+                self.normalize_channels('presets')
         self.dist_transformed = True
 
-    @property
-    def dist_transformed(self):
-        return self._dist_transformed
-
-    @dist_transformed.setter
-    def dist_transformed(self, dist_transformed):
-        # If it is changing, reset and update
-        if dist_transformed is not self.dist_transformed:
-            self._dist_transformed = dist_transformed
-            # self.reset_cache()
-
-    # endregion
-
-    # region Augmentation
     def augment(self):
         self.augmented = True
 
-    @property
-    def augmented(self):
-        return self._augmented
-
-    @augmented.setter
-    def augmented(self, augmented):
-        # If it is changing, reset and update
-        if augmented is not self.augmented:
-            self._augmented = augmented
-            # self.reset_cache()
-
-    # endregion
-
-    # region Psuedo-RGB
     def transform_to_psuedo_rgb(self):
-        # Update the property
         self.psuedo_rgb = True
 
-    @property
-    def psuedo_rgb(self):
-        return self._psuedo_rgb
-
-    @psuedo_rgb.setter
-    def psuedo_rgb(self, psuedo_rgb):
-        # If it is changing, reset and update
-        if psuedo_rgb is not self.psuedo_rgb:
-            self._psuedo_rgb = psuedo_rgb
-            # self.reset_cache()
-
-    # endregion
+    def cutoff_saturation(self):
+        self.saturate = True
 
     # region Normalization
-    def normalize_channels_to_max(self):
-        # Find the max for each mode across the entire dataset
-        # This is mildly time-consuming, so we only do it once, then store the scalar and mark the set as normalized.
-        # In order to make distributions consistent, this step will be required for dist transforms, so it will be
-        # checked before performing the transform
+    @property
+    def normalized_to_max(self):
+        return self._normalized_to_max
 
-        # Temporarily turn psuedo_rgb off (if on) so we can save 2/3 memory and not have to worry about dim shifts for
-        # both cases. Temporarily turn off patching so we can save all the additional ops and just load straight from
-        # once
-        temp_psuedo = self.psuedo_rgb
-        self.psuedo_rgb = False
-        temp_patch = self.use_patches
-        self.use_patches = False
-
-        # Preallocate an array. Each row is an individual image, each column is mode
-        maxes = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
-        for ii, (stack, _) in enumerate(self):
-            # Does the same as np.nanmax(stack, dim=(1,2)) but keeps the tensor on the GPU
-            maxes[ii] = torch.max(torch.max(torch.nan_to_num(stack, nan=-100000), 1).values, 1).values
-        self.scalars = torch.max(maxes, 0).values
-        self.scalars = self.scalars.unsqueeze(1).unsqueeze(2).to(self.device)
-
-        # Reset psuedo_rgb and patching
-        self.psuedo_rgb = temp_psuedo
-        self.use_patches = temp_patch
-
-        # Set normalized to TRUE so images will be scaled to max when retrieved
-        self._normalized = True
+    @normalized_to_max.setter
+    def normalized_to_max(self, normalized_to_max):
+        self._normalized_to_max = normalized_to_max
+        self.normalized_to_preset = False if not self._normalized else not normalized_to_max
+        self._normalized = (normalized_to_max or self.normalized_to_preset)
 
     @property
-    def normalized(self):
-        return self._normalized
+    def normalized_to_preset(self):
+        return self._normalized_to_preset
 
-    @normalized.setter
-    def normalized(self, normalized):
-        # Check if the cache needs to be reset
-        if normalized is not self.normalized:
-            self._normalized = normalized
-            self.scalars = None
-            # self.reset_cache()
-        # Apply the normalization requested (note: method call will set attribute if TRUE)
-        if normalized:
-            self.normalize_channels_to_max()
+    @normalized_to_preset.setter
+    def normalized_to_preset(self, normalized_to_preset):
+        self._normalized_to_preset = normalized_to_preset
+        self.normalized_to_max = False if not self._normalized else not normalized_to_preset
+        self._normalized = (normalized_to_preset or self.normalized_to_max)
 
+    def normalize_channels(self, method='max'):
+        match method.lower():
+            case 'max':
+                # Find the max for each mode across the entire dataset. This is mildly time-consuming, so we only do
+                # it once, then store the scalar and mark the set as normalized_to_max. In order to make
+                # distributions consistent, this step will be required for dist transforms, so it will be checked
+                # before performing the transform
+
+                # Temporarily turn psuedo_rgb off (if on) so we can save 2/3 memory and not have to worry about dim
+                # shifts for both cases. Temporarily turn off patching so we can save all the additional ops and just
+                # load straight from once
+                temp_psuedo = self.psuedo_rgb
+                self.psuedo_rgb = False
+                temp_patch = self.use_patches
+                self.use_patches = False
+
+                # Preallocate an array. Each row is an individual image, each column is mode
+                maxes = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
+                for ii, (stack, _) in enumerate(self):
+                    # Does the same as np.nanmax(stack, dim=(1,2)) but keeps the tensor on the GPU
+                    maxes[ii] = torch.max(torch.max(torch.nan_to_num(stack, nan=-100000), 1).values, 1).values
+                self.scalars = torch.max(maxes, 0).values
+
+                # Reset psuedo_rgb and patching
+                self.psuedo_rgb = temp_psuedo
+                self.use_patches = temp_patch
+
+                # Set normalized_to_max to TRUE so images will be scaled to max when retrieved
+                self._normalized_to_max = True
+            case 'preset':
+                self.scalars = torch.tensor([self._preset_values[mode] for mode in self.mode],
+                                            dtype=torch.float32, device=self.device)
+                self.normalized_to_preset = True
+
+        # Un-squeeze for easy mat-ops at normalization
+        self.scalars = self.scalars.unsqueeze(1).unsqueeze(2).to(self.device)
+
+    # endregion
     # endregion
 
     # region Show random data samples

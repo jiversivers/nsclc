@@ -33,12 +33,12 @@ def main():
         params.requires_grad = False
 
     # Set up the dataset for this model
-    # Images, no mask (feature extractor will hopefully handle this), normalized (already is),
+    # Images, no mask (feature extractor will hopefully handle this), normalized_to_max (already is),
     data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr', 'taumean', 'boundfraction'], device='cpu',
                         label='Metastases', mask_on=True)
     print('Normalizing data to channel max...')
     data.augment()
-    data.normalize_channels_to_max()
+    data.normalize_channels('max')
     data.to(device)
 
     batch_size = 64
