@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=xception_iterator
+#SBATCH --job-name=xception_w_linear
 #SBATCH --partition=agpu06
 #SBATCH --output=nsclc_main.txt
 #SBATCH --error=nsclc_main.err
