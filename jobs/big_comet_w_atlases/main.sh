@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=xception_to_mlp_iterator
+#SBATCH --job-name=big_comet_atlas
 #SBATCH --partition=agpu72
 #SBATCH --output=nsclc_main.txt
 #SBATCH --error=nsclc_main.err
@@ -27,9 +27,9 @@ cd $SLURM_SUBMIT_DIR || exit
 files=/home/jdivers/data
 
 echo "Copying files..."
-rsync -av $files /scratch/$SLURM_JOB_ID
-rsync -avq $SLURM_SUBMIT_DIR/big_comet_w_atlases.py /scratch/$SLURM_JOB_ID
-rsync -avq /home/jdivers/nsclc/my_modules /scratch/$SLURM_JOB_ID
+rsync -aq $files /scratch/$SLURM_JOB_ID
+rsync -aq $SLURM_SUBMIT_DIR/big_comet_w_atlases.py /scratch/$SLURM_JOB_ID
+rsync -aq /home/jdivers/nsclc/my_modules /scratch/$SLURM_JOB_ID
 wait
 
 cd /scratch/$SLURM_JOB_ID/ || exit
