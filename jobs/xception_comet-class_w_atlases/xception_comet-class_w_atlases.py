@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import NSCLCDataset, patient_wise_train_test_splitter
-from my_modules.custom_models import MPMShallowClassifier as Classifier, FeatureExtractorToClassifier as FETC
+from my_modules.custom_models import CometClassifierWithBinaryOutput as Comet, FeatureExtractorToClassifier as FETC
 
 
 def main():
@@ -48,7 +48,7 @@ def main():
     loss_fn = torch.nn.BCEWithLogitsLoss()
 
     # Define base classifier
-    classifier = Classifier
+    classifier = Comet
 
     # Prepare data loaders
     train_set, test_set = patient_wise_train_test_splitter(data, n=3)
