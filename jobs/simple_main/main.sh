@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=nsclc_main
+#SBATCH --job-name=simple_main
 #SBATCH --partition=agpu06
 #SBATCH --output=nsclc_main.txt
 #SBATCH --error=nsclc_main.err
