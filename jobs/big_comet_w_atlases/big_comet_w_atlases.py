@@ -1,6 +1,7 @@
 import os
 
 import torch
+import torchvision.transforms.v2 as tvt
 from pretrainedmodels import inceptionresnetv2
 import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
@@ -33,16 +34,18 @@ def main():
     # Set up the dataset for this model
     # Images, no mask (feature extractor will hopefully handle this), normalized_to_max (already is),
     data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr'], device='cpu',
-                        label='Metastases', mask_on=False, use_atlas=True, use_patches=True, patch_size=(256, 256))
-    data.transform_to_psuedo_rgb()
-    data.transforms = torch.squeeze
+                        label='Metastases', use_atlas=True, patch_size=(512, 512))
+    data.normalize_channels('preset')
+    data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
+                                   tvt.RandomHorizontalFlip(p=0.25),
+                                   tvt.RandomRotation(degrees=(-180, 180))])
     data.to(device)
 
     batch_size = 64
     learning_rates = [5e-5, 1e-5, 5e-6, 1e-6]
     optimizer_fns = {'Adam': [torch.optim.Adam, {}]}
     epochs = [125, 250, 500, 1000]
-    loss_fn = torch.nn.BCEWithLogitsLoss()
+    loss_fn = torch.nn.BCELoss()
 
     # Define base classifier
     classifier = CometClassifierWithBinaryOutput
