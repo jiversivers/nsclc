@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=big-comet_iterator
+#SBATCH --job-name=big-comet
 #SBATCH --partition=agpu06
 #SBATCH --output=nsclc_main.txt
 #SBATCH --error=nsclc_main.err
