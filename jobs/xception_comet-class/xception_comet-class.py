@@ -5,10 +5,9 @@ from pretrainedmodels import xception
 import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
 
-from my_modules.model_learning.loader_maker import split_augmented_data
 from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import NSCLCDataset, patient_wise_train_test_splitter
-from my_modules.custom_models import MLPNet as MLP, FeatureExtractorToClassifier as FETC
+from my_modules.custom_models import CometClassifierWithBinaryOutput as Comet, FeatureExtractorToClassifier as FETC
 
 
 def main():
@@ -34,12 +33,11 @@ def main():
 
     # Set up the dataset for this model
     # Images, no mask (feature extractor will hopefully handle this), normalized_to_max (already is),
-    data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr'], device='cpu',
-                        label='Metastases', mask_on=False, use_atlas=True, use_patches=True, patch_size=(256, 256))
+    data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr', 'taumean', 'boundfraction'], device='cpu',
+                        label='Metastases', mask_on=False)
     print('Normalizing data to channel max...')
+    data.normalize_channels('max')
     data.augment()
-    data.transform_to_psuedo_rgb()
-    data.transforms = torch.squeeze
     data.to(device)
 
     batch_size = 64
@@ -49,7 +47,7 @@ def main():
     loss_fn = torch.nn.BCEWithLogitsLoss()
 
     # Define base classifier
-    classifier = MLP
+    classifier = Comet
 
     # Prepare data loaders
     train_set, test_set = patient_wise_train_test_splitter(data, n=3)
