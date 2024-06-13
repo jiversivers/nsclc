@@ -1,9 +1,7 @@
 import warnings
-from collections import OrderedDict
 
-import torchvision.transforms as t
+import torchvision.transforms.v2 as t
 import os
-import bisect
 
 from PIL import Image
 
@@ -67,16 +65,18 @@ class NSCLCDataset(Dataset):
         self.mask_on = False if self._use_atlas else mask_on
         self.use_cache = use_cache
         self.use_patches = use_patches if self._use_atlas else False
-        self.patch_size = patch_size
+        self._patch_size = patch_size
 
         # Set attribute and property defaults
         self.saturate = False
         self.augmented = False
+        self.filter_bad_data = False
         self.dist_transformed = False
         self.psuedo_rgb = False
         self._name = 'nsclc_'
         self._shape = None
         self._normalized_to_max = False
+        self._min_max_scalars = None
         self._normalized_to_preset = False
         self._normalized = False
         self._nbins = 25
@@ -111,18 +111,51 @@ class NSCLCDataset(Dataset):
         self.mode_dict = {key: [item[0], re.compile(item[1])] for key, item in self.mode_dict.items()}
 
         # Set max value presets for normalization and/or saturation
-        self._preset_values = {'orr': 1,
-                               'g': 1,
-                               's': 1,
-                               'photons': 1000,
-                               'tau1': 1200,
-                               'tau2': 4000,
-                               'alpha1': 1,
-                               'alpha2': 1,
-                               'taumean': 3500,
-                               'boundfraction': 1,
-                               'averageintensity': 255,
-                               }
+        '''
+        These preset values are based on the mean and standard deviation of the dataset for each mode. As a general 
+        rule, when data is normally distributed, 99.7% of samples fall within 3 standard deviations of the mean. We will
+        use that then as the cutoffs for our presets. Theses were performed for masked data across all modes using the 
+        following code:
+        
+            import numpy as np
+            x = torch.tensor([])
+            for i in range(len(data)):
+                x = torch.cat((x, data[i][0].unsqueeze(0)), dim=0)
+            torch.nanmean(torch.nanmean(torch.nanmean(x, dim=0), dim=1), dim=1)
+            np.nanstd(np.nanstd(np.nanstd(x, axis=0), axis=1), axis=1)
+        
+        where 'data' is an instance of this class with all modes (note, not 'all' set as the mode, because this doesn't 
+        actually give all modes)
+        
+        The results for each mode are as follows:
+        Mode                    Mean                StDev
+        ORR                 3.5064e-01          2.9563567e-02    
+        G                   3.5540e-01          1.1096316e-02
+        S                   3.7959e-01          3.8442286e-03
+        Photons             1.9098e+02          1.2940987e+01
+        Tau1                651.6812            45.86681         
+        Tau2                3834.9180           193.67015
+        Alpha1              121.3796            9.293237
+        Alpha2              83.6695             5.76365
+        TauMean             2.0095e+03          9.8343758e+01
+        BoundFraction       4.2615e-01          1.6073210e-02 
+        
+        For reference, that is included as a dict below, which will be used to calculate the ranges for all modes.
+        '''
+        mean_std_mode_dict = {'ORR': [3.5064e-01, 2.9563567e-02],
+                              'G': [3.5540e-01, 1.1096316e-02],
+                              'S': [3.7959e-01, 3.8442286e-03],
+                              'Photons': [1.9098e+02, 1.2940987e+01],
+                              'Tau1': [651.6812, 45.86681],
+                              'Tau2': [3834.9180, 193.67015],
+                              'Alpha1': [121.3796, 9.293237],
+                              'Alpha2': [83.6695, 5.76365],
+                              'TauMean': [2.0095e+03, 9.8343758e+01],
+                              'BoundFraction': [4.2615e-01, .6073210e-02]}
+
+        self._preset_values = {}
+        for key, (m, s) in mean_std_mode_dict.items():
+            self._preset_values[key.lower()] = [m - 3 * s, m + 3 * s]
 
         # Find and load features spreadsheet (or load directly if path provided)
         if xl_file is None:
@@ -178,9 +211,10 @@ class NSCLCDataset(Dataset):
                             self.atlas_mode_dict.append({'orr': [load_tiff, im_path]})
                             with Image.open(im_path) as im:
                                 width, height = im.size
-                                rm_width, rm_height = width % self.patch_size[1], height % self.patch_size[0]
+                                rm_width, rm_height = width % self._patch_size[1], height % self._patch_size[0]
                                 width, height = width - rm_width, height - rm_height  # "crop" to be a perfect fit
-                                self.atlas_patch_dims.append((height / self.patch_size[0], width / self.patch_size[1]))
+                                self.atlas_patch_dims.append(
+                                    (height / self._patch_size[0], width / self._patch_size[1]))
                                 total_patches_through_index += np.prod(self.atlas_patch_dims[-1])
                                 self.atlas_sub_index_map.append(total_patches_through_index)
 
@@ -206,7 +240,7 @@ class NSCLCDataset(Dataset):
                         for file in files:
                             matched.append(re.match(file_pattern, os.path.join(trunk, file)))
                     # If exactly one file matched, then add it to the FOV-LUT dict
-                    if sum(t is not None for t in matched) == 1:
+                    if sum(path_str is not None for path_str in matched) == 1:
                         for match in matched:
                             if match:
                                 self.fov_mode_dict[index][mode] = [load_fn, match.string]
@@ -216,8 +250,8 @@ class NSCLCDataset(Dataset):
 
                 # Add derived modes
                 self.fov_mode_dict[index]['boundfraction'] = [load_bound_fraction, [self.fov_mode_dict[index]['alpha1'],
-                                                                                    self.fov_mode_dict[index][
-                                                                                        'alpha2']]]
+                                                                                    self.fov_mode_dict[index]['alpha2']
+                                                                                    ]]
                 self.fov_mode_dict[index]['taumean'] = [load_weighted_average,
                                                         [self.fov_mode_dict[index]['alpha1'],
                                                          self.fov_mode_dict[index]['tau1'],
@@ -286,21 +320,18 @@ class NSCLCDataset(Dataset):
             img_path = self.all_fovs[path_index]
             load_dict = self.fov_mode_dict
             lists_of_paths = self.fovs_by_slide
+        slide_idx = [img_path in paths for paths in lists_of_paths].index(True)
 
         # Check if indexed sample is in cache (by checking for index in index_cache)...
         # if it is, pull it from the cache;
         # Get base image and label from cache
         if self.index_cache is not None and path_index in self.index_cache:
-            x = self.shared_x[path_index]
+            x = self.shared_x[path_index].clone()
             y = self.shared_y[path_index]
         # Load base image and label into cache
         else:
             # load the sample, and cache the sample (if cache is open)
             # region Load Data and Label
-
-            # Preallocate output tensor based on mask size
-            # self.image_dims = (self.stack_height,) + tuple(fov_mask.size()[1:])
-            # x = torch.empty(self.image_dims, dtype=torch.float32, device=self.device)
 
             # Load modes using load functions
             for ii, mode in enumerate(self.mode):
@@ -314,7 +345,6 @@ class NSCLCDataset(Dataset):
             # Get data label
             # Get index of nested list that contains the image path based on what slide the FOV is from. This index will
             # coincide with the index of the features file to get the label of the sample/slide the image is from.
-            slide_idx = [img_path in paths for paths in lists_of_paths].index(True)
             match self.label:
                 case 'Response':
                     y = torch.tensor(1 if self.features['Status (NR/R)'].iloc[slide_idx] == 'R' else 0,
@@ -338,20 +368,31 @@ class NSCLCDataset(Dataset):
             if self.index_cache is None and self.use_cache:
                 self._open_cache(x, y)
             if self.use_cache:
-                self.shared_x[path_index] = x
-                self.shared_y[path_index] = y
+                self.shared_x[path_index] = x.clone()
+                self.shared_y[path_index] = y.clone()
                 self.index_cache[path_index] = path_index
+
+        # Load mask (if on)
+        if self.mask_on:
+            fov_mask = load_dict[path_index]['mask'][0](load_dict[path_index]['mask']).to(self.device).squeeze()
+            x[:, fov_mask == 0] = float('nan')
 
         # Perform all data augmentations, transformations, etc. on base image
         # patch the atlas into individual images
         if self.use_patches:
-            r = int(self.atlas_patch_dims[path_index][0] * self.patch_size[0])
-            c = int(self.atlas_patch_dims[path_index][1] * self.patch_size[1])
+            r = int(self.atlas_patch_dims[path_index][0] * self._patch_size[0])
+            c = int(self.atlas_patch_dims[path_index][1] * self._patch_size[1])
             x = x[:, :r, :c]
-            x = x.unfold(1, self.patch_size[0], self.patch_size[0])
-            x = x.unfold(2, self.patch_size[1], self.patch_size[1])
-            x = x.reshape(self.stack_height, -1, self.patch_size[0], self.patch_size[1])
+            x = x.unfold(1, self._patch_size[0], self._patch_size[0])
+            x = x.unfold(2, self._patch_size[1], self._patch_size[1])
+            x = x.reshape(self.stack_height, -1, self._patch_size[0], self._patch_size[1])
             x = x[:, patch_index, :, :]
+
+        # Crop and sub index if necessary
+        if self.augmented:
+            cropper = t.FiveCrop((int(x.shape[1] / 2), int(x.shape[2] / 2)))
+            x = cropper(x)
+            x = x[sub_index]
 
         # Cutoff at saturation thresholds
         if self.saturate:
@@ -360,22 +401,16 @@ class NSCLCDataset(Dataset):
 
         # Scale by the scalars from normalization method
         if self._normalized:
-            x = x / self.scalars
+            for ch in range(len(self.mode)):
+                x[ch] = (x[ch] - self.scalars[ch, 0]) / (self.scalars[ch, 1] - self.scalars[ch, 0])
 
-        # Load mask (if on or label)
-        if self.mask_on:
-            fov_mask = load_dict[path_index]['mask'][0](load_dict[path_index]['mask']).to(self.device)
-            fov_mask[fov_mask == 0] = float('nan')
-
-        # Crop and sub index if necessary
-        if self.augmented:
-            cropper = t.FiveCrop((int(x.shape[1] / 2), int(x.shape[2] / 2)))
-            x = cropper(x)
-            x = x[sub_index]
-            if self.mask_on:
-                fov_mask = cropper(fov_mask)
-                fov_mask = fov_mask[sub_index]
-                x[torch.isnan(fov_mask).expand(x.size(0), *fov_mask.size()[1:])] = float('nan')
+        # Dynamically and recursively filter out bad data (namely, images with little or no signal) while maintain the
+        # same patient index
+        if self.filter_bad_data and self.is_bad_data(x):
+            print(f'crap {index}')
+            pt_indices = self.get_patient_subset(slide_idx)
+            new_idx = pt_indices[(pt_indices.index(index) + 1) % len(pt_indices)]
+            return self.__getitem__(new_idx)
 
         # Unsqueeze so "color" is dim 1 and expand to look like an RGB image
         # New image dims: (M, C, H, W), where M is the mode, C is the psuedo-color channel, H and W are height and width
@@ -479,6 +514,10 @@ class NSCLCDataset(Dataset):
                     'An unrecognized label is in use. Update label attribute of dataset and try again.')
         return y
 
+    def is_bad_data(self, x):
+        ## TODO: Write bad data check and add check for atlases to removed and move to next index of the sample at get item ##
+        return (torch.sum(x <= 0.1).item() + torch.sum(x >= 0.9).item()) > (0.60 * np.prod(x.shape))
+
     # endregion
 
     # region Properties
@@ -499,9 +538,12 @@ class NSCLCDataset(Dataset):
     # Shape
     @property
     def shape(self):
+        temp_filter = self.filter_bad_data
+        self.filter_bad_data = False
         if self._use_atlas and not self.use_patches:
             warnings.warn('`shape` is ambiguous when using non-patched atlases.')
         self._shape = self[0][0].shape
+        self.filter_bad_data = temp_filter
         return self._shape
 
     # Label
@@ -523,7 +565,9 @@ class NSCLCDataset(Dataset):
             case _:
                 raise Exception('Invalid data label entered. Allowed labels are "RESPONSE", "METASTASES", and "MASK".')
         if hasattr(self, '_label') and label != self.label:
+            temp_filter = self.filter_bad_data
             self._open_cache(*self[0])
+            self.filter_bad_data = temp_filter
         self._label = label
 
     # Modes
@@ -614,48 +658,48 @@ class NSCLCDataset(Dataset):
         self.normalized_to_max = False if not self._normalized else not normalized_to_preset
         self._normalized = (normalized_to_preset or self.normalized_to_max)
 
-    def normalize_channels(self, method='max'):
+    def normalize_channels(self, method='minmax'):
         match method.lower():
-            case 'max':
-                # Find the max for each mode across the entire dataset. This is mildly time-consuming, so we only do
-                # it once, then store the scalar and mark the set as normalized_to_max. In order to make
-                # distributions consistent, this step will be required for dist transforms, so it will be checked
-                # before performing the transform
+            case 'minmax' | 'max':
+                if self._min_max_scalars is None:
+                    # Find the max for each mode across the entire dataset. This is mildly time-consuming, so we only do
+                    # it once, then store the scalar and mark the set as normalized_to_max. In order to make
+                    # distributions consistent, this step will be required for dist transforms, so it will be checked
+                    # before performing the transform
 
-                # Temporarily turn psuedo_rgb off (if on) so we can save 2/3 memory and not have to worry about dim
-                # shifts for both cases. Temporarily turn off patching so we can save all the additional ops and just
-                # load straight from once
-                temp_psuedo = self.psuedo_rgb
-                self.psuedo_rgb = False
-                temp_patch = self.use_patches
-                self.use_patches = False
+                    # Temporarily turn psuedo_rgb off (if on) so we can save 2/3 memory and not have to worry about dim
+                    # shifts for both cases. Temporarily turn off patching so we can save all the additional ops and just
+                    # load straight from once
+                    temp_psuedo = self.psuedo_rgb
+                    self.psuedo_rgb = False
+                    temp_patch = self.use_patches
+                    self.use_patches = False
 
-                # Preallocate an array. Each row is an individual image, each column is mode
-                maxes = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
-                for ii, (stack, _) in enumerate(self):
-                    # Does the same as np.nanmax(stack, dim=(1,2)) but keeps the tensor on the GPU
-                    maxes[ii] = torch.max(torch.max(torch.nan_to_num(stack, nan=-100000), 1).values, 1).values
-                self.scalars = torch.max(maxes, 0).values
+                    # Preallocate an array. Each row is an individual image, each column is mode
+                    maxes = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
+                    mins = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
+                    for ii, (stack, _) in enumerate(self):
+                        # Does the same as np.nanmax(stack, dim=(1,2)) but keeps the tensor on the GPU
+                        maxes[ii] = torch.max(torch.max(torch.nan_to_num(stack, nan=-100000), 1).values, 1).values
+                        mins[ii] = torch.min(torch.min(torch.nan_to_num(stack, nan=100000), 1).values, 1).values
+                    self._min_max_scalars = torch.stack((torch.max(mins, 0).values, torch.max(mins, 0).values), dim=-1)
 
-                # Reset psuedo_rgb and patching
-                self.psuedo_rgb = temp_psuedo
-                self.use_patches = temp_patch
-
+                    # Reset psuedo_rgb and patching
+                    self.psuedo_rgb = temp_psuedo
+                    self.use_patches = temp_patch
+                self.scalars = self._min_max_scalars
                 # Set normalized_to_max to TRUE so images will be scaled to max when retrieved
                 self._normalized_to_max = True
             case 'preset':
                 self.scalars = torch.tensor([self._preset_values[mode] for mode in self.mode],
                                             dtype=torch.float32, device=self.device)
-                self.normalized_to_preset = True
-
-        # Un-squeeze for easy mat-ops at normalization
-        self.scalars = self.scalars.unsqueeze(1).unsqueeze(2).to(self.device)
+                self._normalized_to_preset = True
 
     # endregion
     # endregion
 
     # region Show random data samples
-    def show_random(self):
+    def show_random(self, stack_as_rgb=False):
         if self.dist_transformed:
             _, ax = plt.subplots(5, 1, figsize=(10, 10))
             for ii in range(5):
@@ -667,14 +711,17 @@ class NSCLCDataset(Dataset):
                 ax[ii].set_title(f'{self.label}: {self[index][1]}', fontsize=10)
         else:
             transform = t.ToPILImage()
-            _, ax = plt.subplots(5, len(self.mode), figsize=(10, 10))
+            if stack_as_rgb:
+                _, ax = plt.subplots(1, 5, figsize=(25, 25))
+            else:
+                _, ax = plt.subplots(5, self.stack_height, figsize=(25, 25))
             for ii in range(5):
                 index = np.random.randint(0, len(self))
                 img = self[index][0]
                 img[torch.isnan(img)] = 0
                 lab = self[index][1]
-                if len(self.mode) > 1:
-                    for jj in range(len(self.mode)):
+                if self.stack_height > 1 and not stack_as_rgb:
+                    for jj in range(self.stack_height):
                         ax[ii, jj].imshow(transform(img[jj]))
                         ax[ii, jj].tick_params(top=False, bottom=False, left=False, right=False,
                                                labelleft=False,
@@ -682,10 +729,10 @@ class NSCLCDataset(Dataset):
                         ax[ii, jj].set_title(f'{self.label}: {self[index][1]}. \n Mode: {self.mode[jj]}',
                                              fontsize=10)
                 else:
-                    ax[ii].imshow(transform(self[index][0]))
+                    ax[ii].imshow(transform(img))
                     ax[ii].tick_params(top=False, bottom=False, left=False, right=False, labelleft=False,
                                        labelbottom=False)
-                    ax[ii].set_title(f'{self.label}: {lab}. \n Mode: {self.mode[0]}', fontsize=10)
+                    ax[ii].set_title(f'{self.label}: {lab}. \n Mode: {self.mode[:]}', fontsize=10)
         plt.show()
 
     # endregion
