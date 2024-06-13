@@ -90,7 +90,8 @@ def main():
                                               drop_last=(True if len(test_set) % batch_size == 1 else False))
 
     # Model zoo for images
-    models = [MLPNet, RegularizedMLPNet, RegularizedParallelMLPNet, CNNet, RegularizedCNNet, RegularizedParallelCNNet]
+    models = [MLPNet, RegularizedMLPNet, ParallelMLPNet, RegularizedParallelMLPNet,
+              CNNet, RegularizedCNNet, ParallelCNNet, RegularizedParallelCNNet]
     try:
         os.mkdir('raw_img_models')
     except FileExistsError:
@@ -116,18 +117,12 @@ def main():
                 print('_____________________________________________________________________________________________\n')
                 # For each epoch
                 train_loss = []
-                eval_loss = []
+
                 for ep in range(epochs[-1]):
                     # Train
                     model.train()
                     train_loss.append(train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=True))
-
-                    # Validate
-                    model.eval()
-                    loss, accu = valid_epoch(model, eval_loader, loss_function, masked_loss_fn=True)
-                    eval_loss.append(loss)
-                    print(f'Epoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} Eval: {eval_loss[-1]:4.4f}')
-                    score_model(model, eval_loader, print_results=True)
+                    print(f'Raw Images -- Epoch {ep + 1} | Loss: {train_loss[-1]}')
 
                     # Test
                     if ep + 1 in epochs:
@@ -215,19 +210,11 @@ def main():
                 print('_____________________________________________________________________________________________\n')
                 # For each epoch
                 train_loss = []
-                eval_loss = []
                 for ep in range(epochs[-1]):
                     # Train
                     model.train()
                     train_loss.append(train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=True))
-
-                    # Validate
-                    model.eval()
-                    loss, accu = valid_epoch(model, eval_loader, loss_function, masked_loss_fn=True)
-                    eval_loss.append(loss)
-                    print(f'Epoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} Eval: {eval_loss[-1]:4.4f}')
-                    score_model(model, eval_loader, print_results=True)
-
+                    print(f'Aug Images -- Epoch {ep + 1} | Loss: {train_loss[-1]}')
                     # Test
                     if ep + 1 in epochs:
                         torch.save(model.state_dict(), f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.pth')
@@ -321,18 +308,11 @@ def main():
                 print('_____________________________________________________________________________________________\n')
                 # For each epoch
                 train_loss = []
-                eval_loss = []
                 for ep in range(epochs[-1]):
                     # Train
                     model.train()
                     train_loss.append(train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=False))
-
-                    # Validate
-                    model.eval()
-                    loss, accu = valid_epoch(model, eval_loader, loss_function, masked_loss_fn=False)
-                    eval_loss.append(loss)
-                    print(f'Epoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} Eval: {eval_loss[-1]:4.4f}')
-                    score_model(model, eval_loader, print_results=True)
+                    print(f'Aug Hists -- Epoch {ep + 1} | Loss: {train_loss[-1]}')
 
                     # Test
                     if ep + 1 in epochs:
@@ -422,19 +402,11 @@ def main():
                 print('_____________________________________________________________________________________________\n')
                 # For each epoch
                 train_loss = []
-                eval_loss = []
                 for ep in range(epochs[-1]):
                     # Train
                     model.train()
                     train_loss.append(train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=False))
-
-                    # Validate
-                    model.eval()
-                    loss, accu = valid_epoch(model, eval_loader, loss_function, masked_loss_fn=False)
-                    eval_loss.append(loss)
-                    print(f'Epoch {ep + 1} || Loss - Train: {train_loss[-1]:4.4f} Eval: {eval_loss[-1]:4.4f}')
-                    score_model(model, eval_loader, print_results=True)
-
+                    print(f'Raw Hists -- Epoch {ep + 1} | Loss: {train_loss[-1]}')
                     # Test
                     if ep + 1 in epochs:
                         torch.save(model.state_dict(), f'raw_hist_models/{data.name}__{model.name}__{lr}_{ep}.pth')
