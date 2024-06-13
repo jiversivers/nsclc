@@ -61,8 +61,6 @@ def main():
                                               drop_last=(True if len(test_set) % batch_size == 1 else False))
 
     training_loss = []
-    evaluation_loss = []
-    evaluation_accuracy = []
     testing_accuracy = []
     for lr in learning_rates:
         # Make full model
@@ -75,8 +73,6 @@ def main():
 
         # Nest iteration lists for tracking model learning
         training_loss.append([])
-        evaluation_accuracy.append([])
-        evaluation_loss.append([])
         testing_accuracy.append([])
 
         # Find max number of epochs to consider and do that, checking along the way for others
@@ -100,8 +96,7 @@ def main():
             training_loss[-1].append(epoch_loss / len(train_set))
 
             with open('outputs/results.txt', 'a') as results_file:
-                results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, '
-                                   f'Eval.Loss: {evaluation_loss[-1][-1]:.4f}%')
+                results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, ')
 
             # See if we are at one of our training length checkpoints. Save and test if we are
             if ep + 1 in epochs:
