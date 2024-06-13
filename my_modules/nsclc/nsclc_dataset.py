@@ -572,7 +572,7 @@ class NSCLCDataset(Dataset):
         else:
             # self.reset_cache()
             self._nbins = nbins
-            if not self.normalized:
+            if not self._normalized:
                 print(
                     'Normalization to presets is automatically applied for the distribution transform.\n     '
                     'This can be manually overwritten by setting the NORMALIZED attribute to False after transforming. '
