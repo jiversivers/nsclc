@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=xception_to_mlp_iterator
+#SBATCH --job-name=xception_to_reg-mlp
 #SBATCH --partition=agpu06
 #SBATCH --output=nsclc_main.txt
 #SBATCH --error=nsclc_main.err
@@ -28,14 +28,14 @@ files=/home/jdivers/ondemand/data/sys/myjobs/projects/nsclc/data
 
 echo "Copying files..."
 rsync -avq $files /scratch/$SLURM_JOB_ID
-rsync -avq $SLURM_SUBMIT_DIR/fetc_mlp.py /scratch/$SLURM_JOB_ID
+rsync -avq $SLURM_SUBMIT_DIR/xception_reg-mlp.py /scratch/$SLURM_JOB_ID
 rsync -avq /home/jdivers/nsclc/my_modules /scratch/$SLURM_JOB_ID
 wait
 
 cd /scratch/$SLURM_JOB_ID/ || exit
 
 echo "Python script initiating..."
-python3 fetc_mlp.py
+python3 xception_reg-mlp.py
 
 mkdir -p $SLURM_SUBMIT_DIR/$job_name
 rsync -av -q /scratch/$SLURM_JOB_ID/outputs $SLURM_SUBMIT_DIR/
