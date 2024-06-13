@@ -5,6 +5,8 @@ from pretrainedmodels import xception
 import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
 
+from my_modules.nsclc import patient_wise_train_test_splitter
+import torchvision.transforms.v2 as tvt
 from my_modules.model_learning.loader_maker import split_augmented_data
 from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import NSCLCDataset
@@ -34,12 +36,14 @@ def main():
         params.requires_grad = False
 
     # Set up the dataset for this model
-    # Images, no mask (feature extractor will hopefully handle this), normalized (already is),
+    # Images, no mask (feature extractor will hopefully handle this), normalized_to_max (already is),
     data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr', 'taumean', 'boundfraction'], device='cpu',
                         label='Metastases', mask_on=False)
-    print('Normalizing data to channel max...')
     data.augment()
-    data.normalize_channels_to_max()
+    data.normalize_channels('preset')
+    data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
+                                   tvt.RandomHorizontalFlip(p=0.25),
+                                   tvt.RandomRotation(degrees=(-180, 180))])
     data.to(device)
 
     batch_size = 64
@@ -52,11 +56,9 @@ def main():
     classifier = torch.nn.Sequential(torch.nn.Linear(2048, 1), torch.nn.Sigmoid())
 
     # Prepare data loaders
-    train_set, eval_set, test_set = split_augmented_data(data, augmentation_factor=5, split=(0.75, 0.15, 0.1))
+    train_set, test_set = patient_wise_train_test_splitter(data, n=3)
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0,
                                                drop_last=(True if len(train_set) % batch_size == 1 else False))
-    eval_loader = torch.utils.data.DataLoader(eval_set, batch_size=batch_size, shuffle=False, num_workers=0,
-                                              drop_last=(True if len(eval_set) % batch_size == 1 else False))
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0,
                                               drop_last=(True if len(test_set) % batch_size == 1 else False))
 
