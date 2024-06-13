@@ -66,6 +66,9 @@ class NSCLCDataset(Dataset):
         self.use_cache = use_cache
         self.use_patches = use_patches if self._use_atlas else False
         self._patch_size = patch_size
+        self.stack_height = len(self.mode)
+        self.image_dims = None
+        self.scalars = None
 
         # Set attribute and property defaults
         self.saturate = False
@@ -73,6 +76,7 @@ class NSCLCDataset(Dataset):
         self.filter_bad_data = False
         self.dist_transformed = False
         self.psuedo_rgb = False
+        self.rgb_squeeze = False if self.stack_height > 1 else True
         self._name = 'nsclc_'
         self._shape = None
         self._normalized_to_max = False
@@ -80,11 +84,6 @@ class NSCLCDataset(Dataset):
         self._normalized_to_preset = False
         self._normalized = False
         self._nbins = 25
-
-        # Set data descriptors
-        self.stack_height = len(self.mode)
-        self.image_dims = None
-        self.scalars = None
 
         # Init placeholder cache arrays
         self.index_cache = None
@@ -397,7 +396,8 @@ class NSCLCDataset(Dataset):
         # Cutoff at saturation thresholds
         if self.saturate:
             for ch, mode in enumerate(self.mode):
-                x[x[ch > self._preset_values[mode]]] = self._preset_values[mode]
+                sat_mask = x[ch] > self._preset_values[mode][1]
+                x[ch, sat_mask] = self._preset_values[mode][1]
 
         # Scale by the scalars from normalization method
         if self._normalized:
@@ -416,6 +416,8 @@ class NSCLCDataset(Dataset):
         # New image dims: (M, C, H, W), where M is the mode, C is the psuedo-color channel, H and W are height and width
         if self.psuedo_rgb:
             x = x.unsqueeze(1).expand(-1, 3, -1, -1)
+            if self.rgb_squeeze:
+                x = x.squeeze()
 
         # Apply distribution transform, if called
         if self.dist_transformed:
@@ -515,8 +517,7 @@ class NSCLCDataset(Dataset):
         return y
 
     def is_bad_data(self, x):
-        ## TODO: Write bad data check and add check for atlases to removed and move to next index of the sample at get item ##
-        return (torch.sum(x <= 0.1).item() + torch.sum(x >= 0.9).item()) > (0.60 * np.prod(x.shape))
+       return (torch.sum(x <= 0.1).item() + torch.sum(x >= 0.9).item()) > (0.60 * np.prod(x.shape))
 
     # endregion
 
@@ -631,7 +632,9 @@ class NSCLCDataset(Dataset):
     def augment(self):
         self.augmented = True
 
-    def transform_to_psuedo_rgb(self):
+    def transform_to_psuedo_rgb(self, rgb_squeeze=None):
+        if rgb_squeeze is None:
+            self.rgb_squeeze = False if self.stack_height > 1 else True
         self.psuedo_rgb = True
 
     def cutoff_saturation(self):
