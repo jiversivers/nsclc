@@ -16,11 +16,11 @@ def main():
     # Set up multiprocessing
     print(f'Num cores: {mp.cpu_count()}')
     print(f'Num GPUs: {torch.cuda.device_count()}')
-    # mp.set_start_method('forkserver', force=True)
+    mp.set_start_method('forkserver', force=True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Prepare data
-    data = NSCLCDataset('E:/NSCLC_Data_for_ML', ['orr'], device='cpu', use_cache=True, use_atlas=True,
+    data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr'], device='cpu', use_cache=True, use_atlas=True,
                         use_patches=True, patch_size=(256, 256), label='Metastases')
     data.to(device)
 
