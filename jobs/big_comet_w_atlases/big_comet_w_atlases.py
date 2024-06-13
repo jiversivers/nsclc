@@ -36,6 +36,7 @@ def main():
     data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr'], device='cpu',
                         label='Metastases', use_atlas=True, patch_size=(512, 512))
     data.normalize_channels('preset')
+    data.transform_to_psuedo_rgb(rgb_squeeze=True)
     data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
                                    tvt.RandomHorizontalFlip(p=0.25),
                                    tvt.RandomRotation(degrees=(-180, 180))])
