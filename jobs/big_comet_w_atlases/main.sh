@@ -24,10 +24,10 @@ echo $SLURM_JOB_ID
 
 cd $SLURM_SUBMIT_DIR || exit
 # input files needed for job
-files=/home/jdivers/ondemand/data/sys/myjobs/projects/nsclc/data
+files=/home/jdivers/data
 
 echo "Copying files..."
-rsync -avq $files /scratch/$SLURM_JOB_ID
+rsync -av $files /scratch/$SLURM_JOB_ID
 rsync -avq $SLURM_SUBMIT_DIR/big_comet_w_atlases.py /scratch/$SLURM_JOB_ID
 rsync -avq /home/jdivers/nsclc/my_modules /scratch/$SLURM_JOB_ID
 wait
