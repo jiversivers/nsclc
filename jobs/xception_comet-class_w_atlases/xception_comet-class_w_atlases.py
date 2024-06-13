@@ -34,7 +34,7 @@ def main():
     # Set up the dataset for this model
     # Images, no mask (feature extractor will hopefully handle this), normalized_to_max (already is),
     data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr'], device='cpu',
-                        label='Metastases', mask_on=False, use_atlas=True, use_patches=True)
+                        label='Metastases', mask_on=False, use_atlas=True, use_patches=True, patch_size=(256, 256))
     print('Normalizing data to channel max...')
     data.augment()
     data.transform_to_psuedo_rgb()
