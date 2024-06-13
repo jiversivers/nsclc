@@ -442,13 +442,17 @@ class NSCLCDataset(Dataset):
         # Get actual index from input index (to handle negatives)
         pt_index = list(range(len(self.features)))[pt_index]
         pt_id = self.features.at[pt_index, 'Sample ID'] if self._use_atlas else self.features.at[pt_index, 'Slide Name']
-        indices = [i for i, path_str in enumerate(self.all_fovs) if pt_id in path_str]
+        if self._use_atlas:
+            indices = [i for i, path_str in enumerate(self.all_atlases) if pt_id in path_str]
+        else:
+            indices = [i for i, path_str in enumerate(self.all_fovs) if pt_id in path_str]
 
-        # If using atlas patches, we have to determine how many patches come before this patient
+        # If using atlas patches, we have to determine how many patches come before this patient and add the number from
+        # the patient from there
         if self.use_patches:
-            pass
-
-        # We also have to determine how many patches belong to this patient
+            im_before_current_pt = int(self.atlas_sub_index_map[indices[0]])
+            number_of_ims_for_pt = int(sum([np.prod(self.atlas_patch_dims[i]) for i in indices]))
+            indices = list(range(im_before_current_pt, im_before_current_pt + number_of_ims_for_pt))
 
         # If using augmenting, each base image results in 5 sequential daughter images
         if self.augmented:
