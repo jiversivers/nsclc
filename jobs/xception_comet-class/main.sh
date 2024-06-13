@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=xception_comet-class_w_atlases
+#SBATCH --job-name=xception_comet-class
 #SBATCH --partition=agpu06
 #SBATCH --output=nsclc_main.txt
 #SBATCH --error=nsclc_main.err
