@@ -79,7 +79,6 @@ def main():
 
         # Nest iteration lists for tracking model learning
         training_loss.append([])
-        evaluation_loss.append([])
         testing_accuracy.append([])
 
         # Find max number of epochs to consider and do that, checking along the way for others
@@ -102,24 +101,8 @@ def main():
                 epoch_loss += loss.item()
             training_loss[-1].append(epoch_loss / len(train_set))
 
-            # Validation
-            model.eval()
-            eval_loss = 0
-            with torch.no_grad():
-                for x, target in eval_loader:
-                    if torch.cuda.is_available() and not x.is_cuda:
-                        x = x.cuda()
-                    if torch.cuda.is_available() and not target.is_cuda:
-                        target = target.cuda()
-                    out = model(x)
-                    loss = loss_fn(out, target.unsqueeze(1))
-                    eval_loss += loss.item()
-                    score_model(model, eval_loader, print_results=True)
-                evaluation_loss[-1].append(eval_loss / len(eval_set))
-
             with open('outputs/results.txt', 'a') as results_file:
-                results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, '
-                                   f'Eval.Loss: {evaluation_loss[-1][-1]:.4f}%')
+                results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, ')
 
             # See if we are at one of our training length checkpoints. Save and test if we are
             if ep + 1 in epochs:
