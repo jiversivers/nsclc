@@ -24,7 +24,7 @@ echo $SLURM_JOB_ID
 
 cd $SLURM_SUBMIT_DIR || exit
 # input files needed for job
-files=/home/jdivers/ondemand/data/sys/myjobs/projects/nsclc/data
+files=/home/jdivers/data
 
 echo "Copying files..."
 rsync -avq $files /scratch/$SLURM_JOB_ID
