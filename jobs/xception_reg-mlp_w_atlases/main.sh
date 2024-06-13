@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH --job-name=xception_to_mlp_iterator
-#SBATCH --partition=agpu06
+#SBATCH --job-name=xception_to_regmlp_atlas
+#SBATCH --partition=agpu72
 #SBATCH --output=nsclc_main.txt
 #SBATCH --error=nsclc_main.err
 #SBATCH --mail-type=ALL
@@ -9,7 +9,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=64
 #SBATCH --cpus-per-task=1
-#SBATCH --time=06:00:00
+#SBATCH --time=72:00:00
 #SBATCH --qos=gpu
 
 export OMP_NUM_THREADS=64
@@ -28,14 +28,14 @@ files=/home/jdivers/data
 
 echo "Copying files..."
 rsync -avq $files /scratch/$SLURM_JOB_ID
-rsync -avq $SLURM_SUBMIT_DIR/fetc_mlp_w_atlases.py /scratch/$SLURM_JOB_ID
+rsync -avq $SLURM_SUBMIT_DIR/xception_reg-mlp_w_atlases.py /scratch/$SLURM_JOB_ID
 rsync -avq /home/jdivers/nsclc/my_modules /scratch/$SLURM_JOB_ID
 wait
 
 cd /scratch/$SLURM_JOB_ID/ || exit
 
 echo "Python script initiating..."
-python3 fetc_mlp_w_atlases.py
+python3 xception_reg-mlp_w_atlases.py
 
 rsync -av -q /scratch/$SLURM_JOB_ID/outputs $SLURM_SUBMIT_DIR/
 
