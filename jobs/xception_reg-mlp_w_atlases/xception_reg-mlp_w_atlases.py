@@ -4,8 +4,8 @@ import torch
 from pretrainedmodels import xception
 import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
-
-from my_modules.model_learning.loader_maker import split_augmented_data
+from my_modules.nsclc import patient_wise_train_test_splitter
+import torchvision.transforms.v2 as tvt
 from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import NSCLCDataset, patient_wise_train_test_splitter
 from my_modules.custom_models import MLPNet as MLP, FeatureExtractorToClassifier as FETC
@@ -36,12 +36,13 @@ def main():
     # Images, no mask (feature extractor will hopefully handle this), normalized_to_max (already is),
     data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr'], device='cpu',
                         label='Metastases', mask_on=False, use_atlas=True, use_patches=True, patch_size=(256, 256))
-    print('Normalizing data to channel max...')
     data.augment()
     data.transform_to_psuedo_rgb()
-    data.transforms = torch.squeeze
+    data.normalize_channels('preset')
+    data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
+                                   tvt.RandomHorizontalFlip(p=0.25),
+                                   tvt.RandomRotation(degrees=(-180, 180))])
     data.to(device)
-
     batch_size = 64
     learning_rates = [5e-5, 1e-5, 5e-6, 1e-6]
     optimizer_fns = {'Adam': [torch.optim.Adam, {}]}
