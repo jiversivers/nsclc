@@ -28,14 +28,14 @@ files=/home/jdivers/data
 
 echo "Copying files..."
 rsync -avq $files /scratch/$SLURM_JOB_ID
-rsync -avq $SLURM_SUBMIT_DIR/xception_comet-class_w.py /scratch/$SLURM_JOB_ID
+rsync -avq $SLURM_SUBMIT_DIR/xception_comet-class.py /scratch/$SLURM_JOB_ID
 rsync -avq /home/jdivers/nsclc/my_modules /scratch/$SLURM_JOB_ID
 wait
 
 cd /scratch/$SLURM_JOB_ID/ || exit
 
 echo "Python script initiating..."
-python3 xception_comet-class_w.py
+python3 xception_comet-class.py
 
 rsync -av -q /scratch/$SLURM_JOB_ID/outputs $SLURM_SUBMIT_DIR/
 
