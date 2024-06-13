@@ -7,7 +7,8 @@ import os
 from matplotlib import pyplot as plt
 
 from my_modules.custom_models import *
-from my_modules.model_learning import train_epoch, valid_epoch, masked_loss
+from my_modules.model_learning import train_epoch
+import torchvision.transforms.v2 as tvt
 from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import NSCLCDataset, patient_wise_train_test_splitter
 
@@ -22,6 +23,10 @@ def main():
     # Prepare data
     data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr'], device='cpu', use_cache=True, use_atlas=True,
                         use_patches=True, patch_size=(256, 256), label='Metastases')
+    data.normalize_channels('preset')
+    data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
+                                   tvt.RandomHorizontalFlip(p=0.25),
+                                   tvt.RandomRotation(degrees=(-180, 180))])
     data.to(device)
 
     # Dataloader parameters
