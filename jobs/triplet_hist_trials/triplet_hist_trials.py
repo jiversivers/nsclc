@@ -25,9 +25,6 @@ def main():
     data.augment()
     data.normalize_channels('preset')
     data.dist_transform(nbins=25)
-    data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
-                                   tvt.RandomHorizontalFlip(p=0.25),
-                                   tvt.RandomRotation(degrees=(-180, 180))])
     data.to(device)
 
     # Set up hyperparameters
