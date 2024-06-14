@@ -81,7 +81,7 @@ def main():
                     targets = torch.cat((targets, target), dim=0)
 
                 # Regroup outputs based on class (random by first instance
-                anchor = outs[targets == target[0]]
+                anchor = outs[targets == targets[0]]
                 negative = outs[targets != targets[0]]
 
                 # Truncate to the smallest class
