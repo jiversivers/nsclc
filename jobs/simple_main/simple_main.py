@@ -76,14 +76,12 @@ def main():
 
     # Iterate through all models
     for m in models:
-        model = m(data.shape)
         if torch.cuda.is_available() and not next(model.parameters()).is_cuda:
             model.to(device)
         # Iterate through sets of hyperparameters
         for lr in learning_rates:
-            # Iterate through optimizing functions
-            # Iterate through optimizing functions
             for name, (optim_fn, options) in optimizers.items():
+                model = m(data.shape)
                 optimizer = optim_fn(model.parameters(), lr=lr, **options)
                 print(f'Training model {model.name} with learning rate of {lr} with {name} optimizer')
                 print('_____________________________________________________________________________________________\n')
@@ -139,13 +137,13 @@ def main():
 
     # Iterate through all models
     for m in models:
-        model = m(data.shape)
         if torch.cuda.is_available() and not next(model.parameters()).is_cuda:
             model.to(device)
         # Iterate through sets of hyperparameters
         for lr in learning_rates:
             # Iterate through optimizing functions
             for name, (optim_fn, options) in optimizers.items():
+                model = m(data.shape)
                 optimizer = optim_fn(model.parameters(), lr=lr, **options)
                 print(f'Training model {model.name} with learning rate of {lr} with {name} optimizer')
                 print('_____________________________________________________________________________________________\n')
