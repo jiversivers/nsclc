@@ -1,8 +1,12 @@
+from typing import Iterator, Tuple
+
 import numpy as np
 import torch
 from torch import nn
 import warnings
 import traceback
+
+from torch.nn import Parameter
 
 
 # region MLPs
@@ -599,6 +603,22 @@ class FeatureExtractorToClassifier(nn.Module):
         # Clean up the hook
         fh.remove()
         return get['features']
+
+    def named_parameters(
+            self,
+            prefix: str = '',
+            recurse: bool = True,
+            remove_duplicate: bool = True
+    ) -> Iterator[Tuple[str, Parameter]]:
+        # Add feature extractor params
+        for name, param in self.feature_extractor.named_parameters(prefix='feature_extractor',
+                                                                   recurse=recurse, remove_duplicate=remove_duplicate):
+            yield name, param
+
+        # Add classifier parameters
+        for name, param in self.classifier.named_parameters(prefix='classifier',
+                                                            recurse=recurse, remove_duplicate=remove_duplicate):
+            yield name, param
 
     def to(self, device):
         self.feature_extractor.to(device)
