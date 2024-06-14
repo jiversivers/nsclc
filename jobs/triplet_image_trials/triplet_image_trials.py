@@ -4,7 +4,8 @@ import torch
 import torch.multiprocessing as mp
 from matplotlib import pyplot as plt
 from torch import nn
-
+from my_modules.nsclc import patient_wise_train_test_splitter
+import torchvision.transforms.v2 as tvt
 from my_modules.custom_models import MLPNet, RegularizedParallelMLPNet, RegularizedMLPNet, \
     ParallelMLPNet, CNNet, RegularizedCNNet, ParallelCNNet, RegularizedParallelCNNet
 from my_modules.model_learning.loader_maker import split_augmented_data
@@ -22,7 +23,10 @@ def main():
         'data/NSCLC_Data_for_ML',
         mode=['orr', 'taumean', 'boundfraction'], label='M', mask_on=False, device='cpu')
     data.augment()
-    data.normalize_channels_to_max()
+    data.normalize_channels('preset')
+    data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
+                                   tvt.RandomHorizontalFlip(p=0.25),
+                                   tvt.RandomRotation(degrees=(-180, 180))])
     data.to(device)
 
     # Set up hyperparameters
@@ -34,14 +38,11 @@ def main():
     loss_fn = nn.TripletMarginLoss()
 
     # Split dataset
-    training_set, validation_set, testing_set = split_augmented_data(data, augmentation_factor=5, split=(.75, .15, .1))
-    training_loader = torch.utils.data.DataLoader(training_set, batch_size=batch_size, shuffle=True, num_workers=0,
-                                                  drop_last=(True if len(training_set) % batch_size == 1 else False))
-    validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=batch_size, shuffle=False, num_workers=0,
-                                                    drop_last=(
-                                                        True if len(validation_set) % batch_size == 1 else False))
-    testing_loader = torch.utils.data.DataLoader(testing_set, batch_size=batch_size, shuffle=False, num_workers=0,
-                                                 drop_last=(True if len(testing_set) % batch_size == 1 else False))
+    train_set, test_set = patient_wise_train_test_splitter(data, n=3)
+    training_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0,
+                                                  drop_last=(True if len(train_set) % batch_size == 1 else False))
+    testing_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0,
+                                                 drop_last=(True if len(test_set) % batch_size == 1 else False))
 
     # Set up models to try
     model_fns = [MLPNet, RegularizedMLPNet, ParallelMLPNet, RegularizedParallelMLPNet,
@@ -97,24 +98,10 @@ def main():
                 loss.backward()
                 optimizer.step()
 
-                # Validation
-                model.eval()
-                validation_loss = 0.0
-                with torch.no_grad():
-                    targets = torch.tensor([]).to(device)
-                    for x, target in validation_loader:
-                        out = model(x)
-                        targets = torch.cat((targets, target), dim=0)
-                        validation_loss += nn.BCEWithLogitsLoss()(out, target.unsqueeze(1))
-                    scores = score_model(model, validation_loader)
-                    with open(f'outputs/{model_fn.__name__}/prints/lr{lr}_results.txt', 'a') as f:
-                        for key, item in scores.items():
-                            if 'Confusion' not in key:
-                                f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
-
                 # Testing
                 if ep + 1 in epochs:
                     scores, fig = score_model(model, testing_loader, make_plot=True, threshold_type='ROC')
+                    fig.savefig(f'outputs/{model_fn.__name__}/plots/auc_{ep + 1}_{lr}.png')
                     with open(f'outputs/{model_fn.__name__}/prints/lr{lr}_results.txt', 'a') as f:
                         f.write('\n_____________________________________________________\n')
                         for key, item in scores.items():
