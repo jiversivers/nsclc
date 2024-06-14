@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=simple_cnns
+#SBATCH --job-name=simple_cnns_with_all
 #SBATCH --partition=agpu06
 #SBATCH --output=nsclc_main.txt
 #SBATCH --error=nsclc_main.err
@@ -29,14 +29,14 @@ files=/home/jdivers/data/NSCLC_Data_for_ML
 echo "Copying files..."
 mkdir /scratch/$SLURM_JOB_ID/data
 rsync -avq $files /scratch/$SLURM_JOB_ID/data
-rsync -avq /home/jdivers/nsclc/jobs/simple_main/simple_main.py /scratch/$SLURM_JOB_ID
+rsync -avq $SLURM_SUBMIT_DIR/simple_cnns_with_all.py /scratch/$SLURM_JOB_ID
 rsync -avq /home/jdivers/nsclc/my_modules /scratch/$SLURM_JOB_ID
 wait
 
 cd /scratch/$SLURM_JOB_ID/ || exit
 
 echo "Python script initiating..."
-python3 simple_main.py
+python3 simple_cnns_with_all.py
 
 rsync -av -q /scratch/$SLURM_JOB_ID/ $SLURM_SUBMIT_DIR/
 
