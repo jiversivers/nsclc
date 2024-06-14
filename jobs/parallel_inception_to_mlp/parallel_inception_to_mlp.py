@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from pretrainedmodels import inceptionresnetv2 as inception
 from torch import nn
 
-from my_modules.custom_models import MLPNet as MLP, FeatureExtractorToClassifier as FETC
+from my_modules.custom_models import CometClassifierWithBinaryOutput as Comet, FeatureExtractorToClassifier as FETC
 from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import NSCLCDataset
 from my_modules.nsclc import patient_wise_train_test_splitter
@@ -55,7 +55,7 @@ def main():
         params.requires_grad = False
 
     # Define classifier
-    classifier = MLP
+    classifier = Comet
 
     # Set up hyperparameters
     batch_size = 64
@@ -88,10 +88,10 @@ def main():
 
         # Parallel feature extraction to single net model with input size for all models features
         input_size = sum([model.feature_map_dims[1] for model in models])
-        fetc_parallel_classifier = MLP(input_size).to(device)
+        fetc_parallel_classifier = classifier(input_size).to(device)
 
         # Set up optimizers
-        optimizers = [optim_fn(model.parameters(), lr=lr) for model in models]
+        individual_optimizers = [optim_fn(model.classifier.parameters(), lr=lr) for model in models]
         ensemble_optimizer = optim_fn(ensemble_combiner.parameters(), lr=lr)
         parallel_optimizer = optim_fn(fetc_parallel_classifier.parameters(), lr=lr)
 
@@ -119,13 +119,15 @@ def main():
                                 for ch, model in enumerate(models)]
 
                 # Get final output for each model and do backprop
-                [optimizer.zero_grad() for optimizer in optimizers]
-                outs = [model(x[:, ch].squeeze(1)) for ch, model in enumerate(models)]
-                losses = [loss_fn(out, target.unsqueeze(1)) for out in outs]
-                [loss.backward() for loss in losses]
-                for individual_loss, loss in zip(individual_losses, losses):
-                    individual_loss += loss.item()
-                [optimizer.step() for optimizer in optimizers]
+                outs = []
+                for ch, (optimizer, model) in enumerate(zip(individual_optimizers, models)):
+                    optimizer.zero_grad()
+                    out = model(x[:, ch].squeeze(1))
+                    outs.append(out)
+                    loss = loss_fn(out, target.unsqueeze(1))
+                    individual_losses[ch] += loss.item()
+                    loss.backward()
+                    optimizer.step()
 
                 # Get ensemble output and do backprop
                 ensemble_optimizer.zero_grad()
@@ -148,7 +150,9 @@ def main():
                 itl.append(il / len(train_set))
             ensemble_training_loss[-1].append(ensemble_loss / len(train_set))
             parallel_training_loss[-1].append(parallel_loss / len(train_set))
-
+            print(f'Epoch: {ep + 1} | Individual Loss: {individual_training_loss[-1]}'
+                  f' | Ensemble Loss: {ensemble_training_loss[-1]}'
+                  f' | Parallel Loss: {parallel_training_loss[-1]}')
             # If we are at a checkpoint epoch
             if ep + 1 in epochs:
                 # Testing
@@ -169,12 +173,12 @@ def main():
                         feature_loader.append((torch.cat(features, dim=1).detach(), target))
 
                         # Get final output for each model
-                        [optimizer.zero_grad() for optimizer in optimizers]
                         outs = []
-                        for ch, (model, pl) in enumerate(zip(models, psuedo_loaders)):
-                            outs.append(model(x[:, ch].squeeze(1)))
-                            # Make a psuedo-loader for each model to use for scoring
-                            pl.append((x[:, ch].squeeze(1), target))
+                        for ch, (model, loader) in enumerate(zip(models, psuedo_loaders)):
+                            out = model(x[:, ch].squeeze(1))
+                            outs.append(out)
+                            # Make a psuedo-loader for each individual model to use for scoring
+                            loader.append(x[:, ch].unsqueeze(1), target)
 
                         # Make output loader for ensemble model
                         individual_output_loader.append((torch.cat(outs, dim=1).detach(), target))
@@ -222,7 +226,6 @@ def main():
                         if 'Confusion' not in key:
                             f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
                     f.write('_____________________________________________________\n')
-
 
 if __name__ == '__main__':
     main()
