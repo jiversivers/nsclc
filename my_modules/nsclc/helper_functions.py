@@ -1,6 +1,6 @@
 import random
 
-import torchvision.transforms as transforms
+import torchvision.transforms.v2 as transforms
 from PIL import Image
 import torch
 import numpy as np
@@ -14,7 +14,7 @@ def load_tiff(load_fns_and_img_paths):
 
 # Function to load ASCs
 def load_asc(load_fns_and_img_paths):
-    x = torch.from_numpy(np.genfromtxt(load_fns_and_img_paths[1])).to(torch.float32)
+    x = torch.from_numpy(np.genfromtxt(load_fns_and_img_paths[1])).to(torch.float32).unsqueeze(0)
     return x
 
 
