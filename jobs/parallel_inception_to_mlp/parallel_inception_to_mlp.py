@@ -1,11 +1,13 @@
 import os
+from contextlib import nullcontext
 
 import torch
 import torch.multiprocessing as mp
 import torchvision.transforms.v2 as tvt
 from matplotlib import pyplot as plt
 from pretrainedmodels import inceptionresnetv2 as inception
-from torch import nn
+from torch import nn, autocast
+from torch.cuda.amp import GradScaler
 
 from my_modules.custom_models import CometClassifierWithBinaryOutput as Comet, FeatureExtractorToClassifier as FETC
 from my_modules.model_learning.model_metrics import score_model
@@ -63,6 +65,8 @@ def main():
     epochs = [125, 250, 500, 1000, 2000]
     optim_fn = torch.optim.Adam
     loss_fn = nn.BCEWithLogitsLoss()
+    if torch.cuda.is_available():
+        scaler = GradScaler()
 
     # Prepare data loaders
     train_set, test_set = patient_wise_train_test_splitter(data, n=3)
@@ -81,8 +85,9 @@ def main():
     for lr in learning_rates:
         # Create models
         # Individual and ensemble-averaging models
-        models = [FETC(data.shape[1:], feature_extractor=feature_extractor, classifier=classifier, layer='conv2d_7b')
-                  for _ in range(data.stack_height)]
+        models = [
+            FETC(data.shape[1:], feature_extractor=feature_extractor, classifier=classifier, layer='conv2d_7b')
+            for _ in range(data.stack_height)]
         [model.to(device) for model in models]
         ensemble_combiner = nn.Linear(data.stack_height, 1).to(device)  # Learnable linear combination of logits
 
@@ -112,38 +117,68 @@ def main():
             parallel_loss = 0
             # Iterate through dataloader
             for x, target in training_loader:
+                if torch.cuda.is_available():
+                    x, target = x.to(torch.float16), target.to(torch.float16)
+
                 # Mode-wise models (for individual and ensemble architectures)
                 with torch.no_grad():
                     # Get feature maps, avg, and flatten (just like in the whole model)
-                    features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
-                                for ch, model in enumerate(models)]
+                    features = []
+                    for ch, model in enumerate(models):
+                        with autocast() if torch.cuda.is_available() else nullcontext():
+                            feature = model.flat(model.global_avg_pool(model.get_features(x[:, ch])))
+                            if torch.cuda.is_available():
+                                features.append(feature.half())
+                            else:
+                                features.append(feature.float())
 
                 # Get final output for each model and do backprop
                 outs = []
                 for ch, (optimizer, model) in enumerate(zip(individual_optimizers, models)):
                     optimizer.zero_grad()
-                    out = model(x[:, ch].squeeze(1))
-                    outs.append(out)
-                    loss = loss_fn(out, target.unsqueeze(1))
+                    with autocast() if torch.cuda.is_available() else nullcontext():
+                        out = model(x[:, ch].squeeze(1))
+                        if torch.cuda.is_available():
+                            outs.append(out.half())
+                        else:
+                            outs.append(out.float())
+                        loss = loss_fn(out, target.unsqueeze(1))
                     individual_losses[ch] += loss.item()
-                    loss.backward()
-                    optimizer.step()
+                    if torch.cuda.is_available():
+                        scaler.scale(loss.cuda()).backward()
+                        scaler.step(optimizer)
+                        scaler.update()
+                    else:
+                        loss.backward()
+                        optimizer.step()
 
                 # Get ensemble output and do backprop
                 ensemble_optimizer.zero_grad()
-                out = ensemble_combiner(torch.cat(outs, dim=1).detach())
-                loss = loss_fn(out, target.unsqueeze(1))
-                loss.backward()
+                with autocast() if torch.cuda.is_available() else nullcontext():
+                    out = ensemble_combiner(torch.cat(outs, dim=1).detach())
+                    loss = loss_fn(out, target.unsqueeze(1))
+                if torch.cuda.is_available():
+                    scaler.scale(loss.cuda()).backward()
+                    scaler.step(ensemble_optimizer)
+                    scaler.update()
+                else:
+                    loss.backward()
+                    ensemble_optimizer.step()
                 ensemble_loss += loss.item()
-                ensemble_optimizer.step()
 
                 # Feed parallel-extracted features into full classifier
                 parallel_optimizer.zero_grad()
-                out = fetc_parallel_classifier(torch.stack(features, dim=1).detach())
-                loss = loss_fn(out, target.unsqueeze(1))
-                loss.backward()
+                with autocast() if torch.cuda.is_available() else nullcontext():
+                    out = fetc_parallel_classifier(torch.stack(features, dim=1).detach())
+                    loss = loss_fn(out, target.unsqueeze(1))
+                if torch.cuda.is_available():
+                    scaler.scale(loss.cuda()).backward()
+                    scaler.step(parallel_optimizer)
+                    scaler.update()
+                else:
+                    loss.backward()
+                    parallel_optimizer.step()
                 parallel_loss += loss.item()
-                parallel_optimizer.step()
 
             # Update training checks
             for il, itl in zip(individual_losses, individual_training_loss[-1]):
@@ -164,18 +199,23 @@ def main():
                     for x, target in testing_loader:
                         # Put onto GPU if not
                         if torch.cuda.is_available():
-                            x = x.cuda() if x.device.type != 'cuda' else x
-                            target = target.cuda() if target.device.type != 'cuda' else target
+                            x = x.half().cuda()
+                            target = target.half().cuda()
                         # Mode-wise models (for individual and ensemble architectures)
                         # Get feature maps, avg, and flatten (just like in the whole model)
-                        features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
-                                    for ch, model in enumerate(models)]
-                        feature_loader.append((torch.cat(features, dim=1).detach(), target))
+                        features = []
+                        for ch, model in enumerate(models):
+                            feature = model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
+                            if torch.cuda.is_available():
+                                features.append((torch.cat(feature, dim=1).detach().half(), target))
+                            else:
+                                features.append((torch.cat(feature, dim=1).detach().float(), target))
 
                         # Get final output for each model
                         outs = []
                         for ch, (model, loader) in enumerate(zip(models, psuedo_loaders)):
-                            out = model(x[:, ch].squeeze(1))
+                            with autocast() if torch.cuda.is_available() else nullcontext():
+                                out = model(x[:, ch].squeeze(1))
                             outs.append(out)
                             # Make a psuedo-loader for each individual model to use for scoring
                             loader.append(x[:, ch].unsqueeze(1), target)
@@ -185,17 +225,20 @@ def main():
 
                 # Update testing scores
                 for score, model, loader in zip(individual_test_scores[-1], models, psuedo_loaders):
-                    auc_score, fig = score_model(model, loader, make_plot=True, threshold_type='roc')
+                    with autocast() if torch.cuda.is_available() else nullcontext():
+                        auc_score, fig = score_model(model, loader, make_plot=True, threshold_type='roc')
                     score.append(auc_score)
                     fig.savefig(f'outputs/plots/individual/auc_{model.name}_{ep}_{lr}.png')
                     plt.close(fig)
-                auc_score, fig = score_model(ensemble_combiner, individual_output_loader,
-                                             make_plot=True, threshold_type='roc')
+                with autocast() if torch.cuda.is_available() else nullcontext():
+                    auc_score, fig = score_model(ensemble_combiner, individual_output_loader,
+                                                 make_plot=True, threshold_type='roc')
                 ensemble_test_scores[-1].append(auc_score)
                 fig.savefig(f'outputs/plots/ensemble/auc_ensemble_{ep}_{lr}.png')
                 plt.close(fig)
-                auc_score, fig = score_model(fetc_parallel_classifier, feature_loader,
-                                             make_plot=True, threshold_type='roc')
+                with autocast() if torch.cuda.is_available() else nullcontext():
+                    auc_score, fig = score_model(fetc_parallel_classifier, feature_loader,
+                                                 make_plot=True, threshold_type='roc')
                 parallel_test_scores[-1].append(auc_score)
                 fig.savefig(f'outputs/plots/parallel/auc_parallel_{ep}_{lr}.png')
                 plt.close(fig)
