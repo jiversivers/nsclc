@@ -31,6 +31,11 @@ def train_epoch(model, loader, loss_fn, optimizer, masked_loss_fn=False):
         total_loss += loss.item()
         loss.backward()
         optimizer.step()
+
+        # Clean up for memory
+        del x, target, out, loss
+        torch.cuda.empty_cache()
+
     epoch_loss = total_loss / len(loader)
     return epoch_loss
 
@@ -53,6 +58,11 @@ def valid_epoch(model, loader, loss_fn, masked_loss_fn=False):
             total_loss += loss.item()
             prediction = torch.round(out)
             correct += (prediction == target).sum().item()
+
+            # Clean up for memory
+            del x, target, out, loss, prediction
+            torch.cuda.empty_cache()
+
     val_loss = total_loss / len(loader)
     val_accu = correct / len(loader.dataset)
     return val_loss, val_accu
@@ -71,6 +81,10 @@ def test_model(model, loader):
             out = model(x).squeeze(1)
             prediction = torch.round(out)
             correct += (prediction == target).sum().item()
+
+            # Clean up for memory
+            del x, target, out, prediction
+            torch.cuda.empty_cache()
     return correct
 
 
