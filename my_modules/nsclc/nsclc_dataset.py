@@ -87,6 +87,7 @@ class NSCLCDataset(Dataset):
 
         # Init placeholder cache arrays
         self.index_cache = None
+        self.in_bad_index_cache = None
         self.shared_x = None
         self.shared_y = None
 
@@ -321,6 +322,14 @@ class NSCLCDataset(Dataset):
             lists_of_paths = self.fovs_by_slide
         slide_idx = [img_path in paths for paths in lists_of_paths].index(True)
 
+        # Check if this index has been previously deemed bad
+        if self.in_bad_index_cache is not None and self.in_bad_index_cache[index]:
+            print(f'skipping previous bad index {index}')
+            pt_indices = self.get_patient_subset(slide_idx)
+            while self.in_bad_index_cache[index]:
+                index = pt_indices[(pt_indices.index(index) + 1) % len(pt_indices)]
+            return self.__getitem__(index)
+
         # Check if indexed sample is in cache (by checking for index in index_cache)...
         # if it is, pull it from the cache;
         # Get base image and label from cache
@@ -407,10 +416,12 @@ class NSCLCDataset(Dataset):
         # Dynamically and recursively filter out bad data (namely, images with little or no signal) while maintain the
         # same patient index
         if self.filter_bad_data and self.is_bad_data(x):
-            print(f'crap {index}')
+            print(f'crap {index} added to bad cache')
+            self.in_bad_index_cache[index] = True
             pt_indices = self.get_patient_subset(slide_idx)
-            new_idx = pt_indices[(pt_indices.index(index) + 1) % len(pt_indices)]
-            return self.__getitem__(new_idx)
+            while self.in_bad_index_cache[index]:
+                index = pt_indices[(pt_indices.index(index) + 1) % len(pt_indices)]
+            return self.__getitem__(index)
 
         # Unsqueeze so "color" is dim 1 and expand to look like an RGB image
         # New image dims: (M, C, H, W), where M is the mode, C is the psuedo-color channel, H and W are height and width
@@ -434,10 +445,22 @@ class NSCLCDataset(Dataset):
 
     def _open_cache(self, x, y):
         # Setup shared memory arrays (i.e. caches that are compatible with multiple workers)
-        # negative initialization ensure no overlap with actual cached indices
+        # Length of cache to hold all FULL images before any manipulation
         cache_len = len(self.all_atlases) if self._use_atlas else len(self.all_fovs)
+
+        # Index cache to track what indices have been hit already. Negative initialization ensure no overlap with actual
+        # cached indices
         index_cache_base = mp.Array(ctypes.c_int, cache_len * [-1])
+        self.index_cache = convert_mp_to_torch(index_cache_base, (cache_len,), device=self.device)
+
+        # If filtering bad data, store a map of bad to good indices to avoid reprocessing the same bad samples. As we
+        # find bad indices, we will set that index in the bad index cache to True. Then we can just check ether an
+        # index was previously deemed bad by checking if the value at that index is True
+        bad_index_base = mp.Array(ctypes.c_bool, len(self) * [False])
+        self.in_bad_index_cache = convert_mp_to_torch(bad_index_base, (len(self),), device=self.device)
+
         shared_x_base = cache_len * [mp.Array(ctypes.c_float, 0)]
+        self.shared_x = [convert_mp_to_torch(x_base, 0, device=self.device) for x_base in shared_x_base]
 
         # Label-size determines cache size, so if no label is set, we will fill cache with -999999 at __getitem__
         match self.label:
@@ -450,11 +473,8 @@ class NSCLCDataset(Dataset):
             case _:
                 raise Exception('An unrecognized label is in use that is blocking the cache from initializing. '
                                 'Update label attribute of dataset and try again.')
-
-        # Convert all arrays to desired data structure
-        self.index_cache = convert_mp_to_torch(index_cache_base, (cache_len,), device=self.device)
-        self.shared_x = [convert_mp_to_torch(x_base, 0, device=self.device) for x_base in shared_x_base]
         self.shared_y = convert_mp_to_torch(shared_y_base, (cache_len,) + y_shape, device=self.device)
+
         print('Cache opened.')
 
     def to(self, device):
@@ -517,7 +537,7 @@ class NSCLCDataset(Dataset):
         return y
 
     def is_bad_data(self, x):
-       return (torch.sum(x <= 0.1).item() + torch.sum(x >= 0.9).item()) > (0.60 * np.prod(x.shape))
+        return (torch.sum(x <= 0.1).item() + torch.sum(x >= 0.9).item()) > (0.60 * np.prod(x.shape))
 
     # endregion
 
@@ -677,6 +697,8 @@ class NSCLCDataset(Dataset):
                     self.psuedo_rgb = False
                     temp_patch = self.use_patches
                     self.use_patches = False
+                    temp_filter = self.filter_bad_data
+                    self.filter_bad_data = False
 
                     # Preallocate an array. Each row is an individual image, each column is mode
                     maxes = torch.zeros(len(self), self.stack_height, dtype=torch.float32, device=self.device)
@@ -687,9 +709,10 @@ class NSCLCDataset(Dataset):
                         mins[ii] = torch.min(torch.min(torch.nan_to_num(stack, nan=100000), 1).values, 1).values
                     self._min_max_scalars = torch.stack((torch.max(mins, 0).values, torch.max(mins, 0).values), dim=-1)
 
-                    # Reset psuedo_rgb and patching
+                    # Reset psuedo_rgb, patching, and filtering
                     self.psuedo_rgb = temp_psuedo
                     self.use_patches = temp_patch
+                    self.filter_bad_data = temp_filter
                 self.scalars = self._min_max_scalars
                 # Set normalized_to_max to TRUE so images will be scaled to max when retrieved
                 self._normalized_to_max = True
