@@ -1,12 +1,10 @@
 import os
-from contextlib import nullcontext
-
 import torch
 import torch.multiprocessing as mp
 import torchvision.transforms.v2 as tvt
 from matplotlib import pyplot as plt
 from pretrainedmodels import xception
-from torch import nn
+from torch import nn, autocast
 
 from my_modules.custom_models import CometClassifierWithBinaryOutput as Comet, FeatureExtractorToClassifier as FETC
 from my_modules.model_learning.model_metrics import score_model
@@ -14,12 +12,12 @@ from my_modules.nsclc import NSCLCDataset
 from my_modules.nsclc import patient_wise_train_test_splitter
 
 if torch.cuda.is_available():
-    from torch.cuda.amp import GradScaler, autocast
+    from torch.cuda.amp import GradScaler
 
 def main():
     # Set up multiprocessing context
     mp.set_start_method('forkserver', force=True)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # Create data with psuedo-RGB stack for each mode
     data = NSCLCDataset('data/NSCLC_Data_for_ML',
@@ -30,6 +28,7 @@ def main():
     data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
                                    tvt.RandomHorizontalFlip(p=0.25),
                                    tvt.RandomRotation(degrees=(-180, 180))])
+    data.to(torch.device(device))
 
     # Prep output dirs and files
     os.makedirs('outputs/plots/individual', exist_ok=True)
@@ -90,12 +89,13 @@ def main():
         models = [
             FETC(data.shape[1:], feature_extractor=feature_extractor, classifier=classifier, layer='conv4')
             for _ in range(data.stack_height)]
-        [model.to(device) for model in models]
-        ensemble_combiner = nn.Linear(data.stack_height, 1).to(device)  # Learnable linear combination of logits
+        [model.to(torch.device(device)) for model in models]
+        ensemble_combiner = nn.Linear(data.stack_height, 1).to(
+            torch.device(device))  # Learnable linear combination of logits
 
         # Parallel feature extraction to single net model with input size for all models features
         input_size = sum([model.feature_map_dims[1] for model in models])
-        fetc_parallel_classifier = classifier(input_size).to(device)
+        fetc_parallel_classifier = classifier(input_size).to(torch.device(device))
 
         # Set up optimizers
         individual_optimizers = [optim_fn(model.classifier.parameters(), lr=lr) for model in models]
@@ -127,7 +127,7 @@ def main():
                     # Get feature maps, avg, and flatten (just like in the whole model)
                     features = []
                     for ch, model in enumerate(models):
-                        with autocast() if torch.cuda.is_available() else nullcontext():
+                        with autocast(device_type=device):
                             feature = model.flat(model.global_avg_pool(model.get_features(x[:, ch])))
                             if torch.cuda.is_available():
                                 features.append(feature.half())
@@ -138,7 +138,7 @@ def main():
                 outs = []
                 for ch, (optimizer, model) in enumerate(zip(individual_optimizers, models)):
                     optimizer.zero_grad()
-                    with autocast() if torch.cuda.is_available() else nullcontext():
+                    with autocast(device_type=device):
                         out = model(x[:, ch].squeeze(1))
                         if torch.cuda.is_available():
                             outs.append(out.half())
@@ -156,7 +156,7 @@ def main():
 
                 # Get ensemble output and do backprop
                 ensemble_optimizer.zero_grad()
-                with autocast() if torch.cuda.is_available() else nullcontext():
+                with autocast(device_type=device):
                     out = ensemble_combiner(torch.cat(outs, dim=1).detach())
                     loss = loss_fn(out, target.unsqueeze(1))
                 if torch.cuda.is_available():
@@ -170,7 +170,7 @@ def main():
 
                 # Feed parallel-extracted features into full classifier
                 parallel_optimizer.zero_grad()
-                with autocast() if torch.cuda.is_available() else nullcontext():
+                with autocast(device_type=device):
                     out = fetc_parallel_classifier(torch.stack(features, dim=1).detach())
                     loss = loss_fn(out, target.unsqueeze(1))
                 if torch.cuda.is_available():
@@ -216,7 +216,7 @@ def main():
                         # Get final output for each model
                         outs = []
                         for ch, (model, loader) in enumerate(zip(models, psuedo_loaders)):
-                            with autocast() if torch.cuda.is_available() else nullcontext():
+                            with autocast(device_type=device):
                                 out = model(x[:, ch].squeeze(1))
                             outs.append(out)
                             # Make a psuedo-loader for each individual model to use for scoring
@@ -227,18 +227,18 @@ def main():
 
                 # Update testing scores
                 for score, model, loader in zip(individual_test_scores[-1], models, psuedo_loaders):
-                    with autocast() if torch.cuda.is_available() else nullcontext():
+                    with autocast(device_type=device):
                         auc_score, fig = score_model(model, loader, make_plot=True, threshold_type='roc')
                     score.append(auc_score)
                     fig.savefig(f'outputs/plots/individual/auc_{model.name}_{ep}_{lr}.png')
                     plt.close(fig)
-                with autocast() if torch.cuda.is_available() else nullcontext():
+                with autocast(device_type=device):
                     auc_score, fig = score_model(ensemble_combiner, individual_output_loader,
                                                  make_plot=True, threshold_type='roc')
                 ensemble_test_scores[-1].append(auc_score)
                 fig.savefig(f'outputs/plots/ensemble/auc_ensemble_{ep}_{lr}.png')
                 plt.close(fig)
-                with autocast() if torch.cuda.is_available() else nullcontext():
+                with autocast(device_type=device):
                     auc_score, fig = score_model(fetc_parallel_classifier, feature_loader,
                                                  make_plot=True, threshold_type='roc')
                 parallel_test_scores[-1].append(auc_score)
