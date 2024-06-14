@@ -3,6 +3,9 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 import torch.utils.data
 import os
+
+from matplotlib import pyplot as plt
+
 from my_modules.nsclc import patient_wise_train_test_splitter
 import torchvision.transforms.v2 as tvt
 
@@ -96,7 +99,9 @@ def main():
                         torch.save(model.state_dict(), f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.pth')
                         print(
                             f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
-                        scores, figs = score_model(model, test_loader, print_results=True, make_plot=True)
+                        scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
+                        fig.savefig(f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.png')
+                        plt.close(fig)
 
                         with open(results_file_path, 'a') as f:
                             f.write(f'\n>>> {model.name} for {ep + 1} epochs with learning rate of {lr}\n')
@@ -157,7 +162,9 @@ def main():
                         torch.save(model.state_dict(), f'aug_hist_models/{data.name}__{model.name}__{lr}_{ep}.pth')
                         print(
                             f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
-                        scores, figs = score_model(model, test_loader, print_results=True, make_plot=True)
+                        scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
+                        fig.savefig(f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.png')
+                        plt.close(fig)
 
                         with open(results_file_path, 'a') as f:
                             f.write(f'\n>>> {model.name} for {ep + 1} epochs with learning rate of {lr}\n')
