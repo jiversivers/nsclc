@@ -77,6 +77,7 @@ def main():
                 for ep in range(epochs[-1]):
                     # Train
                     model.train()
+                    torch.cuda.empty_cache()
                     train_loss.append(train_epoch(model, train_loader, loss_function, optimizer))
 
                     # Test
