@@ -73,7 +73,7 @@ class NSCLCDataset(Dataset):
         # Set attribute and property defaults
         self.saturate = False
         self.augmented = False
-        self.filter_bad_data = False
+        self.filter_bad_data = True if self._use_atlas else False
         self.dist_transformed = False
         self.psuedo_rgb = False
         self.rgb_squeeze = False if self.stack_height > 1 else True
