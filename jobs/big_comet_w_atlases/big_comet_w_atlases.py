@@ -6,7 +6,6 @@ from pretrainedmodels import inceptionresnetv2
 import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
 
-from my_modules.model_learning.loader_maker import split_augmented_data
 from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import NSCLCDataset, patient_wise_train_test_splitter
 from my_modules.custom_models import CometClassifierWithBinaryOutput, FeatureExtractorToClassifier as FETC
@@ -79,6 +78,8 @@ def main():
             epoch_loss = 0
             model.train()
             for x, target in train_loader:
+                # Remove past tensors from GPU cache
+                torch.cuda.empty_cache()
                 if torch.cuda.is_available() and not x.is_cuda:
                     x = x.cuda()
                 if torch.cuda.is_available() and not target.is_cuda:
