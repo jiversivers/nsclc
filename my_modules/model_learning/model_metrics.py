@@ -96,6 +96,8 @@ def score_model(model, loader, print_results=False, make_plot=False, threshold_t
     targets = torch.tensor([])
     with torch.no_grad():
         for x, target in loader:
+            if next(model.parameters()).is_cuda:
+                x, target = x.cuda(), target.cuda()
             outs = torch.cat((outs, model(x).cpu().detach()), dim=0)
             targets = torch.cat((targets, target.cpu().detach()), dim=0)
 
