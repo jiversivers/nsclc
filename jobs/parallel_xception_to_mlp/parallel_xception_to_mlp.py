@@ -171,7 +171,7 @@ def main():
                 # Feed parallel-extracted features into full classifier
                 parallel_optimizer.zero_grad()
                 with autocast(device_type=device):
-                    out = fetc_parallel_classifier(torch.stack(features, dim=1).detach())
+                    out = fetc_parallel_classifier(torch.cat(features, dim=1).detach())
                     loss = loss_fn(out, target.unsqueeze(1))
                 if torch.cuda.is_available():
                     scaler.scale(loss.cuda()).backward()
