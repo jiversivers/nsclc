@@ -6,8 +6,7 @@ from sklearn.metrics import precision_recall_curve, PrecisionRecallDisplay, aver
     accuracy_score, balanced_accuracy_score, RocCurveDisplay, confusion_matrix, ConfusionMatrixDisplay
 
 
-def calculate_auc_roc(model, loader, print_results=False, make_plot=False,
-                      device=torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')):
+def calculate_auc_roc(model, loader, print_results=False, make_plot=False):
     model.eval()
     outs = torch.tensor([])
     targets = torch.tensor([])
@@ -15,6 +14,11 @@ def calculate_auc_roc(model, loader, print_results=False, make_plot=False,
         for x, target in loader:
             outs = torch.cat((outs, model(x).cpu().detach()), dim=0)
             targets = torch.cat((targets, target.cpu().detach()), dim=0)
+
+            # Clean up for memory
+            del x, target
+            torch.cuda.empty_cache()
+
         thresholds, idx = torch.sort(outs.detach().squeeze())
         sorted_targets = targets[idx]
         tpr = []
@@ -94,6 +98,10 @@ def score_model(model, loader, print_results=False, make_plot=False, threshold_t
         for x, target in loader:
             outs = torch.cat((outs, model(x).cpu().detach()), dim=0)
             targets = torch.cat((targets, target.cpu().detach()), dim=0)
+
+            # Clean up for memory
+            del x, target
+            torch.cuda.empty_cache()
     # ROC
     fpr, tpr, thresholds = roc_curve(targets, outs, pos_label=1)
     scores['ROC-AUC'] = auc(fpr, tpr)
@@ -101,7 +109,7 @@ def score_model(model, loader, print_results=False, make_plot=False, threshold_t
 
     # Precision-Recall
     precision, recall, thresholds = precision_recall_curve(targets, outs)
-    scores['F1 Score'] = np.nanmax((2 * precision * recall) / (precision + recall))
+    scores['F1 Score'] = np.nanmax((2 * precision * recall) / (precision + recall + 1e-9))  # Small number for stability
     scores['Optimal Threshold from F1'] = thresholds[np.argmax(scores['F1 Score'])]
     scores['Average Precision'] = average_precision_score(targets, outs)
 
