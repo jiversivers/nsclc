@@ -1,14 +1,16 @@
 import os
 
 import torch
-from torch import nn
-from pretrainedmodels import inceptionresnetv2 as inception
 import torch.multiprocessing as mp
+import torchvision.transforms.v2 as tvt
+from matplotlib import pyplot as plt
+from pretrainedmodels import inceptionresnetv2 as inception
+from torch import nn
 
-from my_modules.model_learning.loader_maker import split_augmented_data
+from my_modules.custom_models import MLPNet as MLP, FeatureExtractorToClassifier as FETC
 from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import NSCLCDataset
-from my_modules.custom_models import MLPNet as MLP, FeatureExtractorToClassifier as FETC
+from my_modules.nsclc import patient_wise_train_test_splitter
 
 
 def main():
@@ -21,11 +23,16 @@ def main():
                         mode=['orr', 'taumean', 'boundfraction'], label='M', mask_on=False, device='cpu')
     data.augment()
     data.transform_to_psuedo_rgb()
-    data.normalize_channels_to_max()
+    data.normalize_channels('preset')
+    data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
+                                   tvt.RandomHorizontalFlip(p=0.25),
+                                   tvt.RandomRotation(degrees=(-180, 180))])
     data.to(device)
 
     # Prep output dirs and files
-    os.makedirs('outputs/plots', exist_ok=True)
+    os.makedirs('outputs/plots/individual', exist_ok=True)
+    os.makedirs('outputs/plots/ensemble', exist_ok=True)
+    os.makedirs('outputs/plots/parallel', exist_ok=True)
     # For individual mode models
     with open('outputs/individual_results.txt', 'w') as f:
         f.write(f'Individual Results\n'
@@ -53,16 +60,14 @@ def main():
     # Set up hyperparameters
     batch_size = 64
     learning_rates = [5e-5, 5e-6, 1e-6, 5e-7]
-    epochs = [125, 250, 500, 1000, 2500]
+    epochs = [125, 250, 500, 1000, 2000]
     optim_fn = torch.optim.Adam
     loss_fn = nn.BCEWithLogitsLoss()
 
     # Prepare data loaders
-    train_set, eval_set, test_set = split_augmented_data(data, augmentation_factor=5, split=(0.75, 0.15, 0.1))
+    train_set, test_set = patient_wise_train_test_splitter(data, n=3)
     training_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0,
                                                   drop_last=(True if len(train_set) % batch_size == 1 else False))
-    evaluation_loader = torch.utils.data.DataLoader(eval_set, batch_size=batch_size, shuffle=False, num_workers=0,
-                                                    drop_last=(True if len(eval_set) % batch_size == 1 else False))
     testing_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0,
                                                  drop_last=(True if len(test_set) % batch_size == 1 else False))
 
@@ -70,12 +75,6 @@ def main():
     individual_training_loss = []
     ensemble_training_loss = []
     parallel_training_loss = []
-    individual_eval_losses = []
-    ensemble_eval_loss = []
-    parallel_eval_loss = []
-    individual_eval_scores = []
-    ensemble_eval_scores = []
-    parallel_eval_scores = []
     individual_test_scores = []
     ensemble_test_scores = []
     parallel_test_scores = []
@@ -101,14 +100,6 @@ def main():
         individual_training_loss.append(data.stack_height * [[]])
         ensemble_training_loss.append([])
         parallel_training_loss.append([])
-
-        individual_eval_losses.append(data.stack_height * [[]])
-        ensemble_eval_loss.append([])
-        parallel_eval_loss.append([])
-
-        individual_eval_scores.append(data.stack_height * [[]])
-        ensemble_eval_scores.append([])
-        parallel_eval_scores.append([])
 
         individual_test_scores.append(data.stack_height * [[]])
         ensemble_test_scores.append([])
@@ -158,86 +149,6 @@ def main():
             ensemble_training_loss[-1].append(ensemble_loss / len(train_set))
             parallel_training_loss[-1].append(parallel_loss / len(train_set))
 
-            # Validation
-            individual_losses = data.stack_height * [0]
-            ensemble_loss = 0
-            parallel_loss = 0
-            # Iterate through dataloader
-            with torch.no_grad():
-                psuedo_loaders = data.stack_height * [[]]  # For scoring
-                individual_output_loader = []
-                feature_loader = []
-                for x, target in evaluation_loader:
-                    # Put onto GPU if not
-                    if torch.cuda.is_available():
-                        x = x.cuda() if x.device.type != 'cuda' else x
-                        target = target.cuda() if target.device.type != 'cuda' else target
-                    # Mode-wise models (for individual and ensemble architectures)
-                    # Get feature maps, avg, and flatten (just like in the whole model)
-                    features = [model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
-                                for ch, model in enumerate(models)]
-                    feature_loader.append((torch.cat(features, dim=1).detach(), target))
-
-                    # Get final output for each model
-                    [optimizer.zero_grad() for optimizer in optimizers]
-                    outs = []
-                    for ch, (model, pl) in enumerate(zip(models, psuedo_loaders)):
-                        outs.append(model(x[:, ch].squeeze(1)))
-                        # Make a psuedo-loader for each model to use for scoring
-                        pl.append((x[:, ch].squeeze(1), target))
-
-                    losses = [loss_fn(out, target.unsqueeze(1)) for out in outs]
-                    for individual_loss, loss in zip(individual_losses, losses):
-                        individual_loss += loss.item()
-
-                    # Make output loader for ensemble model
-                    individual_output_loader.append((torch.cat(outs, dim=1).detach(), target))
-
-                    # Determine ensemble out
-                    ensemble_optimizer.zero_grad()
-                    out = ensemble_combiner(torch.cat(outs, dim=1).detach())
-                    loss = loss_fn(out, target.unsqueeze(1))
-                    ensemble_loss += loss.item()
-
-                    # Feed parallel-extracted features into full classifier
-                    parallel_optimizer.zero_grad()
-                    out = fetc_parallel_classifier(torch.stack(features, dim=1).detach())
-                    loss = loss_fn(out, target.unsqueeze(1))
-                    parallel_loss += loss.item()
-
-            # Update validation losses
-            for il, iel in zip(individual_losses, individual_eval_losses[-1]):
-                iel.append(il / len(eval_set))
-            ensemble_eval_loss[-1].append(ensemble_loss / len(eval_set))
-            parallel_eval_loss[-1].append(parallel_loss / len(eval_set))
-
-            # Update validation scores
-            for score, model, loader in zip(individual_eval_scores[-1], models, psuedo_loaders):
-                score.append(score_model(model, loader))
-            ensemble_eval_scores[-1].append(score_model(ensemble_combiner, individual_output_loader))
-            parallel_eval_scores[-1].append(score_model(fetc_parallel_classifier, feature_loader))
-
-            # Write outputs
-            with open('outputs/individual_results.txt', 'a') as f:
-                f.write(f'LR: {lr} - Epoch: {ep + 1}')
-                for mode, score in zip(data.mode, individual_eval_scores[-1]):
-                    f.write(f'\n{mode}')
-                    for key, item in score[-1].items():
-                        if 'Confusion' not in key:
-                            f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
-
-            with open('outputs/ensemble_results.txt', 'a') as f:
-                f.write(f'LR: {lr} - Epoch: {ep + 1}\n')
-                for key, item in ensemble_eval_scores[-1][-1].items():
-                    if 'Confusion' not in key:
-                        f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
-
-            with open('outputs/parallel_results.txt', 'a') as f:
-                f.write(f'LR: {lr} - Epoch: {ep + 1}\n')
-                for key, item in parallel_eval_scores[-1][-1].items():
-                    if 'Confusion' not in key:
-                        f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
-
             # If we are at a checkpoint epoch
             if ep + 1 in epochs:
                 # Testing
@@ -270,9 +181,20 @@ def main():
 
                 # Update testing scores
                 for score, model, loader in zip(individual_test_scores[-1], models, psuedo_loaders):
-                    score.append(score_model(model, loader))
-                ensemble_test_scores[-1].append(score_model(ensemble_combiner, individual_output_loader))
-                parallel_test_scores[-1].append(score_model(fetc_parallel_classifier, feature_loader))
+                    auc_score, fig = score_model(model, loader, make_plot=True, threshold_type='roc')
+                    score.append(auc_score)
+                    fig.savefig(f'outputs/plots/individual/auc_{model.name}_{ep}_{lr}.png')
+                    plt.close(fig)
+                auc_score, fig = score_model(ensemble_combiner, individual_output_loader,
+                                             make_plot=True, threshold_type='roc')
+                ensemble_test_scores[-1].append(auc_score)
+                fig.savefig(f'outputs/plots/ensemble/auc_ensemble_{ep}_{lr}.png')
+                plt.close(fig)
+                auc_score, fig = score_model(fetc_parallel_classifier, feature_loader,
+                                             make_plot=True, threshold_type='roc')
+                parallel_test_scores[-1].append(auc_score)
+                fig.savefig(f'outputs/plots/parallel/auc_parallel_{ep}_{lr}.png')
+                plt.close(fig)
 
                 # Write outputs
                 with open('outputs/individual_results.txt', 'a') as f:
