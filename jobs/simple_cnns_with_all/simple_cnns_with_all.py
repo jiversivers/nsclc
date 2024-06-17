@@ -89,18 +89,16 @@ def main():
                     total_loss = 0
                     for x, target in train_loader:
                         optimizer.zero_grad()
-                        torch.autograd.set_detect_anomaly(True)
-                        with torch.autograd.detect_anomaly():
-                            with torch.autocast(device_type=device):
-                                out = model(x)
-                                loss = loss_function(out, target)
-                            if torch.cuda.is_available():
-                                scaler.scale(loss.cuda()).backward()
-                                scaler.step(optimizer)
-                                scaler.update()
-                            else:
-                                loss.backward()
-                                optimizer.step()
+                        with torch.autocast(device_type=device):
+                            out = model(x)
+                            loss = loss_function(out, target)
+                        if torch.cuda.is_available():
+                            scaler.scale(loss.cuda()).backward()
+                            scaler.step(optimizer)
+                            scaler.update()
+                        else:
+                            loss.backward()
+                            optimizer.step()
 
                         total_loss += loss.item()
                         train_loss.append(total_loss)
