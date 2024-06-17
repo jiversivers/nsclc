@@ -90,7 +90,7 @@ def main():
                     for x, target in train_loader:
                         with torch.autocast(device_type=device):
                             out = model(x)
-                            loss = loss_function(out, target.unsqueeze(1))
+                            loss = loss_function(out, target.unsqueeze(1), torch.all((~torch.isnan(x)), dim=1))
                         loss.backward()
                         optimizer.step()
                         total_loss += loss.item()
