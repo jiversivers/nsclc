@@ -91,7 +91,7 @@ def main():
                         optimizer.zero_grad()
                         with torch.autocast(device_type=device):
                             out = model(x)
-                            loss = loss_function(out, target)
+                            loss = loss_function(out, target.unsqueeze(1))
                         if torch.cuda.is_available():
                             scaler.scale(loss.cuda()).backward()
                             scaler.step(optimizer)
