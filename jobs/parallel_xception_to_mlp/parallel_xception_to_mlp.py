@@ -187,9 +187,10 @@ def main():
                 itl.append(il / len(train_set))
             ensemble_training_loss[-1].append(ensemble_loss / len(train_set))
             parallel_training_loss[-1].append(parallel_loss / len(train_set))
-            print(f'Epoch: {ep + 1} | Individual Loss: {individual_training_loss[-1]}'
-                  f' | Ensemble Loss: {ensemble_training_loss[-1]}'
-                  f' | Parallel Loss: {parallel_training_loss[-1]}')
+            print(f'Epoch: {ep + 1} | Individual Loss: {individual_training_loss[-1][-1]}'
+                  f' | Ensemble Loss: {ensemble_training_loss[-1][-1]}'
+                  f' | Parallel Loss: {parallel_training_loss[-1][-1]}')
+
             # If we are at a checkpoint epoch
             if ep + 1 in epochs:
                 # Testing
@@ -207,11 +208,12 @@ def main():
                         # Get feature maps, avg, and flatten (just like in the whole model)
                         features = []
                         for ch, model in enumerate(models):
-                            feature = model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
-                            if torch.cuda.is_available():
-                                features.append((torch.cat(feature, dim=1).detach().half(), target))
-                            else:
-                                features.append((torch.cat(feature, dim=1).detach().float(), target))
+                            with autocast(device_type=device):
+                                feature = model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
+                                if torch.cuda.is_available():
+                                    features.append((torch.cat(feature, dim=1).detach().half(), target))
+                                else:
+                                    features.append((torch.cat(feature, dim=1).detach().float(), target))
 
                         # Get final output for each model
                         outs = []
