@@ -43,7 +43,7 @@ def main():
 
     # Set up training functions
     optimizers = {'Adam': [optim.Adam, {}]}
-    loss_function = masked_loss(nn.BCEWithLogitsLoss())
+    loss_function = nn.BCEWithLogitsLoss()
     if torch.cuda.is_available():
         scaler = torch.cuda.amp.GradScaler()
 
