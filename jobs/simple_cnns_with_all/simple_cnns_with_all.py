@@ -92,13 +92,8 @@ def main():
                         with torch.autocast(device_type=device):
                             out = model(x)
                             loss = loss_function(out, target.unsqueeze(1))
-                        if torch.cuda.is_available():
-                            scaler.scale(loss.cuda()).backward()
-                            scaler.step(optimizer)
-                            scaler.update()
-                        else:
-                            loss.backward()
-                            optimizer.step()
+                        loss.backward()
+                        optimizer.step()
 
                         total_loss += loss.item()
                         train_loss.append(total_loss)
