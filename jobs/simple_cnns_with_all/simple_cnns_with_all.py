@@ -1,18 +1,16 @@
 # Import packages
-import torch.optim as optim
-import torch.multiprocessing as mp
-import torch.utils.data
 import os
 
+import torch.multiprocessing as mp
+import torch.optim as optim
+import torch.utils.data
+import torchvision.transforms.v2 as tvt
 from matplotlib import pyplot as plt
 
-from my_modules.nsclc import patient_wise_train_test_splitter
-import torchvision.transforms.v2 as tvt
-
 from my_modules.custom_models import *
-from my_modules.model_learning import train_epoch, valid_epoch, masked_loss
-from my_modules.model_learning.loader_maker import split_augmented_data
+from my_modules.model_learning import train_epoch, masked_loss
 from my_modules.model_learning.model_metrics import score_model
+from my_modules.nsclc import patient_wise_train_test_splitter
 from my_modules.nsclc.nsclc_dataset import NSCLCDataset
 
 
@@ -24,8 +22,9 @@ def main():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # Prepare data
-    data = NSCLCDataset('data/NSCLC_Data_for_ML', ['all'], device='cpu',
-                        label='Metastases', mask_on=True)
+    data = NSCLCDataset('data/NSCLC_Data_for_ML',
+                        ['orr', 'g', 's', 'photons', 'tau1', 'tau2', 'alpha1', 'alpha2', 'taumean', 'boundfraction'],
+                        device='cpu', label='Metastases', mask_on=True)
     data.normalize_channels('preset')
     data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
                                    tvt.RandomHorizontalFlip(p=0.25),
@@ -37,10 +36,6 @@ def main():
     data_split = [0.8, 0.15, 0.05]
     set_lengths = [round(len(data) * fraction) for fraction in data_split]
     set_lengths[-1] = (set_lengths[-1] - 1 if np.sum(set_lengths) > len(data) else set_lengths[-1])
-    if torch.cuda.is_available():
-        workers = [0, 0, 0]
-    else:
-        workers = [round(0.75 * mp.cpu_count() * fraction) for fraction in data_split]
 
     # Set up hyperparameters
     epochs = [125, 250, 500, 1000]
@@ -49,6 +44,8 @@ def main():
     # Set up training functions
     optimizers = {'Adam': [optim.Adam, {}]}
     loss_function = masked_loss(nn.BCEWithLogitsLoss())
+    if torch.cuda.is_available():
+        scaler = torch.cuda.amp.GradScaler()
 
     # Model zoo for images
     models = [CNNet, RegularizedCNNet, ParallelCNNet, RegularizedParallelCNNet]
@@ -89,10 +86,22 @@ def main():
                 for ep in range(epochs[-1]):
                     # Train
                     model.train()
-                    with torch.autocast(device_type=device):
-                        train_loss.append(
-                            train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=True))
+                    total_loss = 0
+                    for x, target in train_loader:
+                        optimizer.zero_grad()
+                        with torch.autocast(device_type=device):
+                            out = model(x)
+                            loss = loss_function(out, target, torch.all((~torch.isnan(x)), dim=1))
+                        if torch.cuda.is_available():
+                            scaler.scale(loss.cuda()).backward()
+                            scaler.step(optimizer)
+                            scaler.update()
+                        else:
+                            loss.backward()
+                            optimizer.step()
 
+                        total_loss += loss.item()
+                        train_loss.append(total_loss)
                     # Test
                     if ep + 1 in epochs:
                         torch.save(model.state_dict(), f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.pth')
@@ -102,7 +111,7 @@ def main():
                             scores, fig = score_model(model, test_loader,
                                                       print_results=True, make_plot=True,threshold_type='roc')
                         fig.savefig(f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.png')
-                        plt.close(fig)
+                        plt.close('all')
 
                         with open(results_file_path, 'a') as f:
                             f.write(f'\n>>> {model.name} for {ep + 1} epochs with learning rate of {lr}\n')
