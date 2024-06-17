@@ -89,16 +89,18 @@ def main():
                     total_loss = 0
                     for x, target in train_loader:
                         optimizer.zero_grad()
-                        with torch.autocast(device_type=device):
-                            out = model(x)
-                            loss = loss_function(out, target, torch.all((~torch.isnan(x)), dim=1))
-                        if torch.cuda.is_available():
-                            scaler.scale(loss.cuda()).backward()
-                            scaler.step(optimizer)
-                            scaler.update()
-                        else:
-                            loss.backward()
-                            optimizer.step()
+                        torch.autograd.set_detect_anomaly(True)
+                        with torch.autograd.detect_anomaly():
+                            with torch.autocast(device_type=device):
+                                out = model(x)
+                                loss = loss_function(out, target, torch.all((~torch.isnan(x)), dim=1))
+                            if torch.cuda.is_available():
+                                scaler.scale(loss.cuda()).backward()
+                                scaler.step(optimizer)
+                                scaler.update()
+                            else:
+                                loss.backward()
+                                optimizer.step()
 
                         total_loss += loss.item()
                         train_loss.append(total_loss)
@@ -107,10 +109,8 @@ def main():
                         torch.save(model.state_dict(), f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.pth')
                         print(
                             f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
-                        torch.autograd.set_detect_anomaly(True)
                         with torch.autocast(device_type=device):
-                            with torch.autograd.detect_anomaly():
-                                scores, fig = score_model(model, test_loader,
+                            scores, fig = score_model(model, test_loader,
                                                       print_results=True, make_plot=True, threshold_type='roc')
                         fig.savefig(f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.png')
                         plt.close('all')
