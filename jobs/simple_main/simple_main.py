@@ -41,7 +41,7 @@ def main():
 
     # Set up hyperparameters
     epochs = [125, 250, 500, 1000]
-    learning_rates = [0.01, 0.001, 0.0001, 0.00001]
+    learning_rates = [1e-6]
 
     # Set up training functions
     optimizers = {'Adam': [optim.Adam, {}]}

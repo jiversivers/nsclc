@@ -8,7 +8,6 @@ import torchvision.transforms.v2 as tvt
 from matplotlib import pyplot as plt
 
 from my_modules.custom_models import *
-from my_modules.model_learning import train_epoch, masked_loss
 from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import patient_wise_train_test_splitter
 from my_modules.nsclc.nsclc_dataset import NSCLCDataset
@@ -39,7 +38,7 @@ def main():
 
     # Set up hyperparameters
     epochs = [125, 250, 500, 1000]
-    learning_rates = [1e-4, 1e-5, 1e-6]
+    learning_rates = [1e-6]
 
     # Set up training functions
     optimizers = {'Adam': [optim.Adam, {}]}
