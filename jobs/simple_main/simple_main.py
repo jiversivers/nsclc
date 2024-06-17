@@ -1,18 +1,16 @@
 # Import packages
-import torch.optim as optim
-import torch.multiprocessing as mp
-import torch.utils.data
 import os
 
+import torch.multiprocessing as mp
+import torch.optim as optim
+import torch.utils.data
+import torchvision.transforms.v2 as tvt
 from matplotlib import pyplot as plt
 
-from my_modules.nsclc import patient_wise_train_test_splitter
-import torchvision.transforms.v2 as tvt
-
 from my_modules.custom_models import *
-from my_modules.model_learning import train_epoch, valid_epoch, masked_loss
-from my_modules.model_learning.loader_maker import split_augmented_data
+from my_modules.model_learning import masked_loss
 from my_modules.model_learning.model_metrics import score_model
+from my_modules.nsclc import patient_wise_train_test_splitter
 from my_modules.nsclc.nsclc_dataset import NSCLCDataset
 
 
@@ -40,7 +38,7 @@ def main():
     set_lengths[-1] = (set_lengths[-1] - 1 if np.sum(set_lengths) > len(data) else set_lengths[-1])
 
     # Set up hyperparameters
-    epochs = [125, 250, 500, 1000]
+    epochs = [125, 250, 500, 1000, 2000]
     learning_rates = [1e-6]
 
     # Set up training functions
@@ -88,9 +86,8 @@ def main():
                     model.train()
                     total_loss = 0
                     for x, target in train_loader:
-                        with torch.autocast(device_type=device):
-                            out = model(x)
-                            loss = loss_function(out, target.unsqueeze(1), torch.all((~torch.isnan(x)), dim=1))
+                        out = model(x)
+                        loss = loss_function(out, target.unsqueeze(1), torch.all((~torch.isnan(x)), dim=1))
                         loss.backward()
                         optimizer.step()
                         total_loss += loss.item()
@@ -158,9 +155,8 @@ def main():
                     model.train()
                     total_loss = 0
                     for x, target in train_loader:
-                        with torch.autocast(device_type=device):
-                            out = model(x)
-                            loss = loss_function(out, target.unsqueeze(1))
+                        out = model(x)
+                        loss = loss_function(out, target.unsqueeze(1))
                         loss.backward()
                         optimizer.step()
                         total_loss += loss.item()

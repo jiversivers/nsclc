@@ -37,7 +37,7 @@ def main():
     set_lengths[-1] = (set_lengths[-1] - 1 if np.sum(set_lengths) > len(data) else set_lengths[-1])
 
     # Set up hyperparameters
-    epochs = [125, 250, 500, 1000]
+    epochs = [125, 250, 500, 1000, 2000]
     learning_rates = [1e-6]
 
     # Set up training functions
@@ -88,9 +88,8 @@ def main():
                     total_loss = 0
                     for x, target in train_loader:
                         optimizer.zero_grad()
-                        with torch.autocast(device_type=device):
-                            out = model(x)
-                            loss = loss_function(out, target.unsqueeze(1))
+                        out = model(x)
+                        loss = loss_function(out, target.unsqueeze(1))
                         loss.backward()
                         optimizer.step()
 
