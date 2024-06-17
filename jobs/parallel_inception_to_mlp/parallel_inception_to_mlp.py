@@ -198,7 +198,8 @@ def main():
                         for ch, model in enumerate(models):
                             with autocast(device_type=device):
                                 feature = model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
-                            features.append((torch.cat(feature, dim=1).detach(), target))
+                            features.append(feature)
+                        feature_loader.append((torch.cat(features, dim=1).detach(), target))
 
                         # Get final output for each model
                         outs = []
