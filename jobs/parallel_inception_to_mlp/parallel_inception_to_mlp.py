@@ -206,11 +206,12 @@ def main():
                         # Get feature maps, avg, and flatten (just like in the whole model)
                         features = []
                         for ch, model in enumerate(models):
-                            feature = model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
-                            if torch.cuda.is_available():
-                                features.append((torch.cat(feature, dim=1).detach().half(), target))
-                            else:
-                                features.append((torch.cat(feature, dim=1).detach().float(), target))
+                            with autocast(device_type=device):
+                                feature = model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
+                                if torch.cuda.is_available():
+                                    features.append((torch.cat(feature, dim=1).detach().half(), target))
+                                else:
+                                    features.append((torch.cat(feature, dim=1).detach().float(), target))
 
                         # Get final output for each model
                         outs = []
