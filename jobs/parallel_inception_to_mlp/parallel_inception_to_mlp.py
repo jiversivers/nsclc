@@ -208,7 +208,7 @@ def main():
                                 out = model(x[:, ch].squeeze(1))
                             outs.append(out)
                             # Make a psuedo-loader for each individual model to use for scoring
-                            loader.append(x[:, ch].unsqueeze(1), target)
+                            loader.append((x[:, ch].unsqueeze(1), target))
 
                         # Make output loader for ensemble model
                         individual_output_loader.append((torch.cat(outs, dim=1).detach(), target))
