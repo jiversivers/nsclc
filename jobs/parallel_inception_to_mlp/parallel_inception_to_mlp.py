@@ -118,9 +118,6 @@ def main():
             parallel_loss = 0
             # Iterate through dataloader
             for x, target in training_loader:
-                if torch.cuda.is_available():
-                    x, target = x.to(torch.float16), target.to(torch.float16)
-
                 # Mode-wise models (for individual and ensemble architectures)
                 with torch.no_grad():
                     # Get feature maps, avg, and flatten (just like in the whole model)
@@ -128,22 +125,15 @@ def main():
                     for ch, model in enumerate(models):
                         with autocast(device_type=device):
                             feature = model.flat(model.global_avg_pool(model.get_features(x[:, ch])))
-                            if torch.cuda.is_available():
-                                features.append(feature.half())
-                            else:
-                                features.append(feature.float())
-
+                        features.append(feature)
                 # Get final output for each model and do backprop
                 outs = []
                 for ch, (optimizer, model) in enumerate(zip(individual_optimizers, models)):
                     optimizer.zero_grad()
                     with autocast(device_type=device):
                         out = model(x[:, ch].squeeze(1))
-                        if torch.cuda.is_available():
-                            outs.append(out.half())
-                        else:
-                            outs.append(out.float())
                         loss = loss_fn(out, target.unsqueeze(1))
+                    outs.append(out)
                     individual_losses[ch] += loss.item()
                     if torch.cuda.is_available():
                         scaler.scale(loss.cuda()).backward()
@@ -200,18 +190,15 @@ def main():
                     for x, target in testing_loader:
                         # Put onto GPU if not
                         if torch.cuda.is_available():
-                            x = x.half().cuda()
-                            target = target.half().cuda()
+                            x = x.cuda()
+                            target = target.cuda()
                         # Mode-wise models (for individual and ensemble architectures)
                         # Get feature maps, avg, and flatten (just like in the whole model)
                         features = []
                         for ch, model in enumerate(models):
                             with autocast(device_type=device):
                                 feature = model.flat(model.global_avg_pool(model.get_features(x[:, ch].squeeze(1))))
-                                if torch.cuda.is_available():
-                                    features.append((torch.cat(feature, dim=1).detach().half(), target))
-                                else:
-                                    features.append((torch.cat(feature, dim=1).detach().float(), target))
+                            features.append((torch.cat(feature, dim=1).detach(), target))
 
                         # Get final output for each model
                         outs = []
