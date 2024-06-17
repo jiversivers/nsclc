@@ -21,26 +21,23 @@ def main():
     print(f'Num cores: {mp.cpu_count()}')
     print(f'Num GPUs: {torch.cuda.device_count()}')
     mp.set_start_method('forkserver', force=True)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # Prepare data
-    data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr', 'taumean', 'boundfraction'], device='cpu',
+    data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr', 'taumean', 'boundfraction'], device=torch.device('cpu'),
                         label='Metastases', mask_on=True)
     data.normalize_channels('preset')
     data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
                                    tvt.RandomHorizontalFlip(p=0.25),
                                    tvt.RandomRotation(degrees=(-180, 180))])
-    data.to(device)
+    data.to(torch.device(device))
+    data.augment()
 
     # Dataloader parameters
     batch_size = 32
     data_split = [0.8, 0.15, 0.05]
     set_lengths = [round(len(data) * fraction) for fraction in data_split]
     set_lengths[-1] = (set_lengths[-1] - 1 if np.sum(set_lengths) > len(data) else set_lengths[-1])
-    if torch.cuda.is_available():
-        workers = [0, 0, 0]
-    else:
-        workers = [round(0.75 * mp.cpu_count() * fraction) for fraction in data_split]
 
     # Set up hyperparameters
     epochs = [125, 250, 500, 1000]
@@ -56,7 +53,6 @@ def main():
 
     # region Augmented Images
     # Augment and recreated the dataloaders
-    data.augment()
     train_set, test_set = patient_wise_train_test_splitter(data, n=3)
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0,
                                                drop_last=(True if len(train_set) % batch_size == 1 else False))
@@ -81,7 +77,7 @@ def main():
             for name, (optim_fn, options) in optimizers.items():
                 model = m(data.shape)
                 if torch.cuda.is_available() and not next(model.parameters()).is_cuda:
-                    model.to(device)
+                    model.to(torch.device(device))
                 optimizer = optim_fn(model.parameters(), lr=lr, **options)
                 print(f'Training model {model.name} with learning rate of {lr} with {name} optimizer')
                 print('_____________________________________________________________________________________________\n')
@@ -90,7 +86,15 @@ def main():
                 for ep in range(epochs[-1]):
                     # Train
                     model.train()
-                    train_loss.append(train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=True))
+                    total_loss = 0
+                    for x, target in train_loader:
+                        with torch.autocast(device_type=device):
+                            out = model(x)
+                            loss = loss_function(out, target.unsqueeze(1))
+                        loss.backward()
+                        optimizer.step()
+                        total_loss += loss.item()
+                        train_loss.append(total_loss)
 
                     # Test
                     if ep + 1 in epochs:
@@ -143,26 +147,36 @@ def main():
             for name, (optim_fn, options) in optimizers.items():
                 model = m(data.shape)
                 if torch.cuda.is_available() and not next(model.parameters()).is_cuda:
-                    model.to(device)
+                    model.to(torch.device(device))
                 optimizer = optim_fn(model.parameters(), lr=lr, **options)
                 print(f'Training model {model.name} with learning rate of {lr} with {name} optimizer')
                 print('_____________________________________________________________________________________________\n')
                 # For each epoch
                 train_loss = []
-                eval_loss = []
                 for ep in range(epochs[-1]):
                     # Train
                     model.train()
-                    train_loss.append(train_epoch(model, train_loader, loss_function, optimizer, masked_loss_fn=False))
+                    total_loss = 0
+                    for x, target in train_loader:
+                        with torch.autocast(device_type=device):
+                            out = model(x)
+                            loss = loss_function(out, target.unsqueeze(1))
+                        loss.backward()
+                        optimizer.step()
+                        total_loss += loss.item()
+                        train_loss.append(total_loss)
 
                     # Test
                     if ep + 1 in epochs:
                         torch.save(model.state_dict(), f'aug_hist_models/{data.name}__{model.name}__{lr}_{ep}.pth')
                         print(
                             f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
-                        scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
+                        with torch.autocast(device_type=device):
+                            scores, fig = score_model(model, test_loader,
+                                                      print_results=True, make_plot=True, threshold_type='roc')
                         fig.savefig(f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.png')
                         plt.close(fig)
+                        plt.close('all')
 
                         with open(results_file_path, 'a') as f:
                             f.write(f'\n>>> {model.name} for {ep + 1} epochs with learning rate of {lr}\n')
