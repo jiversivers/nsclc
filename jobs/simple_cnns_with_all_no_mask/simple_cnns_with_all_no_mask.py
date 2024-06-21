@@ -100,9 +100,8 @@ def main():
                         torch.save(model.state_dict(), f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.pth')
                         print(
                             f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
-                        with torch.autocast(device_type=device):
-                            scores, fig = score_model(model, test_loader,
-                                                      print_results=True, make_plot=True,threshold_type='roc')
+                        scores, fig = score_model(model, test_loader,
+                                                  print_results=True, make_plot=True,threshold_type='roc')
                         fig.savefig(f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.png')
                         plt.close('all')
 

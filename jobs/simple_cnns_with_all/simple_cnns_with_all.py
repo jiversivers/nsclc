@@ -24,26 +24,22 @@ def main():
     # Prepare data
     data = NSCLCDataset('data/NSCLC_Data_for_ML',
                         ['orr', 'g', 's', 'photons', 'tau1', 'tau2', 'alpha1', 'alpha2', 'taumean', 'boundfraction'],
-                        device='cpu', label='Metastases', mask_on=True)
+                        device=torch.device('cpu'), label='Metastases', mask_on=True)
     data.normalize_channels('preset')
     data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
                                    tvt.RandomHorizontalFlip(p=0.25),
                                    tvt.RandomRotation(degrees=(-180, 180))])
     data.to(torch.device(device))
-
-    # Dataloader parameters
-    batch_size = 32
-    data_split = [0.8, 0.15, 0.05]
-    set_lengths = [round(len(data) * fraction) for fraction in data_split]
-    set_lengths[-1] = (set_lengths[-1] - 1 if np.sum(set_lengths) > len(data) else set_lengths[-1])
+    data.augment()
 
     # Set up hyperparameters
     epochs = [125, 250, 500, 1000, 2000]
     learning_rates = [1e-6]
+    batch_size = 32
 
     # Set up training functions
     optimizers = {'Adam': [optim.Adam, {}]}
-    loss_function = nn.BCEWithLogitsLoss()
+    loss_function = masked_loss(nn.BCEWithLogitsLoss())
     if torch.cuda.is_available():
         scaler = torch.cuda.amp.GradScaler()
 
@@ -52,7 +48,6 @@ def main():
 
     # region Augmented Images
     # Augment and recreated the dataloaders
-    data.augment()
     train_set, test_set = patient_wise_train_test_splitter(data, n=3)
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0,
                                                drop_last=(True if len(train_set) % batch_size == 1 else False))
@@ -90,20 +85,19 @@ def main():
                     for x, target in train_loader:
                         optimizer.zero_grad()
                         out = model(x)
-                        loss = loss_function(out, target.unsqueeze(1))
+                        loss = loss_function(out, target.unsqueeze(1), torch.all((~torch.isnan(x)), dim=1))
                         loss.backward()
                         optimizer.step()
-
                         total_loss += loss.item()
                         train_loss.append(total_loss)
+
                     # Test
                     if ep + 1 in epochs:
                         torch.save(model.state_dict(), f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.pth')
                         print(
                             f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
-                        with torch.autocast(device_type=device):
-                            scores, fig = score_model(model, test_loader,
-                                                      print_results=True, make_plot=True, threshold_type='roc')
+                        scores, fig = score_model(model, test_loader,
+                                                  print_results=True, make_plot=True, threshold_type='roc')
                         fig.savefig(f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.png')
                         plt.close('all')
 
