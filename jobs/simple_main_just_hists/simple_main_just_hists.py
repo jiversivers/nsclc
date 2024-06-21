@@ -93,7 +93,7 @@ def main():
                         with torch.autocast(device_type=device):
                             scores, fig = score_model(model, test_loader,
                                                       print_results=True, make_plot=True, threshold_type='roc')
-                        fig.savefig(f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.png')
+                        fig.savefig(f'aug_hist_models/{data.name}__{model.name}__{lr}_{ep}.png')
                         plt.close(fig)
                         plt.close('all')
 
