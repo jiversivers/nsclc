@@ -71,8 +71,8 @@ def main():
             running_figs = []
 
             # Training
-            model.train()
             for ep in range(epoch):
+                model.train()
                 # Model the entire loader
                 outs = torch.tensor([]).to(device)
                 targets = torch.tensor([]).to(device)
