@@ -40,6 +40,7 @@ def main():
     data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
                                    tvt.RandomHorizontalFlip(p=0.25),
                                    tvt.RandomRotation(degrees=(-180, 180))])
+    data.augment()
     data.to(device)
 
     batch_size = 64
