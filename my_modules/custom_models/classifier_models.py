@@ -235,8 +235,7 @@ class ParallelRNNet(nn.Module):
         xii = torch.tensor([], device=x.device)
 
         for ii in range(self.dims):
-            xi = self.bn(x[:, ii].unsqueeze(2))
-            xi = xi
+            xi = x[:, ii].unsqueeze(2)
             xi, _ = self.rnn[ii](xi)
             xi = xi[:, -1, :]
             xii = torch.cat((xii, xi), 1)
@@ -272,12 +271,13 @@ class RegularizedParallelRNNet(nn.Module):
         xii = torch.tensor([], device=x.device)
 
         for ii in range(self.dims):
-            xi = x[:, ii].unsqueeze(2)
+            xi = self.bn(x[:, ii].unsqueeze(2))
             xi, _ = self.rnn[ii](xi)
             xi = xi[:, -1, :]
             xii = torch.cat((xii, xi), 1)
 
-        x = self.fc1(xii)
+        x = self.drop(xii)
+        x = self.fc1(x)
         x = self.relu(x)
         x = self.drop(x)
         x = self.fc2(x)
