@@ -195,7 +195,7 @@ def main():
         preds[outs > best_thresh] = 1
         bacs.append(balanced_accuracy_score(targets, preds))
         print(f'>>> {model.name} for fold {fold + 1} -- '
-              f'AUC: {auc[-1]:.4f} | BAC: {100 * bacs[-1]:.2f}%  at threshold: {best_thresh:.4f}.')
+              f'AUC: {aucs[-1]:.4f} | BAC: {100 * bacs[-1]:.2f}%  at threshold: {best_thresh:.4f}.')
 
         # Plot
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 5))
