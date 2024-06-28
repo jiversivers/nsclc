@@ -28,7 +28,7 @@ def main():
 
     #region Set up the dataset
     # Images, no mask (feature extractor will hopefully handle this), normalized_to_max (already is),
-    data = NSCLCDataset('data/NSCLC_Data_for_ML', ['orr', 'taumean', 'boundfraction'], device='cpu',
+    data = NSCLCDataset('NSCLC_Data_for_ML', ['orr', 'taumean', 'boundfraction'], device='cpu',
                         label='Metastases', mask_on=True)
     data.augment()
     data.normalize_channels('preset')
