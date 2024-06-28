@@ -170,7 +170,7 @@ def main():
             training_loss[-1].append(epoch_loss / len(train_folds[fold]))
             scheduler.step(training_loss[-1][-1])
             if scheduler.get_last_lr() != current_lr:
-                current_lr = scheduler.get_lr()
+                current_lr = scheduler.get_last_lr()
                 print(f'Updated LR at {ep + 1} to {current_lr}')
 
             with open('outputs/results.txt', 'a') as results_file:
