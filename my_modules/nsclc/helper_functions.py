@@ -86,3 +86,16 @@ def patient_wise_train_test_splitter(data, n=3):
     test_set = torch.utils.data.Subset(data, test_indices)
     train_set = torch.utils.data.Subset(data, train_indices)
     return train_set, test_set
+
+def subdivide_list(list_to_subdivide, num_parts):
+    length = len(list_to_subdivide)
+    quotient, remainder = divmod(length, num_parts)
+
+    subdivisions = []
+    start = 0
+    for i in range(num_parts):
+        end = start + quotient + (1 if i < remainder else 0)
+        subdivisions.append(list_to_subdivide[start:end])
+        start = end
+
+    return subdivisions
