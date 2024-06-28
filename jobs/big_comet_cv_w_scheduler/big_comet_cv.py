@@ -146,7 +146,7 @@ def main():
         optimizer = optimizer_fn(model.classifier.parameters(), lr=lr, momentum=0.9)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5,
                                                                cooldown=5, min_lr=5e-6)
-        current_lr = scheduler.get_lr()
+        current_lr = lr
 
         # Training
         # Nest iteration lists for tracking model learning
