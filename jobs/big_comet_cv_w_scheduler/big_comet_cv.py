@@ -119,7 +119,7 @@ def main():
     # Hyerparameters
     batch_size = 64
     lr = 0.01
-    optimizer_fn = torch.optim.RMSprop
+    optimizer_fn = torch.optim.Adam
     epochs = 1000
     loss_fn = torch.nn.BCELoss()
 
@@ -143,9 +143,9 @@ def main():
         model.to(device)
 
         # Make optimizer at the current larning rate with only classifier parameters
-        optimizer = optimizer_fn(model.classifier.parameters(), lr=lr, momentum=0.9)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5,
-                                                               cooldown=5, min_lr=5e-6)
+        optimizer = optimizer_fn(model.classifier.parameters(), lr=lr)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3,
+                                                               cooldown=0, min_lr=5e-6)
         current_lr = lr
 
         # Training
@@ -172,6 +172,8 @@ def main():
             if scheduler.get_last_lr() != current_lr:
                 current_lr = scheduler.get_last_lr()
                 print(f'Updated LR at {ep + 1} to {current_lr}')
+                with open('outputs/results.txt', 'a') as results_file:
+                    results_file.write(f'Updated LR at {ep + 1} to {current_lr}')
 
             with open('outputs/results.txt', 'a') as results_file:
                 results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, ')
