@@ -141,20 +141,20 @@ def main():
                                                   batch_size=batch_size, shuffle=False, num_workers=0,
                                                   drop_last=(True if len(test_folds) % batch_size == 1 else False))
 
-        if torch.cuda.is_available() and not next(model.parameters()).is_cuda:
+        if torch.cuda.is_available() and not next(m.parameters()).is_cuda:
             m.to(torch.device(device))
 
-        optimizer = optimizer(model.parameters(), lr=lr)
+        optimizer = optimizer(m.parameters(), lr=lr)
         print(f'Training fold {fold + 1}')
         print('_____________________________________________________________________________________________\n')
         # Train
         training_loss.append([])
-        model.train()
+        m.train()
         for ep in range(epochs):
             total_loss = 0
             for x, target in train_loader:
                 optimizer.zero_grad()
-                out = model(x)
+                out = m(x)
                 loss = loss_function(out, target.unsqueeze(1))
                 loss.backward()
                 optimizer.step()
@@ -164,10 +164,10 @@ def main():
             with open('outputs/results.txt', 'a') as results_file:
                 results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, ')
 
-        torch.save(model.state_dict(), f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}__fold{fold + 1}.pth')
+        torch.save(m.state_dict(), f'aug_img_models/{data.name}__{m.name}__{lr}_{ep}__fold{fold + 1}.pth')
 
         # Testing
-        model.eval()
+        m.eval()
         outs = torch.tensor([])
         targets = torch.tensor([])
         with torch.no_grad():
@@ -175,7 +175,7 @@ def main():
                 if torch.cuda.is_available() and not x.is_cuda:
                     x = x.cuda()
                     target = target.cuda()
-                outs = torch.cat((outs, model(x).cpu().detach()), dim=0)
+                outs = torch.cat((outs, m(x).cpu().detach()), dim=0)
                 targets = torch.cat((targets, target.cpu().detach()), dim=0)
 
         # AUC
@@ -189,7 +189,7 @@ def main():
         preds = torch.zeros_like(outs)
         preds[outs > best_thresh] = 1
         bacs.append(balanced_accuracy_score(targets, preds))
-        print(f'>>> {model.name} for fold {fold + 1} -- '
+        print(f'>>> {m.name} for fold {fold + 1} -- '
               f'AUC: {aucs[-1]:.4f} | BAC: {100 * bacs[-1]:.2f}%  at threshold: {best_thresh:.4f}.')
 
         # Plot
