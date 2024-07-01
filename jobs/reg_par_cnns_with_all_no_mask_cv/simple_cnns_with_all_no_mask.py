@@ -118,6 +118,8 @@ def main():
     results_file_path = 'results.txt'
     with open(results_file_path, 'a') as results_file:
         results_file.write('\nAugmented Images\n')
+    os.makedirs('outputs/plots', exist_ok=True)
+    os.makedirs('outputs/models', exist_ok=True)
 
     # Model path
     try:
@@ -161,7 +163,7 @@ def main():
 
                 total_loss += loss.item()
             training_loss[-1].append(total_loss)
-            with open('outputs/results.txt', 'a') as results_file:
+            with open(results_file_path, 'a') as results_file:
                 results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, ')
 
         torch.save(m.state_dict(), f'aug_img_models/{data.name}__{m.name}__{lr}_{ep}__fold{fold + 1}.pth')
@@ -202,7 +204,7 @@ def main():
         plt.close(fig)
 
         # Write
-        with open('outputs/results.txt', 'a') as f:
+        with open(results_file_path, 'a') as f:
             f.write(f'Fold {fold + 1} -- AUC: {aucs[-1]:.4f}'
                     f' | BAC: {100 * bacs[-1]:.2f}%  at threshold: {best_thresh:.4f}.\n')
 
