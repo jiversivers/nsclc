@@ -117,8 +117,8 @@ def main():
     #endregion
 
     # Hyerparameters
-    batch_size = 8 
-    lr = 0.01
+    batch_size = 8
+    lr = 0.0001
     optimizer_fn = torch.optim.Adam
     epochs = 2500
     loss_fn = torch.nn.BCELoss()
