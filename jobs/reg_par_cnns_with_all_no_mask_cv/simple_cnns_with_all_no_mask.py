@@ -34,16 +34,13 @@ def main():
 
     # Dataloader parameters
     batch_size = 32
-    data_split = [0.8, 0.15, 0.05]
-    set_lengths = [round(len(data) * fraction) for fraction in data_split]
-    set_lengths[-1] = (set_lengths[-1] - 1 if np.sum(set_lengths) > len(data) else set_lengths[-1])
 
     # Set up hyperparameters
-    epochs = 500
+    epochs = 1000
     lr = 1e-6
 
     # Set up training functions
-    optimizer = optim.Adam
+    optim_fn = optim.Adam
     loss_function = nn.BCEWithLogitsLoss()
 
     # Model zoo for images
@@ -79,7 +76,7 @@ def main():
     num_folds = 1
     while dividend / num_folds > 3:
         num_folds += 1
-    print('Number of data folds to ensure at least n=3 per class: {}'.format(num_folds))
+    print('Number of data folds to ensure at least n=3 per class for most classes: {}'.format(num_folds))
 
     # Fold data
     folded_ones = subdivide_list(shuffled_ones, num_folds)
@@ -110,7 +107,7 @@ def main():
 
     for fold, (train, test) in enumerate(zip(train_folds, test_folds)):
         print(f'Final dataset split for fold {fold + 1} - Training set: {len(train)}, Test set: {len(test)}'
-              f' - {len(train) / len(data):0.2f} : {len(test) / len(data):0.2f} ')
+              f' - {len(train) / len(data):0.2f} : {len(test) / len(data):0.2f}')
 
     # endregion
 
@@ -146,7 +143,7 @@ def main():
         if torch.cuda.is_available() and not next(m.parameters()).is_cuda:
             m.to(torch.device(device))
 
-        optimizer = optimizer(m.parameters(), lr=lr)
+        optimizer = optim_fn(m.parameters(), lr=lr)
         print(f'Training fold {fold + 1}')
         print('_____________________________________________________________________________________________\n')
         # Train
@@ -164,7 +161,7 @@ def main():
                 total_loss += loss.item()
             training_loss[-1].append(total_loss)
             with open(results_file_path, 'a') as results_file:
-                results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, ')
+                results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1] / len(train_folds[fold]):.4f}')
 
         torch.save(m.state_dict(), f'aug_img_models/{data.name}__{m.name}__{lr}_{ep}__fold{fold + 1}.pth')
 
