@@ -117,10 +117,10 @@ def main():
     #endregion
 
     # Hyerparameters
-    batch_size = 64
+    batch_size = 8 
     lr = 0.01
     optimizer_fn = torch.optim.Adam
-    epochs = 1000
+    epochs = 2500
     loss_fn = torch.nn.BCELoss()
 
     training_loss = []
@@ -144,8 +144,7 @@ def main():
 
         # Make optimizer at the current larning rate with only classifier parameters
         optimizer = optimizer_fn(model.classifier.parameters(), lr=lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3,
-                                                               cooldown=0, min_lr=5e-6)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, cooldown=0, min_lr=5e-9):
         current_lr = lr
 
         # Training
@@ -231,6 +230,7 @@ def main():
     print(f'Mean AUC -- from AUCS: {np.mean(aucs):.4f} -- from rates: {mean_auc:.4f} | Std.Dev. AUCS: {std_auc:.4f}')
 
     # Plot
+    plt.close('all')
     plt.plot(mean_fpr, mean_tpr, color='blue', lw=5, alpha=0.8,
              label=f'Mean ROC (AUC = {mean_auc:.2f} ± {std_auc:.2f})')
     for tpr in tprs:
