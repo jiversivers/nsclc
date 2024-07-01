@@ -144,7 +144,7 @@ def main():
 
         # Make optimizer at the current larning rate with only classifier parameters
         optimizer = optimizer_fn(model.classifier.parameters(), lr=lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, cooldown=0, min_lr=5e-9):
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, cooldown=0, min_lr=5e-9)
         current_lr = lr
 
         # Training
