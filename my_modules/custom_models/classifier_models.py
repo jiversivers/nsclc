@@ -525,15 +525,31 @@ class MPMShallowClassifier(nn.Module):
 
 
 class FeatureExtractorToClassifier(nn.Module):
-    def __init__(self, input_size, feature_extractor, classifier=CometClassifier, layer='conv2d_7b'):
+    def __init__(self, input_size, feature_extractor, classifier=CometClassifier, layer=None):
         super().__init__()
         self.input_size = input_size
-        self.feature_extractor = feature_extractor
-        self.layer = [layer] if type(layer) is not list else layer
-        self._layer_for_eval = ''.join(['.' + lay for lay in self.layer])
+
+        # Parse input layer
+        if layer is not None:
+            self.layer = layer
+        else:
+            self.layer = list(feature_extractor.named_children())[-1][0]
+        # self._layer_for_eval = ''.join(['.' + lay for lay in self.layer])
+
+        # Isolate the feature extractor params through the input layer
+        self.feature_extractor_params = nn.Module()
+        reached_layer = False
+        for name, module in feature_extractor.named_children():
+            if name is self.layer:
+                reached_layer = True
+            elif reached_layer:
+                break
+            setattr(self.feature_extractor_params, name, module)
+
         self.exception_list = []
 
         # Dry run for feature dims
+        self.feature_extractor = feature_extractor
         self.feature_map_dims = self.get_features(
             torch.rand(1, *self.input_size, device=next(feature_extractor.parameters()).device)).shape
 
@@ -546,11 +562,11 @@ class FeatureExtractorToClassifier(nn.Module):
             self.classifier = classifier((self.feature_map_dims[1]))
 
             # Put init classifier onto same device as feature extractor
-            self.classifier.to(next(self.feature_extractor.parameters()).device)
+            self.classifier.to(next(self.feature_extractor_params.parameters()).device)
         else:
             self.classifier = classifier
             # Check for device compatibility
-            if next(self.classifier.parameters()).device != next(self.feature_extractor.parameters()).device:
+            if next(self.classifier.parameters()).device != next(self.feature_extractor_params.parameters()).device:
                 warnings.warn('Model classifier and feature extractor appear to be on different devices.',
                               RuntimeWarning)
 
@@ -559,7 +575,7 @@ class FeatureExtractorToClassifier(nn.Module):
     def forward(self, x):
         # Force input to match device and store original to put it back from where it came
         input_device = x.device
-        x.to(next(self.feature_extractor.parameters()).device)
+        x.to(next(self.feature_extractor_params.parameters()).device)
 
         # Extract features with nan-masking as 0
         x[torch.isnan(x)] = 0
@@ -580,15 +596,16 @@ class FeatureExtractorToClassifier(nn.Module):
 
         # Create hook for feature extraction
         def hook(model, input, output):
-            get['features'] = output.detach()
+            get['features'] = output
             return
 
         # Set hook in feature extractor
-        fh = eval(f'self.feature_extractor{self._layer_for_eval}.register_forward_hook(hook, always_call=True)')
+        fh = getattr(self.feature_extractor, self.layer).register_forward_hook(hook, always_call=True)
+        # fh = eval(f'self.feature_extractor_params{self._layer_for_eval}.register_forward_hook(hook, always_call=True)')
 
         # Get the features from the specified layer via the hook, even if the image is "too small" for the final avg filter
         try:
-            x.to(next(self.feature_extractor.parameters()).device)
+            x.to(next(self.feature_extractor_params.parameters()).device)
             _ = self.feature_extractor(x)
         except Exception as e:
             # Print the first occurrence of the error type
@@ -611,8 +628,8 @@ class FeatureExtractorToClassifier(nn.Module):
             remove_duplicate: bool = True
     ) -> Iterator[Tuple[str, Parameter]]:
         # Add feature extractor params
-        for name, param in self.feature_extractor.named_parameters(prefix='feature_extractor',
-                                                                   recurse=recurse, remove_duplicate=remove_duplicate):
+        for name, param in self.feature_extractor_params.named_parameters(prefix='feature_extractor',
+                                                                          recurse=recurse, remove_duplicate=remove_duplicate):
             yield name, param
 
         # Add classifier parameters
@@ -621,7 +638,7 @@ class FeatureExtractorToClassifier(nn.Module):
             yield name, param
 
     def to(self, device):
-        self.feature_extractor.to(device)
+        self.feature_extractor_params.to(device)
         self.global_avg_pool.to(device)
         self.flat.to(device)
         self.classifier.to(device)
