@@ -119,7 +119,7 @@ def main():
 
     # Hyerparameters
     batch_size = 21
-    lr = 5e-4
+    lr = 5e-6
     optimizer_fn = torch.optim.RMSprop
     total_epochs = 1500
     cutoff_epochs = [1000, 1250]
@@ -144,30 +144,42 @@ def main():
                      layer='conv2d_7b')
         model.to(device)
 
-        # Make optimizer at the current larning rate with only classifier parameters
+        # Make initial optimizer with only classifier parameters
         optimizer = optimizer_fn(model.classifier.parameters(), lr=lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, cooldown=0, min_lr=5e-9)
-        current_lr = lr
 
         # Training
         # Nest iteration lists for tracking model learning
         training_loss.append([])
         for ep in range(total_epochs):
             # Adjust training params at cutoffs
-            # Add last Inception-C block to trainable at first cutoff
+            # Make Inception-C block  trainable at first cutoff
             if ep + 1 == cutoff_epochs[0]:
                 for name, param in model.named_parameters():
                     if 'block8' in name or 'conv2d_7b' in name:
                         param.requires_grad = True
                         optimizer.param_groups[0]['params'].append(param)
-                        print('Now allowing training of Inception-C')
-            # Add full inception feature extractor to trainable at last cutoff
+                # Reset optimizer LR and scheduler
+                optimizer.param_groups[0]['lr'] = lr
+                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                                       mode='min', factor=0.1,
+                                                                       patience=5, min_lr=5e-9)
+                with open('outputs/results.txt', 'a') as results_file:
+                    results_file.write('\nNow allowing training of Inception-C')
+                print('Now allowing training of Inception-C')
+            # Make full inception feature extractor trainable at last cutoff
             elif ep + 1 == cutoff_epochs[1]:
                 for name, param in model.named_parameters():
                     if 'feature_extractor' in name:
                         param.requires_grad = True
                         optimizer.param_groups[0]['params'].append(param)
-                        print('Now allowing full model training')
+                # Reset optimizer LR and scheduler
+                optimizer.param_groups[0]['lr'] = lr
+                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                                       mode='min', factor=0.1,
+                                                                       patience=5, min_lr=5e-9)
+                with open('outputs/results.txt', 'a') as results_file:
+                    results_file.write('\nNow allowing full model training')
+                print('Now allowing full model training')
 
             # Training
             epoch_loss = 0
@@ -185,13 +197,15 @@ def main():
                 optimizer.step()
                 epoch_loss += loss.item()
             training_loss[-1].append(epoch_loss / len(train_folds[fold]))
-            scheduler.step(training_loss[-1][-1])
-            if scheduler.get_last_lr() != current_lr:
-                current_lr = scheduler.get_last_lr()
-                print(f'Updated LR at {ep + 1} to {current_lr}')
-                with open('outputs/results.txt', 'a') as results_file:
-                    results_file.write(f'Updated LR at {ep + 1} to {current_lr}')
-
+            try:
+                scheduler.step(training_loss[-1][-1])
+                if scheduler.get_last_lr() != current_lr:
+                    current_lr = scheduler.get_last_lr()
+                    print(f'Updated LR at {ep + 1} to {current_lr}')
+                    with open('outputs/results.txt', 'a') as results_file:
+                        results_file.write(f'\nUpdated LR at {ep + 1} to {current_lr}')
+            except Exception as e:
+                pass
             with open('outputs/results.txt', 'a') as results_file:
                 results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, ')
 
