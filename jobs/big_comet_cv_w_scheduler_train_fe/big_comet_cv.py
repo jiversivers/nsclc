@@ -103,26 +103,18 @@ def main():
 
     #endregion
 
-    #region Prepare model
-    # Define our base feature extractor and turn the gradients off -- we won't train it, just use it to feed our MLP.
-    feature_extractor = inceptionresnetv2(num_classes=1001, pretrained=False)
-
-    # Load pretrained from download
-    feature_extractor.load_state_dict(
-        torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth'))
-    for params in feature_extractor.parameters():
-        params.requires_grad = False
+    # Define our base feature extractor
+    backbone = inceptionresnetv2
 
     # Define base classifier
     classifier = CometClassifierWithBinaryOutput
-    #endregion
 
     # Hyerparameters
     batch_size = 21
-    lr = 5e-6
+    lr = 1e-5
     optimizer_fn = torch.optim.RMSprop
-    total_epochs = 1500
-    cutoff_epochs = [1000, 1250]
+    total_epochs = 500
+    cutoff_epochs = [250, 400]
     loss_fn = torch.nn.BCELoss()
 
     training_loss = []
@@ -140,6 +132,13 @@ def main():
                                                   drop_last=(True if len(test_folds) % batch_size == 1 else False))
 
         # Init full model
+        feature_extractor = backbone(num_classes=1001, pretrained=False)
+
+        # Load pretrained from download
+        feature_extractor.load_state_dict(
+            torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth'))
+        for params in feature_extractor.parameters():
+            params.requires_grad = False
         model = FETC(data.shape, feature_extractor=feature_extractor, classifier=classifier,
                      layer='conv2d_7b')
         model.to(device)
