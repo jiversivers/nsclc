@@ -79,7 +79,7 @@ def main():
 
     train_folds = []
     test_folds = []
-    for fold in range(4):
+    for fold in range(num_folds):
         # Get subsets for this fold
         train_subjects = []
         for sub in range(num_folds):
