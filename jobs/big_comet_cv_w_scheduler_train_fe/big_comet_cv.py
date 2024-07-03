@@ -65,8 +65,8 @@ def main():
 
     # Determine number of folds such that at least 3 unique patients from each class can be present in all folds
     dividend = len(shuffled_zeros) if len(shuffled_zeros) < len(shuffled_ones) else len(shuffled_ones)
-    num_folds = 1
-    while dividend / num_folds > 3:
+    num_folds = 0
+    while dividend / (num_folds  + 1) > 3:
         num_folds += 1
     print('Number of data folds to ensure at least n=3 per class: {}'.format(num_folds))
 
@@ -113,8 +113,8 @@ def main():
     batch_size = 64
     lr = 1e-5
     optimizer_fn = torch.optim.Adam
-    total_epochs = 1000
-    cutoff_epochs = [150, 750]
+    total_epochs = 350
+    cutoff_epochs = [150, 250]
     loss_fn = torch.nn.BCELoss()
 
     training_loss = []
@@ -161,7 +161,7 @@ def main():
                 optimizer.param_groups[0]['lr'] = lr
                 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                                                        mode='min', factor=0.1,
-                                                                       patience=5, min_lr=5e-9)
+                                                                       patience=5, min_lr=1e-9)
                 with open('outputs/results.txt', 'a') as results_file:
                     results_file.write('\nNow allowing training of Inception-C')
                 print('Now allowing training of Inception-C')
@@ -175,7 +175,7 @@ def main():
                 optimizer.param_groups[0]['lr'] = lr
                 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                                                        mode='min', factor=0.1,
-                                                                       patience=5, min_lr=5e-9)
+                                                                       patience=5, min_lr=1e-9)
                 with open('outputs/results.txt', 'a') as results_file:
                     results_file.write('\nNow allowing full model training')
                 print('Now allowing full model training')
@@ -208,12 +208,6 @@ def main():
             with open('outputs/results.txt', 'a') as results_file:
                 results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, ')
 
-        plt.close('all')
-        plt.plot(range(total_epochs), training_loss[-1])
-        plt.axvline(cutoff_epochs[0], 0, 1, linestyle='dashed')
-        plt.axvline(cutoff_epochs[1], 0, 1, linestyle='dashed')
-        plt.savefig(f'outputs/plots/training_loss__Fold{fold +1}.png')
-        plt.close('all')
         torch.save(model.state_dict(), f'outputs/models/{data.name}__{model.name}__{lr}_{ep}__Fold{fold + 1}.pth')
 
         # Testing
@@ -243,12 +237,18 @@ def main():
               f'AUC: {aucs[-1]:.4f} | BAC: {100 * bacs[-1]:.2f}%  at threshold: {best_thresh:.4f}.')
 
         # Plot
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 5))
-        RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=aucs[-1]).plot(ax=ax1)
-        ax1.set_title(f'ROC for Fold {fold + 1}')
-        ConfusionMatrixDisplay.from_predictions(targets, preds).plot(ax=ax2)
-        ax2.set_title(f'Confusion Matrix for Fold {fold + 1}')
-        fig.savefig(f'outputs/plots/fold{fold + 1}_roc_big-comet.png')
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(90, 15))
+        fig.suptitle(f'Fold {fold + 1}')
+        ax1.plot(range(total_epochs), training_loss[-1])
+        ax1.axvline(cutoff_epochs[0], 0, 1, linestyle='dashed')
+        ax1.axvline(cutoff_epochs[1], 0, 1, linestyle='dashed')
+        ax1.set_title('Training Loss')
+        RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=aucs[-1]).plot(ax=ax2)
+        ax2.axline((0, 0), slope=1, linestyle='dashed')
+        ax2.set_title(f'Receiver Operating Characteristic')
+        ConfusionMatrixDisplay.from_predictions(targets, preds).plot(ax=ax3)
+        ax3.set_title(f'Confusion Matrix')
+        fig.savefig(f'outputs/plots/fold{fold + 1}__big-comet.png')
         plt.close('all')
 
         # Write
