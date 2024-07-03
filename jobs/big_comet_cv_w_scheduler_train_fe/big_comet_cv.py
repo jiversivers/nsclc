@@ -209,7 +209,7 @@ def main():
                 results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, ')
 
         plt.plot(range(total_epochs), training_loss[-1])
-        plt.axvline(cutoff_epochs, 0, 1, linestyle='dashed')
+        plt.vlines(cutoff_epochs, 0, 1, linestyle='dashed')
         plt.savefig(f'outputs/plots/training_loss__Fold{fold +1}.png')
         plt.close()
         torch.save(model.state_dict(), f'outputs/models/{data.name}__{model.name}__{lr}_{ep}__Fold{fold + 1}.pth')
