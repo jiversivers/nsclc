@@ -113,8 +113,8 @@ def main():
     batch_size = 64
     lr = 5e-6
     optimizer_fn = torch.optim.Adam
-    total_epochs = 550
-    cutoff_epochs = [250, 400]
+    total_epochs = 500
+    cutoff_epochs = [300, 400]
     loss_fn = torch.nn.BCELoss()
 
     training_loss = []
@@ -209,7 +209,8 @@ def main():
                 results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, ')
 
         plt.plot(range(total_epochs), training_loss[-1])
-        plt.vlines(cutoff_epochs, 0, 1, linestyle='dashed')
+        plt.axvline(cutoff_epochs[0], 0, 1, linestyle='dashed')
+        plt.axvline(cutoff_epochs[1], 0, 1, linestyle='dashed')
         plt.savefig(f'outputs/plots/training_loss__Fold{fold +1}.png')
         plt.close()
         torch.save(model.state_dict(), f'outputs/models/{data.name}__{model.name}__{lr}_{ep}__Fold{fold + 1}.pth')
