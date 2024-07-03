@@ -1,5 +1,6 @@
 import os
 import random
+import traceback
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -66,7 +67,7 @@ def main():
     # Determine number of folds such that at least 3 unique patients from each class can be present in all folds
     dividend = len(shuffled_zeros) if len(shuffled_zeros) < len(shuffled_ones) else len(shuffled_ones)
     num_folds = 0
-    while dividend / (num_folds  + 1) > 3:
+    while dividend / (num_folds + 1) > 3:
         num_folds += 1
     print('Number of data folds to ensure at least n=3 per class: {}'.format(num_folds))
 
@@ -122,6 +123,7 @@ def main():
     bacs = []
     tprs = []
     mean_fpr = np.linspace(0, 1, 100)
+    error_printed = False
     for fold in range(num_folds):
         # Create dataloaders for fold
         train_loader = torch.utils.data.DataLoader(train_folds[fold],
@@ -204,7 +206,11 @@ def main():
                     with open('outputs/results.txt', 'a') as results_file:
                         results_file.write(f'\nUpdated LR at {ep + 1} to {current_lr}')
             except Exception as e:
-                pass
+                if not error_printed:
+                    error_printed = True
+                    print(f'{''.join(traceback.format_tb(e.__traceback__))}\n '
+                          f'Warning {type(e)} error caught during feature extraction\n'
+                          f'{e}')
             with open('outputs/results.txt', 'a') as results_file:
                 results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, ')
 
