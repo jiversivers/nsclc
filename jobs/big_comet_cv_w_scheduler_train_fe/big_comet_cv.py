@@ -111,10 +111,10 @@ def main():
 
     # Hyerparameters
     batch_size = 64
-    lr = 5e-6
+    lr = 1e-5
     optimizer_fn = torch.optim.Adam
-    total_epochs = 500
-    cutoff_epochs = [300, 400]
+    total_epochs = 1000
+    cutoff_epochs = [150, 750]
     loss_fn = torch.nn.BCELoss()
 
     training_loss = []
