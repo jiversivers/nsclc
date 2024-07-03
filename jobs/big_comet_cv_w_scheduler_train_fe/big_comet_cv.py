@@ -208,11 +208,12 @@ def main():
             with open('outputs/results.txt', 'a') as results_file:
                 results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, ')
 
+        plt.close('all')
         plt.plot(range(total_epochs), training_loss[-1])
         plt.axvline(cutoff_epochs[0], 0, 1, linestyle='dashed')
         plt.axvline(cutoff_epochs[1], 0, 1, linestyle='dashed')
         plt.savefig(f'outputs/plots/training_loss__Fold{fold +1}.png')
-        plt.close()
+        plt.close('all')
         torch.save(model.state_dict(), f'outputs/models/{data.name}__{model.name}__{lr}_{ep}__Fold{fold + 1}.pth')
 
         # Testing
@@ -248,7 +249,7 @@ def main():
         ConfusionMatrixDisplay.from_predictions(targets, preds).plot(ax=ax2)
         ax2.set_title(f'Confusion Matrix for Fold {fold + 1}')
         fig.savefig(f'outputs/plots/fold{fold + 1}_roc_big-comet.png')
-        plt.close(fig)
+        plt.close('all')
 
         # Write
         with open('outputs/results.txt', 'a') as f:
@@ -277,7 +278,7 @@ def main():
     plt.title('Receiver Operating Characteristic')
     plt.legend(loc="lower right")
     plt.savefig('outputs/plots/mean_roc_big-comet.png')
-    plt.close()
+    plt.close('all')
 
     # Write
     with open('outputs/results.txt', 'a') as f:
