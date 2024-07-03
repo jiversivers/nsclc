@@ -110,11 +110,11 @@ def main():
     classifier = CometClassifierWithBinaryOutput
 
     # Hyerparameters
-    batch_size = 21
+    batch_size = 32
     lr = 1e-5
     optimizer_fn = torch.optim.RMSprop
-    total_epochs = 500
-    cutoff_epochs = [250, 400]
+    total_epochs = 750
+    cutoff_epochs = [250, 500]
     loss_fn = torch.nn.BCELoss()
 
     training_loss = []
@@ -256,7 +256,7 @@ def main():
     mean_auc = auc(mean_fpr, mean_tpr)
     std_auc = np.std(aucs)
     tprs_upper = np.minimum(mean_tpr + np.std(tprs, axis=0), 1)
-    tprs_lower = np.maximum(mean_tpr - np.std(tprs, axis=0), 1)
+    tprs_lower = np.maximum(mean_tpr - np.std(tprs, axis=0), 0)
 
     print(f'Mean AUC -- from AUCS: {np.mean(aucs):.4f} -- from rates: {mean_auc:.4f} | Std.Dev. AUCS: {std_auc:.4f}')
 
