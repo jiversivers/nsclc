@@ -164,7 +164,7 @@ def main():
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss.item()
-            training_loss[-1].append(epoch_loss / len(train_loader))
+            training_loss[-1].append(epoch_loss / len(train_folds[fold]))
 
             with open('outputs/results.txt', 'a') as results_file:
                 results_file.write(f'\nEpoch {ep + 1}: Train.Loss: {training_loss[-1][-1]:.4f}, ')
