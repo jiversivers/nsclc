@@ -8,8 +8,8 @@ import numpy as np
 
 # Function to load TIFFs
 def load_tiff(load_fns_and_img_paths):
-    X = transforms.ToTensor()(Image.open(load_fns_and_img_paths[1])).to(torch.float32)
-    return X
+    x = transforms.ToTensor()(Image.open(load_fns_and_img_paths[1])).to(torch.float32)
+    return x
 
 
 # Function to load ASCs
@@ -33,10 +33,19 @@ def load_bound_fraction(load_fns_and_img_paths):
     x = torch.tensor([], dtype=torch.float32)
     for fp in load_fns_and_img_paths[1]:
         x = torch.cat((x, torch.unsqueeze(fp[0](fp), dim=0)), dim=0)
-    X = x[1] / (x[0] + x[1])
-    X[X < 0] = 0
-    X[X > 1] = 1
-    return X
+    x = x[1] / (x[0] + x[1])
+    x[x < 0] = 0
+    x[x > 1] = 1
+    return x
+
+
+def load_intensity(load_fns_and_img_paths):
+    x = torch.tensor([], dtype=torch.float32)
+    for fp in load_fns_and_img_paths[1]:
+        x = torch.cat((x, torch.unsqueeze(fp[0](fp), dim=0)), dim=0)
+    x = torch.nanmean(x, dim=0)
+    x[x < 0] = 0
+    return x
 
 
 def convert_mp_to_torch(mp_array, shape,
@@ -45,6 +54,7 @@ def convert_mp_to_torch(mp_array, shape,
     np_array = np.reshape(np_array, shape)
     torch_array = torch.from_numpy(np_array).to(device)
     return torch_array
+
 
 def patient_wise_train_test_splitter(data, n=3):
     # Split data by patients, ensuring n patients per class in test set
@@ -86,6 +96,7 @@ def patient_wise_train_test_splitter(data, n=3):
     test_set = torch.utils.data.Subset(data, test_indices)
     train_set = torch.utils.data.Subset(data, train_indices)
     return train_set, test_set
+
 
 def subdivide_list(list_to_subdivide, num_parts):
     length = len(list_to_subdivide)
