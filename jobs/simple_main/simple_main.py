@@ -95,7 +95,7 @@ def main():
 
                     # Test
                     if ep + 1 in epochs:
-                        torch.save(model.state_dict(), f'aug_img_models/{data.name}__{model.name}__{lr}_{ep}.pth')
+                        torch.save(model.state_dict(), f'aug_hist_models/{data.name}__{model.name}__{lr}_{ep}.pth')
                         print(
                             f'>>> {model.name} for {ep + 1} epochs with learning rate of {lr} using {name} optimizer...')
                         scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
