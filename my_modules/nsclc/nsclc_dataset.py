@@ -7,7 +7,8 @@ from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = None
 
-from .helper_functions import load_tiff, load_asc, load_weighted_average, load_bound_fraction, convert_mp_to_torch
+from .helper_functions import (load_tiff, load_asc, load_intensity, load_weighted_average, load_bound_fraction,
+                               convert_mp_to_torch)
 import pandas as pd
 import numpy as np
 import torch
@@ -94,22 +95,28 @@ class NSCLCDataset(Dataset):
         # Define loading functions for different image types
         load_fn = {'tiff': load_tiff,
                    'asc': load_asc,
+                   'int': load_intensity,
                    'weighted_average': load_weighted_average,
                    'ratio': load_bound_fraction}
 
         # Define a mode dict that matches appropriate load functions and filename regex to mode
-        self.mode_dict = {'mask': [load_fn['tiff'], rf'.*?(\\|/)Redox(\\|/)ROI_mask\.(tiff|TIFF)'],
-                          'orr': [load_fn['tiff'], rf'.*?(\\|/)Redox(\\|/)RawRedoxMap\.(tiff|TIFF)'],
-                          'g': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_phasor_G\.(asc|ASC)'],
-                          's': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_phasor_S\.(asc|ASC)'],
-                          'photons': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_photons\.(asc|ASC)'],
-                          'tau1': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_t1\.(asc|ASC)'],
-                          'tau2': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_t2\.(asc|ASC)'],
-                          'alpha1': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_a1\.(asc|ASC)'],
-                          'alpha2': [load_fn['asc'], rf'.*?(\\|/)FLIM(\\|/).*?_a2\.(asc|ASC)']}
-        # Compile regexes
-        self.mode_dict = {key: [item[0], re.compile(item[1])] for key, item in self.mode_dict.items()}
 
+        self.mode_dict = {'mask': [load_fn['tiff'], r'mask\.(tiff|TIFF)'],
+                          'nadh': [load_fn['tiff'], r'nadh\.(tiff|TIFF)'],
+                          'fad': [load_fn['tiff'], r'fad\.(tiff|TIFF)'],
+                          'shg': [load_fn['tiff'], r'shg\.(tiff|TIFF)'],
+                          'orr': [load_fn['tiff'], r'orr\.(tiff|TIFF)'],
+                          'g': [load_fn['asc'], r'G\.(asc|ASC)'],
+                          's': [load_fn['asc'], r'S\.(asc|ASC)'],
+                          'photons': [load_fn['asc'], r'photons\.(asc|ASC)'],
+                          'tau1': [load_fn['asc'], r't1\.(asc|ASC)'],
+                          'tau2': [load_fn['asc'], r't2\.(asc|ASC)'],
+                          'alpha1': [load_fn['asc'], r'a1\.(asc|ASC)'],
+                          'alpha2': [load_fn['asc'], r'a2\.(asc|ASC)']}
+        # Compile regexes
+        self.mode_dict = {key: [item[0], re.compile(rf'.*{item[1]}')] for key, item in self.mode_dict.items()}
+
+        ## TODO: Update scaling factors for new metrics
         # Set max value presets for normalization and/or saturation
         '''
         These preset values are based on the mean and standard deviation of the dataset for each mode. As a general 
@@ -129,6 +136,9 @@ class NSCLCDataset(Dataset):
         
         The results for each mode are as follows:
         Mode                    Mean                StDev
+        NADH                    NaN                  NaN
+        FAD                     NaN                  NaN
+        SHG                     NaN                  NaN
         ORR                 3.5064e-01          2.9563567e-02    
         G                   3.5540e-01          1.1096316e-02
         S                   3.7959e-01          3.8442286e-03
@@ -168,7 +178,7 @@ class NSCLCDataset(Dataset):
         self.features = pd.read_excel(self.xl_file)
         self.patient_count = len(self.features)
         """
-        - atlases_by_sample and fovs_by_slide are lists of lists. The inner lists correspond to the images within a 
+        - atlases_by_sample and fovs_by_subject are lists of lists. The inner lists correspond to the images within a 
         given sample or slide and the outer lists match the index of the slide to the features. In other words, the 
         index of a given slide in the features file will also match a list of all images from that slide in the list of 
         lists.
@@ -221,9 +231,15 @@ class NSCLCDataset(Dataset):
             # Un-nest list (still ordered, but now easily indexable)
             self.all_atlases = [atlas for sample_atlases in self.atlases_by_sample for atlas in sample_atlases]
         else:
-            self.fovs_by_slide = [glob.glob(self.root + os.sep + slide + '*') for slide in
-                                  self.features['Slide Name']]  # This gives a list of lists of fovs sorted by slide
-            self.all_fovs = [fov for slide_fovs in self.fovs_by_slide for fov in
+            self.fovs_by_subject = []
+            for subject in self.features['Subject ID']:
+                self.fovs_by_subject.append([])
+                # Walk the root until files are hit
+                for rt, dr, f in os.walk(f'{self.root}{os.sep}{subject}{os.sep}'):
+                    # When files are hit, add that dir to the nested list for the subject
+                    if f:
+                        self.fovs_by_subject[-1].append(rt)
+            self.all_fovs = [fov for slide_fovs in self.fovs_by_subject for fov in
                              slide_fovs]  # This will give a list of all fovs (still ordered, but now not nested,
             # making it simple for indexing in __getitem__)
 
@@ -250,13 +266,15 @@ class NSCLCDataset(Dataset):
 
                 # Add derived modes
                 self.fov_mode_dict[index]['boundfraction'] = [load_bound_fraction, [self.fov_mode_dict[index]['alpha1'],
-                                                                                    self.fov_mode_dict[index]['alpha2']
-                                                                                    ]]
+                                                                                    self.fov_mode_dict[index][
+                                                                                        'alpha2']]]
                 self.fov_mode_dict[index]['taumean'] = [load_weighted_average,
                                                         [self.fov_mode_dict[index]['alpha1'],
                                                          self.fov_mode_dict[index]['tau1'],
                                                          self.fov_mode_dict[index]['alpha2'],
                                                          self.fov_mode_dict[index]['tau2']]]
+                self.fov_mode_dict[index]['intensity'] = [load_intensity, [self.fov_mode_dict[index]['nadh'],
+                                                                           self.fov_mode_dict[index]['fad']]]
             # Remove items that are missing a called mode
             # Note the [:] makes a copy of the list so indices don't change on removal
             for ii, fov_lut in enumerate(self.fov_mode_dict[:]):
@@ -319,7 +337,7 @@ class NSCLCDataset(Dataset):
             path_index = base_index
             img_path = self.all_fovs[path_index]
             load_dict = self.fov_mode_dict
-            lists_of_paths = self.fovs_by_slide
+            lists_of_paths = self.fovs_by_subject
         slide_idx = [img_path in paths for paths in lists_of_paths].index(True)
 
         # Check if this index has been previously deemed bad
@@ -410,7 +428,7 @@ class NSCLCDataset(Dataset):
 
         # Scale by the scalars from normalization method
         if self._normalized:
-            for ch in range(len(self.mode)):
+            for ch in range(self.stack_height):
                 x[ch] = (x[ch] - self.scalars[ch, 0]) / (self.scalars[ch, 1] - self.scalars[ch, 0])
 
         # Dynamically and recursively filter out bad data (namely, images with little or no signal) while maintain the
@@ -498,7 +516,7 @@ class NSCLCDataset(Dataset):
     def get_patient_subset(self, pt_index):
         # Get actual index from input index (to handle negatives)
         pt_index = list(range(len(self.features)))[pt_index]
-        pt_id = self.features.at[pt_index, 'Sample ID'] if self._use_atlas else self.features.at[pt_index, 'Slide Name']
+        pt_id = self.features.at[pt_index, 'Sample ID'] if self._use_atlas else self.features.at[pt_index, 'Subject ID']
         if self._use_atlas:
             indices = [i for i, path_str in enumerate(self.all_atlases) if pt_id in path_str]
         else:
