@@ -116,7 +116,6 @@ class NSCLCDataset(Dataset):
         # Compile regexes
         self.mode_dict = {key: [item[0], re.compile(rf'.*{item[1]}')] for key, item in self.mode_dict.items()}
 
-        ## TODO: Update scaling factors for new metrics
         # Set max value presets for normalization and/or saturation
         '''
         These preset values are based on the mean and standard deviation of the dataset for each mode. As a general 
@@ -135,37 +134,44 @@ class NSCLCDataset(Dataset):
         actually give all modes)
         
         The results for each mode are as follows:
-        Mode                    Mean                StDev
-        NADH                    NaN                  NaN
-        FAD                     NaN                  NaN
-        SHG                     NaN                  NaN
-        ORR                 3.5064e-01          2.9563567e-02    
-        G                   3.5540e-01          1.1096316e-02
-        S                   3.7959e-01          3.8442286e-03
-        Photons             1.9098e+02          1.2940987e+01
-        Tau1                651.6812            45.86681         
-        Tau2                3834.9180           193.67015
-        Alpha1              121.3796            9.293237
-        Alpha2              83.6695             5.76365
-        TauMean             2.0095e+03          9.8343758e+01
-        BoundFraction       4.2615e-01          1.6073210e-02 
+        ________________________________________________________________
+        Mode                Mean                    StDev
+        ________________________________________________________________
+        NADH                6483.380859375          885.8341674804688
+        FAD                 4073.089599609375       699.3536376953125
+        SHG                 331.3970031738281       437.4752197265625
+        INTENSITY           5442.0341796875         572.8677368164062
+        ORR                 0.3612004220485687      0.030011581256985664
+        G                   0.34587711095809937     0.01107413787394762
+        S                   0.3741823434829712      0.0050955880433321
+        PHOTONS             187.3328094482422       12.199613571166992
+        TAU1                721.684814453125        49.622989654541016
+        TAU2                4216.166015625          406.20733642578125
+        ALPHA1              116.04776763916016      9.549643516540527
+        ALPHA2              78.53902435302734       5.436614513397217
+        TAUMEAN             2123.447265625          223.97804260253906
+        BOUNDFRACTION       0.41824400424957275     0.016083599999547005
         
         For reference, that is included as a dict below, which will be used to calculate the ranges for all modes.
         '''
-        mean_std_mode_dict = {'ORR': [3.5064e-01, 2.9563567e-02],
-                              'G': [3.5540e-01, 1.1096316e-02],
-                              'S': [3.7959e-01, 3.8442286e-03],
-                              'Photons': [1.9098e+02, 1.2940987e+01],
-                              'Tau1': [651.6812, 45.86681],
-                              'Tau2': [3834.9180, 193.67015],
-                              'Alpha1': [121.3796, 9.293237],
-                              'Alpha2': [83.6695, 5.76365],
-                              'TauMean': [2.0095e+03, 9.8343758e+01],
-                              'BoundFraction': [4.2615e-01, .6073210e-02]}
+        mean_std_mode_dict = {'nadh': [6483.380859375, 885.8341674804688],
+                              'fad': [4073.089599609375, 699.3536376953125],
+                              'shg': [331.3970031738281, 437.4752197265625],
+                              'intensity': [5442.0341796875, 572.8677368164062],
+                              'orr': [0.3612004220485687, 0.030011581256985664],
+                              'g': [0.34587711095809937, 0.01107413787394762],
+                              's': [0.3741823434829712, 0.0050955880433321],
+                              'photons': [187.3328094482422, 12.199613571166992],
+                              'tau1': [721.684814453125, 49.622989654541016],
+                              'tau2': [4216.166015625, 406.20733642578125],
+                              'alpha1': [116.04776763916016, 9.549643516540527],
+                              'alpha2': [78.53902435302734, 5.436614513397217],
+                              'taumean': [2123.447265625, 223.97804260253906],
+                              'boundfraction': [0.41824400424957275, 0.016083599999547005]}
 
         self._preset_values = {}
         for key, (m, s) in mean_std_mode_dict.items():
-            self._preset_values[key.lower()] = [m - 3 * s, m + 3 * s]
+            self._preset_values[key] = [m - 3 * s, m + 3 * s]
 
         # Find and load features spreadsheet (or load directly if path provided)
         if xl_file is None:
@@ -175,7 +181,7 @@ class NSCLCDataset(Dataset):
                     'Features file not found,'
                     ' input path manually at dataset initialization using xl_file=<path_to_file>.')
             self.xl_file = xl_file[0]
-        self.features = pd.read_excel(self.xl_file)
+        self.features = pd.read_excel(self.xl_file, header=[0, 1])
         self.patient_count = len(self.features)
         """
         - atlases_by_sample and fovs_by_subject are lists of lists. The inner lists correspond to the images within a 
@@ -210,7 +216,7 @@ class NSCLCDataset(Dataset):
 
             # A "mode_dict" that looks the same as the fov_mode_dict (though this one is trivial)
             self.atlas_mode_dict = []
-            for subject in self.features['Sample ID']:
+            for subject in self.features['ID']['Sample']:
                 sample_dir = os.path.join(self.root, 'Atlas_Images', subject)
                 self.atlases_by_sample.append([])
                 for trunk, dirs, files in os.walk(sample_dir):
@@ -232,7 +238,7 @@ class NSCLCDataset(Dataset):
             self.all_atlases = [atlas for sample_atlases in self.atlases_by_sample for atlas in sample_atlases]
         else:
             self.fovs_by_subject = []
-            for subject in self.features['Subject ID']:
+            for subject in self.features['ID']['Subject']:
                 self.fovs_by_subject.append([])
                 # Walk the root until files are hit
                 for rt, dr, f in os.walk(f'{self.root}{os.sep}{subject}{os.sep}'):
@@ -373,11 +379,11 @@ class NSCLCDataset(Dataset):
             # coincide with the index of the features file to get the label of the sample/slide the image is from.
             match self.label:
                 case 'Response':
-                    y = torch.tensor(1 if self.features['Status (NR/R)'].iloc[slide_idx] == 'R' else 0,
-                                     dtype=torch.float32, device=self.device)
+                    y = torch.tensor(1 if self.features['FOLLOWUP DATA']['Status (NR/R)'].iloc[slide_idx] == 'R'
+                                     else 0, dtype=torch.float32, device=self.device)
                 case 'Metastases':
-                    y = torch.tensor(1 if self.features['Status (Mets/NM)'].iloc[slide_idx] == 'NM' else 0,
-                                     dtype=torch.float32, device=self.device)
+                    y = torch.tensor(1 if self.features['FOLLOWUP DATA']['Status (Mets/NM)'].iloc[slide_idx] == 'NM'
+                                     else 0, dtype=torch.float32, device=self.device)
                 case 'Mask':
                     # Load mask (if on or label)
                     fov_mask = load_dict[path_index]['mask'][0](load_dict[path_index]['mask']).to(self.device)
@@ -516,10 +522,11 @@ class NSCLCDataset(Dataset):
     def get_patient_subset(self, pt_index):
         # Get actual index from input index (to handle negatives)
         pt_index = list(range(len(self.features)))[pt_index]
-        pt_id = self.features.at[pt_index, 'Sample ID'] if self._use_atlas else self.features.at[pt_index, 'Subject ID']
         if self._use_atlas:
+            pt_id = self.features['ID'].at[pt_index, 'Sample']
             indices = [i for i, path_str in enumerate(self.all_atlases) if pt_id in path_str]
         else:
+            pt_id = self.features['ID'].at[pt_index, 'Subject']
             indices = [i for i, path_str in enumerate(self.all_fovs) if pt_id in path_str]
 
         # If using atlas patches, we have to determine how many patches come before this patient and add the number from
@@ -538,10 +545,10 @@ class NSCLCDataset(Dataset):
     def get_patient_label(self, pt_index):
         match self.label:
             case 'Response':
-                y = torch.tensor(1 if self.features.at[pt_index, 'Status (NR/R)'] == 'R' else 0,
+                y = torch.tensor(1 if self.features['FOLLOWUP DATA'].at[pt_index, 'Status (NR/R)'] == 'R' else 0,
                                  dtype=torch.float32, device=self.device)
             case 'Metastases':
-                y = torch.tensor(1 if self.features.at[pt_index, 'Status (Mets/NM)'] == 'NM' else 0,
+                y = torch.tensor(1 if self.features['FOLLOWUP DATA'].at[pt_index, 'Status (Mets/NM)'] == 'NM' else 0,
                                  dtype=torch.float32, device=self.device)
             case 'Mask':
                 # Load mask (if on or label)
@@ -700,6 +707,7 @@ class NSCLCDataset(Dataset):
         self._normalized = (normalized_to_preset or self.normalized_to_max)
 
     def normalize_channels(self, method='minmax'):
+
         match method.lower():
             case 'minmax' | 'max':
                 if self._min_max_scalars is None:
