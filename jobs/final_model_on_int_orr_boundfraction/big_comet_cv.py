@@ -33,7 +33,6 @@ def main():
     data = NSCLCDataset('NSCLC_Data_for_ML', ['intensity', 'orr', 'boundfraction'], device='cpu',
                         label='Metastases', mask_on=True)
     data.augment()
-    data.psuedo_rgb()
     data.normalize_channels('preset')
     data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
                                    tvt.RandomHorizontalFlip(p=0.25),
