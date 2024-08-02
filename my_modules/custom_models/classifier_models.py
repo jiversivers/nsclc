@@ -8,7 +8,7 @@ import traceback
 
 from torch.nn import Parameter
 
-import blocks
+from my_modules.custom_models import blocks
 
 
 # region MLPs
