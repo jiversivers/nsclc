@@ -8,6 +8,8 @@ import traceback
 
 from torch.nn import Parameter
 
+import blocks
+
 
 # region MLPs
 class MLPNet(nn.Module):
@@ -154,7 +156,7 @@ class RegularizedParallelMLPNet(nn.Module):
 
 # endregion
 
-# region RNNS
+# region RNNs
 class RNNet(nn.Module):
     def __init__(self, input_size):
         super(RNNet, self).__init__()
@@ -287,7 +289,7 @@ class RegularizedParallelRNNet(nn.Module):
 
 # endregion
 
-# region CNNs
+# region 2D CNNs
 class CNNet(nn.Module):
     def __init__(self, input_size):
         super(CNNet, self).__init__()
@@ -643,4 +645,106 @@ class FeatureExtractorToClassifier(nn.Module):
         self.flat.to(device)
         self.classifier.to(device)
 
+
+class ResNet18NPlaned(nn.Module):
+    def __init__(self, input_size, start_width=64, n_classes=1):
+        super().__init__()
+        self.input_size = input_size
+        self.planes = self.input_size[0]
+        self.start_width = start_width
+        self.name = f'{self.planes}-Planed ResNet18'
+
+        self.relu = nn.ReLU(inplace=True)
+        self.flat = nn.Flatten()
+
+        # Stem
+        self.stem = nn.Sequential(nn.Conv2d(self.planes, self.start_width,
+                                            kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False),
+                                  nn.BatchNorm2d(self.start_width,
+                                                 eps=1e-05, momentum=0.1, affine=True, track_running_stats=True))
+        self.maxpool_1 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1, dilation=1, ceil_mode=False)
+
+        # Block 2, Pass 1
+        width = self.start_width
+        self.block2_1 = nn.Sequential(blocks.conv3x3_bn(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
+                                      blocks.conv3x3_bn(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
+        # Pass 2
+        self.block2_2 = nn.Sequential(blocks.conv3x3_bn(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
+                                      blocks.conv3x3_bn(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
+
+        # Block 3, Pass 1
+        self.block3_1 = nn.Sequential(blocks.conv3x3_bn(width, 2 * width, 'relu', stride=(2, 2), padding=(1, 1)),
+                                      blocks.conv3x3_bn(2 * width, 2 * width, 'drop', stride=(1, 1), padding=(1, 1)))
+        self.concat_adj3 = nn.Conv2d(width, 2 * width, kernel_size=(3, 3), stride=(2, 2), padding=(0, 0))
+        # Pass 2
+        width *= 2
+        self.block3_2 = nn.Sequential(blocks.conv3x3_bn(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
+                                      blocks.conv3x3_bn(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
+
+        # Block 4, Pass 1
+        self.block4_1 = nn.Sequential(blocks.conv3x3_bn(width, 2 * width, 'relu', stride=(2, 2), padding=(1, 1)),
+                                      blocks.conv3x3_bn(2 * width, 2 * width, 'drop', stride=(1, 1), padding=(1, 1)))
+        self.concat_adj4 = nn.Conv2d(width, 2 * width, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0))
+        # Pass 2
+        width *= 2
+        self.block4_2 = nn.Sequential(blocks.conv3x3_bn(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
+                                      blocks.conv3x3_bn(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
+
+        # Block 5, Pass 1
+        self.block5_1 = nn.Sequential(blocks.conv3x3_bn(width, 2 * width, 'relu', stride=(2, 2), padding=(1, 1)),
+                                      blocks.conv3x3_bn(2 * width, 2 * width, 'drop', stride=(1, 1), padding=(1, 1)))
+        self.concat_adj5 = nn.Conv2d(width, 2 * width, kernel_size=(1, 1), stride=(2, 2), padding=(0, 0))
+        # Pass 2
+        width *= 2
+        self.block5_2 = nn.Sequential(blocks.conv3x3_bn(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
+                                      blocks.conv3x3_bn(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
+
+        # Head
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(width, 1000)
+        self.out = nn.Linear(1000, n_classes)
+    def forward(self, x):
+        # Prep
+        x[torch.isnan(x)] = 0
+
+        # Stem (Block 1)
+        x = self.stem(x)
+        x = self.relu(x)
+        rx = self.maxpool_1(x)
+
+        # Block 2
+        x = self.block2_1(x)
+        rx = self.relu(rx + x)
+        x = self.block2_2(rx)
+        rx = self.relu(rx + x)
+
+        # Block 3
+        x = self.block3_1(rx)
+        rx = self.concat_adj3(rx)
+        rx = self.relu(rx + x)
+        x = self.block3_2(rx)
+        rx = self.relu(rx + x)
+
+        # Block 4
+        x = self.block4_1(rx)
+        rx = self.concat_adj4(rx)
+        rx = self.relu(rx + x)
+        x = self.block4_2(rx)
+        rx = self.relu(rx + x)
+
+        # Block 5
+        x = self.block5_1(rx)
+        rx = self.concat_adj5(rx)
+        rx = self.relu(rx + x)
+        x = self.block5_2(rx)
+        x = self.relu(rx + x)
+
+        # Head
+        x = self.avgpool(x)
+        x = self.flat(x)
+        x = self.fc(x)
+        x = self.out(x)
+        return x
+
 # endregion
+
