@@ -272,15 +272,17 @@ class NSCLCDataset(Dataset):
 
                 # Add derived modes
                 self.fov_mode_dict[index]['boundfraction'] = [load_bound_fraction, [self.fov_mode_dict[index]['alpha1'],
-                                                                                    self.fov_mode_dict[index][
-                                                                                        'alpha2']]]
+                                                                                    self.fov_mode_dict[index]['alpha2']
+                                                                                    ]]
                 self.fov_mode_dict[index]['taumean'] = [load_weighted_average,
                                                         [self.fov_mode_dict[index]['alpha1'],
                                                          self.fov_mode_dict[index]['tau1'],
                                                          self.fov_mode_dict[index]['alpha2'],
-                                                         self.fov_mode_dict[index]['tau2']]]
+                                                         self.fov_mode_dict[index]['tau2']
+                                                         ]]
                 self.fov_mode_dict[index]['intensity'] = [load_intensity, [self.fov_mode_dict[index]['nadh'],
-                                                                           self.fov_mode_dict[index]['fad']]]
+                                                                           self.fov_mode_dict[index]['fad']
+                                                                           ]]
             # Remove items that are missing a called mode
             # Note the [:] makes a copy of the list so indices don't change on removal
             for ii, fov_lut in enumerate(self.fov_mode_dict[:]):
@@ -297,6 +299,11 @@ class NSCLCDataset(Dataset):
                                 self.all_fovs.remove(fov_lut['alpha1'][0])
                                 self.fov_mode_dict.remove(fov_lut)
                                 break
+                        case 'intensity':
+                            if not all([fov_lut['fad'][1], fov_lut['nadh'][1]]):
+                                print('not')
+                                self.all_fovs.remove(fov_lut['fad'][0])
+                                self.fov_mode_dict.remove(fov_lut)
                         case _:
                             if fov_lut[mode][1] is None:
                                 self.all_fovs.remove(fov_lut[mode][0])
