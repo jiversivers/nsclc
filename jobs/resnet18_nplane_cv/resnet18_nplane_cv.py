@@ -65,7 +65,7 @@ def main():
     # Determine number of folds such that at least 3 unique patients from each class can be present in all folds
     dividend = len(shuffled_zeros) if len(shuffled_zeros) < len(shuffled_ones) else len(shuffled_ones)
     num_folds = 0
-    while dividend / (num_folds + 1) > 3:
+    while dividend / (num_folds + 1) >= 3:
         num_folds += 1
     print('Number of data folds to ensure at least n=3 per class: {}'.format(num_folds))
 
