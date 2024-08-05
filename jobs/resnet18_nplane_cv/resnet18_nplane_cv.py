@@ -110,7 +110,7 @@ def main():
     batch_size = 64
     lr = 1e-5
     optimizer_fn = torch.optim.Adam
-    total_epochs = 350
+    total_epochs = 1000
     loss_fn = torch.nn.BCELoss()
 
     training_loss = []
