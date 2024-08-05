@@ -118,7 +118,6 @@ def main():
     bacs = []
     tprs = []
     mean_fpr = np.linspace(0, 1, 100)
-    error_printed = False
     for fold in range(num_folds):
         # Create dataloaders for fold
         train_loader = torch.utils.data.DataLoader(train_folds[fold],
@@ -129,7 +128,7 @@ def main():
                                                   drop_last=(True if len(test_folds) % batch_size == 1 else False))
 
         # Make initial optimizer with only classifier parameters
-        optimizer = optimizer_fn(model.classifier.parameters(), lr=lr)
+        optimizer = optimizer_fn(model.parameters(), lr=lr)
 
         # Training
         # Nest iteration lists for tracking model learning
