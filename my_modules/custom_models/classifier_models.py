@@ -289,7 +289,7 @@ class RegularizedParallelRNNet(nn.Module):
 
 # endregion
 
-# region 2D CNNs
+# region CNNs
 class CNNet(nn.Module):
     def __init__(self, input_size):
         super(CNNet, self).__init__()
@@ -662,42 +662,42 @@ class ResNet18NPlaned(nn.Module):
                                             kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False),
                                   nn.BatchNorm2d(self.start_width,
                                                  eps=1e-05, momentum=0.1, affine=True, track_running_stats=True))
-        self.maxpool_1 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1, dilation=1, ceil_mode=False)
+        self.maxpool_1 = nn.MaxPool2d(kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), ceil_mode=False)
 
         # Block 2, Pass 1
         width = self.start_width
-        self.block2_1 = nn.Sequential(blocks.conv3x3_bn(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
-                                      blocks.conv3x3_bn(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
+        self.block2_1 = nn.Sequential(blocks.conv3x3_to_outfun(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
+                                      blocks.conv3x3_to_outfun(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
         # Pass 2
-        self.block2_2 = nn.Sequential(blocks.conv3x3_bn(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
-                                      blocks.conv3x3_bn(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
+        self.block2_2 = nn.Sequential(blocks.conv3x3_to_outfun(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
+                                      blocks.conv3x3_to_outfun(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
 
         # Block 3, Pass 1
-        self.block3_1 = nn.Sequential(blocks.conv3x3_bn(width, 2 * width, 'relu', stride=(2, 2), padding=(1, 1)),
-                                      blocks.conv3x3_bn(2 * width, 2 * width, 'drop', stride=(1, 1), padding=(1, 1)))
-        self.concat_adj3 = nn.Conv2d(width, 2 * width, kernel_size=(3, 3), stride=(2, 2), padding=(0, 0))
+        self.block3_1 = nn.Sequential(blocks.conv3x3_to_outfun(width, 2 * width, 'relu', stride=(2, 2), padding=(1, 1)),
+                                      blocks.conv3x3_to_outfun(2 * width, 2 * width, 'drop', stride=(1, 1), padding=(1, 1)))
+        self.concat_adj3 = nn.Conv2d(width, 2 * width, kernel_size=(1, 1), stride=(2, 2), padding=(0, 0))
         # Pass 2
         width *= 2
-        self.block3_2 = nn.Sequential(blocks.conv3x3_bn(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
-                                      blocks.conv3x3_bn(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
+        self.block3_2 = nn.Sequential(blocks.conv3x3_to_outfun(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
+                                      blocks.conv3x3_to_outfun(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
 
         # Block 4, Pass 1
-        self.block4_1 = nn.Sequential(blocks.conv3x3_bn(width, 2 * width, 'relu', stride=(2, 2), padding=(1, 1)),
-                                      blocks.conv3x3_bn(2 * width, 2 * width, 'drop', stride=(1, 1), padding=(1, 1)))
-        self.concat_adj4 = nn.Conv2d(width, 2 * width, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0))
+        self.block4_1 = nn.Sequential(blocks.conv3x3_to_outfun(width, 2 * width, 'relu', stride=(2, 2), padding=(1, 1)),
+                                      blocks.conv3x3_to_outfun(2 * width, 2 * width, 'drop', stride=(1, 1), padding=(1, 1)))
+        self.concat_adj4 = nn.Conv2d(width, 2 * width, kernel_size=(1, 1), stride=(2, 2), padding=(0, 0))
         # Pass 2
         width *= 2
-        self.block4_2 = nn.Sequential(blocks.conv3x3_bn(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
-                                      blocks.conv3x3_bn(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
+        self.block4_2 = nn.Sequential(blocks.conv3x3_to_outfun(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
+                                      blocks.conv3x3_to_outfun(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
 
         # Block 5, Pass 1
-        self.block5_1 = nn.Sequential(blocks.conv3x3_bn(width, 2 * width, 'relu', stride=(2, 2), padding=(1, 1)),
-                                      blocks.conv3x3_bn(2 * width, 2 * width, 'drop', stride=(1, 1), padding=(1, 1)))
+        self.block5_1 = nn.Sequential(blocks.conv3x3_to_outfun(width, 2 * width, 'relu', stride=(2, 2), padding=(1, 1)),
+                                      blocks.conv3x3_to_outfun(2 * width, 2 * width, 'drop', stride=(1, 1), padding=(1, 1)))
         self.concat_adj5 = nn.Conv2d(width, 2 * width, kernel_size=(1, 1), stride=(2, 2), padding=(0, 0))
         # Pass 2
         width *= 2
-        self.block5_2 = nn.Sequential(blocks.conv3x3_bn(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
-                                      blocks.conv3x3_bn(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
+        self.block5_2 = nn.Sequential(blocks.conv3x3_to_outfun(width, width, 'relu', stride=(1, 1), padding=(1, 1)),
+                                      blocks.conv3x3_to_outfun(width, width, 'drop', stride=(1, 1), padding=(1, 1)))
 
         # Head
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
@@ -713,7 +713,7 @@ class ResNet18NPlaned(nn.Module):
         rx = self.maxpool_1(x)
 
         # Block 2
-        x = self.block2_1(x)
+        x = self.block2_1(rx)
         rx = self.relu(rx + x)
         x = self.block2_2(rx)
         rx = self.relu(rx + x)
