@@ -631,7 +631,8 @@ class FeatureExtractorToClassifier(nn.Module):
     ) -> Iterator[Tuple[str, Parameter]]:
         # Add feature extractor params
         for name, param in self.feature_extractor_params.named_parameters(prefix='feature_extractor',
-                                                                          recurse=recurse, remove_duplicate=remove_duplicate):
+                                                                          recurse=recurse,
+                                                                          remove_duplicate=remove_duplicate):
             yield name, param
 
         # Add classifier parameters
@@ -647,15 +648,15 @@ class FeatureExtractorToClassifier(nn.Module):
 
 
 class ResNet18NPlaned(nn.Module):
-    def __init__(self, input_size, start_width=64, n_classes=1):
+    def __init__(self, input_size, start_width=64, n_classes=1, sigmoid=True):
         super().__init__()
         self.input_size = input_size
         self.planes = self.input_size[0]
         self.start_width = start_width
         self.name = f'{self.planes}-Planed ResNet18'
+        self.sigmoid_on = sigmoid
 
         self.relu = nn.ReLU(inplace=True)
-        self.flat = nn.Flatten()
 
         # Stem
         self.stem = nn.Sequential(nn.Conv2d(self.planes, self.start_width,
@@ -674,7 +675,8 @@ class ResNet18NPlaned(nn.Module):
 
         # Block 3, Pass 1
         self.block3_1 = nn.Sequential(blocks.conv3x3_to_outfun(width, 2 * width, 'relu', stride=(2, 2), padding=(1, 1)),
-                                      blocks.conv3x3_to_outfun(2 * width, 2 * width, 'drop', stride=(1, 1), padding=(1, 1)))
+                                      blocks.conv3x3_to_outfun(2 * width, 2 * width, 'drop', stride=(1, 1),
+                                                               padding=(1, 1)))
         self.concat_adj3 = nn.Conv2d(width, 2 * width, kernel_size=(1, 1), stride=(2, 2), padding=(0, 0))
         # Pass 2
         width *= 2
@@ -683,7 +685,8 @@ class ResNet18NPlaned(nn.Module):
 
         # Block 4, Pass 1
         self.block4_1 = nn.Sequential(blocks.conv3x3_to_outfun(width, 2 * width, 'relu', stride=(2, 2), padding=(1, 1)),
-                                      blocks.conv3x3_to_outfun(2 * width, 2 * width, 'drop', stride=(1, 1), padding=(1, 1)))
+                                      blocks.conv3x3_to_outfun(2 * width, 2 * width, 'drop', stride=(1, 1),
+                                                               padding=(1, 1)))
         self.concat_adj4 = nn.Conv2d(width, 2 * width, kernel_size=(1, 1), stride=(2, 2), padding=(0, 0))
         # Pass 2
         width *= 2
@@ -692,7 +695,8 @@ class ResNet18NPlaned(nn.Module):
 
         # Block 5, Pass 1
         self.block5_1 = nn.Sequential(blocks.conv3x3_to_outfun(width, 2 * width, 'relu', stride=(2, 2), padding=(1, 1)),
-                                      blocks.conv3x3_to_outfun(2 * width, 2 * width, 'drop', stride=(1, 1), padding=(1, 1)))
+                                      blocks.conv3x3_to_outfun(2 * width, 2 * width, 'drop', stride=(1, 1),
+                                                               padding=(1, 1)))
         self.concat_adj5 = nn.Conv2d(width, 2 * width, kernel_size=(1, 1), stride=(2, 2), padding=(0, 0))
         # Pass 2
         width *= 2
@@ -701,8 +705,11 @@ class ResNet18NPlaned(nn.Module):
 
         # Head
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.flat = nn.Flatten()
         self.fc = nn.Linear(width, 1000)
         self.out = nn.Linear(1000, n_classes)
+        self.sigmoid = nn.Sigmoid()
+
     def forward(self, x):
         # Prep
         x[torch.isnan(x)] = 0
@@ -744,7 +751,7 @@ class ResNet18NPlaned(nn.Module):
         x = self.flat(x)
         x = self.fc(x)
         x = self.out(x)
+        x = self.sigmoid(x) if self.sigmoid_on else x
         return x
 
 # endregion
-
