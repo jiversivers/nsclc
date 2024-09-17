@@ -10,10 +10,13 @@ import torchvision.transforms.v2 as tvt
 from my_modules.custom_models import ResNet18NPlaned
 from sklearn.metrics import roc_curve, auc, balanced_accuracy_score, RocCurveDisplay, ConfusionMatrixDisplay
 
-from my_modules.nsclc import NSCLCDataset, subdivide_list
+from my_modules.nsclc import NSCLCDataset, subdivide_list, set_seed
 
 
 def main():
+    # Set random seed for reprodeucibility
+    set_seed(42)
+
     #region Prepare environment
     # Set up multiprocessing context
     mp.set_start_method('forkserver', force=True)
