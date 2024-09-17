@@ -186,7 +186,7 @@ TODO: Update doc
                               'alpha1': [load_fn['asc'], r'a1\.(asc|ASC)'],
                               'alpha2': [load_fn['asc'], r'a2\.(asc|ASC)']}
             # Compile regexes
-            self.mode_dict = {key: [item[0], re.compile(rf'.*\\{item[1]}')] for key, item in self.mode_dict.items()}
+            self.mode_dict = {key: [item[0], re.compile(rf'.*{os.sep}{item[1]}')] for key, item in self.mode_dict.items()}
 
             # Make an indexed FOV-LUT dict list of loaders and files
             self.fov_mode_dict = [{} for _ in range(len(self.all_fovs))]
