@@ -50,7 +50,7 @@ TODO: Update doc
             items on DEVICE.
     """
 
-    # region Main Dataset Methods (init, len, getitem)
+    # region Main Dataset Methods -- init, len, getitem (with helper methods included)
     def __init__(self, root, mode, xl_file=None, label=None, mask_on=True, transforms=None,
                  use_atlas=False, use_patches=True, patch_size=(512, 512), use_cache=True,
                  device=(torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'))):
@@ -71,7 +71,7 @@ TODO: Update doc
 
         # Set attribute and property defaults
         self.saturate = False
-        self.augmented = False
+        self._augmented = False
         self.filter_bad_data = True if self._use_atlas else False
         self.dist_transformed = False
         self.psuedo_rgb = False
@@ -186,7 +186,8 @@ TODO: Update doc
                               'alpha1': [load_fn['asc'], r'a1\.(asc|ASC)'],
                               'alpha2': [load_fn['asc'], r'a2\.(asc|ASC)']}
             # Compile regexes
-            self.mode_dict = {key: [item[0], re.compile(rf'.*{os.sep}{item[1]}')] for key, item in self.mode_dict.items()}
+            self.mode_dict = {key: [item[0], re.compile(rf'.*?[/\\]{item[1]}')] for key, item in
+                              self.mode_dict.items()}
 
             # Make an indexed FOV-LUT dict list of loaders and files
             self.fov_mode_dict = [{} for _ in range(len(self.all_fovs))]
@@ -269,8 +270,41 @@ TODO: Update doc
             else:
                 return len(self.all_fovs)
 
+    def __parse_index__(self, index):
+        # Parse the index
+        # Get image path from index
+        if self.augmented:
+            base_index = int(index // 5)  # This will give us the index for the base img
+            sub_index = index % 5  # This gives the index of the crop
+        else:
+            base_index = index
+            sub_index = None
+        if self._use_atlas:
+            # Find where the index is <= than the number of patches
+            if self.use_patches:
+                path_index = 0
+                while self.atlas_sub_index_map[path_index + 1] <= base_index:
+                    path_index += 1
+                patch_index = int(base_index - self.atlas_sub_index_map[path_index])
+            else:
+                path_index = base_index
+                patch_index = None
+            img_path = self.all_atlases[path_index]
+            load_dict = self.atlas_mode_dict
+            lists_of_paths = self.atlases_by_sample
+        else:
+            path_index = base_index
+            img_path = self.all_fovs[path_index]
+            load_dict = self.fov_mode_dict
+            lists_of_paths = self.fovs_by_subject
+            patch_index = None
+        slide_idx = [img_path in paths for paths in lists_of_paths].index(True)
+
+        # Return appropriate indices
+        return slide_idx, path_index, sub_index, patch_index, load_dict
+
     def __getitem__(self, index):
-        slide_idx, sub_index, path_index, patch_index, load_dict = self.__parse_index__(index)
+        slide_idx, path_index, sub_index, patch_index, load_dict = self.__parse_index__(index)
 
         # Check if this index has been previously deemed bad
         if self.in_bad_index_cache is not None and self.in_bad_index_cache[index]:
@@ -395,39 +429,6 @@ TODO: Update doc
 
         return x, y
         # endregion
-
-    def __parse_index__(self, index):
-        # Parse the index
-        # Get image path from index
-        if self.augmented:
-            base_index = int(index // 5)  # This will give us the index for the base img
-            sub_index = index % 5  # This gives the index of the crop
-        else:
-            base_index = index
-            sub_index = None
-        if self._use_atlas:
-            # Find where the index is <= than the number of patches
-            if self.use_patches:
-                path_index = 0
-                while self.atlas_sub_index_map[path_index + 1] <= base_index:
-                    path_index += 1
-                patch_index = int(base_index - self.atlas_sub_index_map[path_index])
-            else:
-                path_index = base_index
-                patch_index = None
-            img_path = self.all_atlases[path_index]
-            load_dict = self.atlas_mode_dict
-            lists_of_paths = self.atlases_by_sample
-        else:
-            path_index = base_index
-            img_path = self.all_fovs[path_index]
-            load_dict = self.fov_mode_dict
-            lists_of_paths = self.fovs_by_subject
-            patch_index = None
-        slide_idx = [img_path in paths for paths in lists_of_paths].index(True)
-
-        # Return appropriate indices
-        return slide_idx, sub_index, path_index, patch_index, load_dict
 
     def _open_cache(self, x, y):
         # Setup shared memory arrays (i.e. caches that are compatible with multiple workers)
@@ -638,9 +639,6 @@ TODO: Update doc
                 self.normalize_method = 'preset'
         self.dist_transformed = True
 
-    def augment(self):
-        self.augmented = True
-
     def transform_to_psuedo_rgb(self, rgb_squeeze=None):
         if rgb_squeeze is None:
             self.rgb_squeeze = False if self.stack_height > 1 else True
@@ -648,6 +646,30 @@ TODO: Update doc
 
     def cutoff_saturation(self):
         self.saturate = True
+
+    #region Augmentation
+    def augment(self):
+        self.augmented = True
+
+    @property
+    def augmented(self):
+        return self._augmented
+
+    @augmented.setter
+    def augmented(self, augmented):
+        # Updates method and the size of bad index cache because it holds a single value for each possible index, not
+        # base image wise like the others
+        if augmented is not self.augmented:
+            if augmented:
+                self._augmented = True
+                bad_index_base = mp.Array(ctypes.c_bool, len(self) * [False])
+                self.in_bad_index_cache = convert_mp_to_torch(bad_index_base, (len(self),), device=self.device)
+            else:
+                self._augmented = False
+                bad_index_base = mp.Array(ctypes.c_bool, len(self) * [False])
+                self.in_bad_index_cache = convert_mp_to_torch(bad_index_base, (len(self),), device=self.device)
+
+    #endregion
 
     # region Normalization
     @property
@@ -709,10 +731,10 @@ TODO: Update doc
                 case 'preset':
                     # Set max value presets for normalization and/or saturation
                     '''
-                    These preset values are based on the mean and standard deviation of the dataset for each mode. As a general 
-                    rule, when data is normally distributed, 99.7% of samples fall within 3 standard deviations of the mean. We will
-                    use that then as the cutoffs for our presets. Theses were performed for masked data across all modes using the 
-                    following code:
+                    These preset values are based on the mean and standard deviation of the dataset for each mode. As a 
+                    general rule, when data is normally distributed, 99.7% of samples fall within 3 standard deviations 
+                    of the mean. We will use that then as the cutoffs for our presets. Theses were performed for masked
+                    data across all modes using the following code:
 
                         from my_modules.nsclc import NSCLCDataset
                         import numpy as np
@@ -726,11 +748,11 @@ TODO: Update doc
                         for mode, bar, s in zip(data.mode, x_bar, sig):
                             print(f"'{mode}': [{bar}, {sig}],")
 
-                    where 'data' is an instance of this class with all modes (note, not 'all' set as the mode, because this doesn't 
-                    actually give all modes)
+                    where 'data' is an instance of this class with all modes (note, not 'all' set as the mode, because 
+                    this doesn't actually give all modes)
 
-                    The results for each mode are as  included as a dict below, which will be used to calculate the ranges for all
-                    modes.
+                    The results for each mode are as  included as a dict below, which will be used to calculate the 
+                    ranges for all modes.
                     '''
                     mean_std_mode_dict = {'nadh': [0.8325826525688171, 0.051511045545339584],
                                           'fad': [0.38952434062957764, 0.026814082637429237],
