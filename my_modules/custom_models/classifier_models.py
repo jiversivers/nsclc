@@ -527,9 +527,10 @@ class MPMShallowClassifier(nn.Module):
 
 
 class FeatureExtractorToClassifier(nn.Module):
-    def __init__(self, input_size, feature_extractor, classifier=CometClassifier, layer=None):
+    def __init__(self, input_size, feature_extractor, feature_extractor_channels=3, classifier=CometClassifier, layer=None):
         super().__init__()
         self.input_size = input_size
+        self.expand_to_rgb = (self.input_size[0] != feature_extractor_channels)
 
         # Parse input layer
         if layer is not None:
@@ -552,8 +553,9 @@ class FeatureExtractorToClassifier(nn.Module):
 
         # Dry run for feature dims
         self.feature_extractor = feature_extractor
-        self.feature_map_dims = self.get_features(
-            torch.rand(1, *self.input_size, device=next(feature_extractor.parameters()).device)).shape
+        x = torch.rand(1, *self.input_size, device=next(feature_extractor.parameters()).device)
+        x = x.expand(-1, 3, -1, -1) if self.expand_to_rgb else x
+        self.feature_map_dims = self.get_features(x).shape
 
         # Get average value for each feature map
         self.global_avg_pool = nn.AvgPool2d(self.feature_map_dims[-2::])
@@ -581,6 +583,7 @@ class FeatureExtractorToClassifier(nn.Module):
 
         # Extract features with nan-masking as 0
         x[torch.isnan(x)] = 0
+        x = x.expand(-1, 3, -1, -1) if self.expand_to_rgb else x
         x = self.get_features(x)
 
         # Pool and flatten feature maps
@@ -609,7 +612,7 @@ class FeatureExtractorToClassifier(nn.Module):
         try:
             x.to(next(self.feature_extractor_params.parameters()).device)
             _ = self.feature_extractor(x)
-        except Exception as e:
+        except RuntimeError as e:
             # Print the first occurrence of the error type
             if type(e) not in self.exception_list:
                 self.exception_list.append(type(e))
