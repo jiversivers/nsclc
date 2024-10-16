@@ -82,7 +82,7 @@ def main():
 
     train_pts = shuffled_zeros[3:] + shuffled_ones[3:]
     train_idx = [data.get_patient_subset(i) for i in train_pts]
-    train_idx = [i for i in train_idx for im in i]
+    train_idx = [im for i in train_idx for im in i]
     random.shuffle(train_idx)
     image_counts = [0, 0]
     for idx in train_pts:
@@ -98,10 +98,12 @@ def main():
 
     # Create dataloaders for fold
     batch_size = 64
-    train_loader = torch.utils.data.DataLoader(train_idx,
+    train_set = torch.utils.data.Subset(data, train_idx)
+    test_set = torch.utils.data.Subset(data, test_idx)
+    train_loader = torch.utils.data.DataLoader(train_set,
                                                batch_size=batch_size, shuffle=True, num_workers=0,
                                                drop_last=(True if len(train_idx) % batch_size == 1 else False))
-    test_loader = torch.utils.data.DataLoader(test_idx,
+    test_loader = torch.utils.data.DataLoader(test_set,
                                               batch_size=batch_size, shuffle=False, num_workers=0,
                                               drop_last=(True if len(test_idx) % batch_size == 1 else False))
 
