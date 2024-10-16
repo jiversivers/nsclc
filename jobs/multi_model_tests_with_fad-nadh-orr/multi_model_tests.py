@@ -169,7 +169,7 @@ def main():
     # For each epoch
     for ep in range(epochs):
         print(f'Epoch {ep}')
-        train_loss = len(models) * [0]
+        epoch_loss = len(models) * [0]
         # Train
         for model in models:
             model.train()
@@ -178,10 +178,10 @@ def main():
                 out = model(x)
                 loss = loss_function(out, target.unsqueeze(1))
                 loss.backward()
-                train_loss[i] += loss.item()
+                epoch_loss[i] += loss.item()
                 optimizers[i].step()
-        for epoch_loss, loss_tracker in train_loss, train_loss:
-            loss_tracker.append(epoch_loss)
+        for running, current in zip(train_loss, epoch_loss):
+            running.append(current)
 
         # Evaluation
         for i, model in enumerate(models):

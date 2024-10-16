@@ -162,7 +162,7 @@ def main():
                 loss.backward()
                 epoch_loss[i] += loss.item()
                 optimizers[i].step()
-        for running, current in train_loss, epoch_loss:
+        for running, current in zip(train_loss, epoch_loss):
             running.append(current)
 
         # Evaluation
