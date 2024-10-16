@@ -7,8 +7,6 @@ import torchvision.transforms.v2 as tvt
 from matplotlib import pyplot as plt
 import random
 
-from pretrainedmodels import inceptionresnetv2, xception
-
 from my_modules.custom_models import *
 from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import set_seed
@@ -30,12 +28,12 @@ def main():
     ################
     data = NSCLCDataset('NSCLC_Data_for_ML', ['fad', 'nadh', 'shg'], device=torch.device('cpu'),
                         label='Metastases', mask_on=True)
+    data.augment()
     data.normalize_method = 'preset'
     data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
                                    tvt.RandomHorizontalFlip(p=0.25),
                                    tvt.RandomRotation(degrees=(-180, 180))])
     data.to(device)
-    data.augment()
 
     # Random split datasets
     subsampler = torch.utils.data.sampler.SubsetRandomSampler(range(data.patient_count))
@@ -113,23 +111,19 @@ def main():
     # ResNet18
     models = [ResNet18NPlaned(data.shape, start_width=64, n_classes=1)]
 
-    # BigCoMET
-    feature_extractor = inceptionresnetv2(num_classes=1001, pretrained=False)
-    feature_extractor.load_state_dict(
-        torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth'))
+    # InceptionResNetV2 Feature Extractor (BigCoMET)
+    feature_extractor = AdaptedInputInceptionResnetv2(data.shape, num_classes=1000, pretrained=False)
     classifier = CometClassifierWithBinaryOutput
-    models.append(FeatureExtractorToClassifier(data.shape, feature_extractor=feature_extractor, classifier=classifier,
-                                               layer='conv2d_7b'))
+    models.append(FeatureExtractorToClassifier(data.shape,
+                                               feature_extractor=feature_extractor,
+                                               classifier=classifier, layer='conv2d_7b'))
 
-    # Xception
-    feature_extractor = xception(num_classes=1000, pretrained=False)
-    state_dict = torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/xception-43020ad28.pth')
-    state_dict['last_linear.weight'] = state_dict.pop('fc.weight')
-    state_dict['last_linear.bias'] = state_dict.pop('fc.bias')
-    feature_extractor.load_state_dict(state_dict)
+    # Xception Feature Extractor
+    feature_extractor = AdaptedInputXception(data.shape, num_classes=1000, pretrained=False)
     classifier = torch.nn.Sequential(torch.nn.Linear(2048, 1), torch.nn.Sigmoid())
-    models.append(FeatureExtractorToClassifier(data.shape, feature_extractor=feature_extractor, classifier=classifier,
-                                               layer='conv4'))
+    models.append(FeatureExtractorToClassifier(data.shape,
+                                               feature_extractor=feature_extractor,
+                                               classifier=classifier, layer='conv4'))
 
     # Basic CNNs
     models[len(models):] = [CNNet(data.shape),
@@ -170,7 +164,7 @@ def main():
     best_score = [0 for _ in range(len(models))]
     # For each epoch
     for ep in range(epochs):
-        print(f'Epoch {ep}')
+        print(f'\nEpoch {ep + 1}')
         epoch_loss = [0 for _ in range(len(models))]
         # Train
         for model in models:
@@ -183,22 +177,27 @@ def main():
                 epoch_loss[i] += loss.item()
                 optimizers[i].step()
         for i, current in enumerate(epoch_loss):
-            train_loss[i].append(current)
+            train_loss[i].append(current / len(train_set))
 
         # Evaluation
         for i, model in enumerate(models):
-            with open(f'outputs/{model.name}/results.txt', 'a') as f:
-                f.write(f'Epoch {ep}\n'
-                        f'{model.name}: Training loss: {train_loss[i]}. Evaluation scores:')
-            print(f'>>> {model.name}: Training loss: {train_loss[i]}. Evaluation scores:')
+            print(f'>>> {model.name}: Training loss: {train_loss[i][-1]}. Evaluation scores:')
             scores = score_model(model, test_loader, loss_fn=loss_function, print_results=True, make_plot=False,
                                  threshold_type='roc')
             eval_loss[i] = scores['Loss']
+
+            with open(f'outputs/{model.name}/results.txt', 'a') as f:
+                f.write(f'\n\nEpoch {ep + 1}\n'
+                        f'{model.name}: Training loss: {train_loss[i][-1]}. Evaluation scores:')
+                for key, item in scores.items():
+                    if 'Confusion' not in key:
+                        f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
+
             if scores['ROC-AUC'] > best_score[i]:
                 best_score[i] = scores['ROC-AUC']
                 torch.save(model.state_dict(), f'best_models/Best {model.name}.pth')
                 with open(f'outputs/{model.name}/results.txt', 'a') as f:
-                    f.write(f'New best {model.name} saved at epoch {ep} with ROC-AUC of {scores["ROC-AUC"]}')
+                    f.write(f'New best {model.name} saved at epoch {ep + 1} with ROC-AUC of {scores["ROC-AUC"]}')
 
     # Plot epoch-wise outputs
     plt.figure(figsize=(10, 5))
@@ -216,7 +215,7 @@ def main():
     for model in models:
         print(f'>>> {model.name}...')
         scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
-        fig.savefig(f'outputs/{model.name}/plots/test_results.png')
+        fig.savefig(f'outputs/{model.name}_plots.png')
         plt.close(fig)
         with open(f'outputs/{model.name}/results.txt', 'a') as f:
             f.write(f'\n>>> {model.name}...')
