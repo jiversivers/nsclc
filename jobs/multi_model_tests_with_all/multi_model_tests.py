@@ -147,7 +147,8 @@ def main():
     except FileExistsError:
         pass
 
-    train_loss, eval_loss, best_score = 3 * [len(models) * [0]]
+    train_loss, eval_loss = 2 * [len(models) * [[]]]
+    best_score = len(models) * [0]
     # For each epoch
     for ep in range(epochs):
         print(f'Epoch {ep}')
