@@ -34,7 +34,7 @@ def main():
     data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
                                    tvt.RandomHorizontalFlip(p=0.25),
                                    tvt.RandomRotation(degrees=(-180, 180))])
-    data.to(torch.device(device))
+    data.to(device)
     data.augment()
 
     # Random split datasets
