@@ -111,24 +111,6 @@ def main():
     # ResNet18
     models = [ResNet18NPlaned(data.shape, start_width=64, n_classes=1)]
 
-    # BigCoMET
-    feature_extractor = inceptionresnetv2(num_classes=1001, pretrained=False)
-    feature_extractor.load_state_dict(
-        torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth'))
-    classifier = CometClassifierWithBinaryOutput
-    models.append(FeatureExtractorToClassifier(data.shape, feature_extractor=feature_extractor, classifier=classifier,
-                                               layer='conv2d_7b'))
-
-    # Xception
-    feature_extractor = xception(num_classes=1000, pretrained=False)
-    state_dict = torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/xception-43020ad28.pth')
-    state_dict['last_linear.weight'] = state_dict.pop('fc.weight')
-    state_dict['last_linear.bias'] = state_dict.pop('fc.bias')
-    feature_extractor.load_state_dict(state_dict)
-    classifier = torch.nn.Sequential(torch.nn.Linear(2048, 1), torch.nn.Sigmoid())
-    models.append(FeatureExtractorToClassifier(data.shape, feature_extractor=feature_extractor, classifier=classifier,
-                                               layer='conv4'))
-
     # Basic CNNs
     models[len(models):] = [CNNet(data.shape),
                             RegularizedCNNet(data.shape),
