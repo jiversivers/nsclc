@@ -30,7 +30,7 @@ def main():
     ################
     data = NSCLCDataset('NSCLC_Data_for_ML', ['shg'], device=torch.device('cpu'),
                         label='Metastases', mask_on=True)
-    data.normalize_channels('preset')
+    data.normalize_channels ='preset'
     data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
                                    tvt.RandomHorizontalFlip(p=0.25),
                                    tvt.RandomRotation(degrees=(-180, 180))])
@@ -117,7 +117,7 @@ def main():
         torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth'))
     classifier = CometClassifierWithBinaryOutput
     models.append(FeatureExtractorToClassifier(data.shape, feature_extractor=feature_extractor, classifier=classifier,
-                                               layer='conv2d_7b'))
+                                               feature_extractor_channels=3, layer='conv2d_7b'))
 
     # Xception
     feature_extractor = xception(num_classes=1000, pretrained=False)
@@ -127,7 +127,7 @@ def main():
     feature_extractor.load_state_dict(state_dict)
     classifier = torch.nn.Sequential(torch.nn.Linear(2048, 1), torch.nn.Sigmoid())
     models.append(FeatureExtractorToClassifier(data.shape, feature_extractor=feature_extractor, classifier=classifier,
-                                               layer='conv4'))
+                                               feature_extractor_channels=3, layer='conv4'))
 
     # Basic CNNs
     models[len(models):] = [CNNet(data.shape),
