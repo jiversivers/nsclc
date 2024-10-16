@@ -2,6 +2,7 @@ from typing import Iterator, Tuple
 
 import numpy as np
 import torch
+from pretrainedmodels import inceptionresnetv2, xception
 from torch import nn
 import warnings
 import traceback
@@ -535,7 +536,8 @@ class MPMShallowClassifier(nn.Module):
 
 
 class FeatureExtractorToClassifier(nn.Module):
-    def __init__(self, input_size, feature_extractor, feature_extractor_channels=3, classifier=CometClassifier, layer=None):
+    def __init__(self, input_size, feature_extractor, feature_extractor_channels=3, classifier=CometClassifier,
+                 layer=None):
         super().__init__()
         self.input_size = input_size
         self.expand_to_rgb = (self.input_size[0] != feature_extractor_channels)
@@ -545,7 +547,7 @@ class FeatureExtractorToClassifier(nn.Module):
             self.layer = layer
         else:
             self.layer = list(feature_extractor.named_children())[-1][0]
-        # self._layer_for_eval = ''.join(['.' + lay for lay in self.layer])
+        # model._layer_for_eval = ''.join(['.' + lay for lay in model.layer])
 
         # Isolate the feature extractor params through the input layer
         self.feature_extractor_params = nn.Module()
@@ -614,7 +616,7 @@ class FeatureExtractorToClassifier(nn.Module):
 
         # Set hook in feature extractor
         fh = getattr(self.feature_extractor, self.layer).register_forward_hook(hook, always_call=True)
-        # fh = eval(f'self.feature_extractor_params{self._layer_for_eval}.register_forward_hook(hook, always_call=True)')
+        # fh = eval(f'model.feature_extractor_params{model._layer_for_eval}.register_forward_hook(hook, always_call=True)')
 
         # Get the features from the specified layer via the hook, even if the image is "too small" for the final avg filter
         try:
@@ -764,5 +766,136 @@ class ResNet18NPlaned(nn.Module):
         x = self.out(x)
         x = self.sigmoid(x) if self.sigmoid_on else x
         return x
+
+
+class AdaptedInputInceptionResnetv2(nn.Module):
+    def __init__(self, input_size, start_width=32, sigmoid=True, num_classes=1000, pretrained=False):
+        super().__init__()
+        self.input_size = input_size
+        self.planes = self.input_size[0]
+        self.start_width = start_width
+        self.name = f'InceptionResNetV2 with {self.planes}-Planed Stem'
+        self.sigmoid_on = sigmoid
+        self.sigmoid = nn.Sigmoid()
+
+        self.model = inceptionresnetv2(num_classes=num_classes, pretrained=pretrained)
+        setattr(self.model.conv2d_1a, 'conv', nn.Conv2d(in_channels=self.planes,
+                                                        out_channels=self.start_width,
+                                                        kernel_size=self.model.conv2d_1a.conv.kernel_size,
+                                                        stride=self.model.conv2d_1a.conv.stride,
+                                                        padding=self.model.conv2d_1a.conv.padding,
+                                                        dilation=self.model.conv2d_1a.conv.dilation,
+                                                        groups=self.model.conv2d_1a.conv.groups,
+                                                        bias=self.model.conv2d_1a.conv.bias is not None))
+        setattr(self.model.conv2d_1a, 'bn', nn.BatchNorm2d(num_features=self.start_width,
+                                                           eps=self.model.conv2d_1a.bn.eps,
+                                                           momentum=self.model.conv2d_1a.bn.momentum,
+                                                           affine=self.model.conv2d_1a.bn.affine,
+                                                           track_running_stats=self.model.conv2d_1a.bn.track_running_stats))
+        setattr(self.model.conv2d_2a, 'conv', nn.Conv2d(in_channels=self.start_width,
+                                                        out_channels=self.start_width,
+                                                        kernel_size=self.model.conv2d_2a.conv.kernel_size,
+                                                        stride=self.model.conv2d_2a.conv.stride,
+                                                        padding=self.model.conv2d_2a.conv.padding,
+                                                        dilation=self.model.conv2d_2a.conv.dilation,
+                                                        groups=self.model.conv2d_2a.conv.groups,
+                                                        bias=self.model.conv2d_2a.conv.bias is not None))
+        setattr(self.model.conv2d_2a, 'bn', nn.BatchNorm2d(num_features=self.start_width,
+                                                           eps=self.model.conv2d_2a.bn.eps,
+                                                           momentum=self.model.conv2d_2a.bn.momentum,
+                                                           affine=self.model.conv2d_2a.bn.affine,
+                                                           track_running_stats=self.model.conv2d_2a.bn.track_running_stats))
+        setattr(self.model.conv2d_2b, 'conv', nn.Conv2d(in_channels=self.start_width,
+                                                        out_channels=self.model.conv2d_2b.conv.out_channels,
+                                                        kernel_size=self.model.conv2d_2b.conv.kernel_size,
+                                                        stride=self.model.conv2d_2b.conv.stride,
+                                                        padding=self.model.conv2d_2b.conv.padding,
+                                                        dilation=self.model.conv2d_2b.conv.dilation,
+                                                        groups=self.model.conv2d_2b.conv.groups,
+                                                        bias=self.model.conv2d_2b.conv.bias is not None))
+        setattr(self.model.conv2d_2b, 'bn', nn.BatchNorm2d(num_features=self.model.conv2d_2b.conv.out_channels,
+                                                           eps=self.model.conv2d_2b.bn.eps,
+                                                           momentum=self.model.conv2d_2b.bn.momentum,
+                                                           affine=self.model.conv2d_2b.bn.affine,
+                                                           track_running_stats=self.model.conv2d_2b.bn.track_running_stats))
+
+    def forward(self, x):
+        x = self.model(x)
+        x = self.sigmoid(x) if self.sigmoid_on else x
+        return x
+
+    def to(self, device):
+        self.model.to(device)
+        self.sigmoid.to(device)
+
+
+class AdaptedInputXception(nn.Module):
+    def __init__(self, input_size, start_width=32, n_classes=1, sigmoid=True, num_classes=1000, pretrained=False):
+        super().__init__()
+        self.input_size = input_size
+        self.planes = self.input_size[0]
+        self.start_width = start_width
+        self.name = f'Xception with {self.planes}-Planed Stem'
+        self.sigmoid_on = sigmoid
+        self.sigmoid = nn.Sigmoid()
+
+        self.model = xception(num_classes=num_classes, pretrained=pretrained)
+        setattr(self.model, 'conv1', nn.Conv2d(in_channels=self.planes,
+                                               out_channels=self.start_width,
+                                               kernel_size=self.model.conv1.kernel_size,
+                                               stride=self.model.conv1.stride,
+                                               padding=self.model.conv1.padding,
+                                               dilation=self.model.conv1.dilation,
+                                               groups=self.model.conv1.groups,
+                                               bias=self.model.conv1.bias is not None))
+        setattr(self.model, 'bn1', nn.BatchNorm2d(num_features=self.start_width,
+                                                  eps=self.model.bn1.eps,
+                                                  momentum=self.model.bn1.momentum,
+                                                  affine=self.model.bn1.affine,
+                                                  track_running_stats=self.model.bn1.track_running_stats))
+        setattr(self.model, 'conv2', nn.Conv2d(in_channels=self.start_width,
+                                               out_channels=self.model.conv2.out_channels,
+                                               kernel_size=self.model.conv2.kernel_size,
+                                               stride=self.model.conv2.stride,
+                                               padding=self.model.conv2.padding,
+                                               dilation=self.model.conv2.dilation,
+                                               groups=self.model.conv2.groups,
+                                               bias=self.model.conv2.bias is not None))
+        setattr(self.model, 'bn2', nn.BatchNorm2d(num_features=self.model.conv2.out_channels,
+                                                  eps=self.model.bn2.eps,
+                                                  momentum=self.model.bn2.momentum,
+                                                  affine=self.model.bn2.affine,
+                                                  track_running_stats=self.model.bn2.track_running_stats))
+
+    def forward(self, x):
+        x = self.model(x)
+        x = self.sigmoid(x) if self.sigmoid_on else x
+        return x
+
+    def to(self, device):
+        self.model.to(device)
+        self.sigmoid.to(device)
+
+
+def update_layer_channels(model, new_channels, old_channels):
+    updated_layers = {}
+    for name, module in model.named_modules():
+        if isinstance(module, nn.Conv2d):
+            updated_layers[name] = nn.Conv2d(
+                in_channels=int(np.round(new_channels * module.in_channels / old_channels)),
+                out_channels=int(np.round(new_channels * module.out_channels / old_channels)),
+                kernel_size=module.kernel_size, stride=module.stride, padding=module.padding,
+                dilation=module.dilation, groups=module.groups, bias=module.bias is not None)
+        elif isinstance(module, nn.BatchNorm2d):
+            updated_layers[name] = nn.BatchNorm2d(
+                num_features=int(np.round(new_channels * module.num_features / old_channels)),
+                eps=module.eps, momentum=module.momentum, affine=module.affine,
+                track_running_stats=module.track_running_stats)
+    for name, layer in updated_layers.items():
+        parts = name.split('.')
+        current_module = model
+        for part in parts[:-1]:
+            current_module = getattr(current_module, part)
+        setattr(current_module, parts[-1], layer)
 
 # endregion
