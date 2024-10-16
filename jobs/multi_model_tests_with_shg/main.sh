@@ -28,7 +28,7 @@ files=/home/jdivers/data/
 
 echo "Copying files..."
 mkdir /scratch/$SLURM_JOB_ID
-rsync -avq $files /scratch/$SLURM_JOB_ID/data
+rsync -avq $files /scratch/$SLURM_JOB_ID
 rsync -avq $SLURM_SUBMIT_DIR/*.py /scratch/$SLURM_JOB_ID
 rsync -avq /home/jdivers/nsclc/my_modules /scratch/$SLURM_JOB_ID
 wait
