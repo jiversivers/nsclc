@@ -30,12 +30,12 @@ def main():
     ################
     data = NSCLCDataset('NSCLC_Data_for_ML', ['fad', 'nadh', 'shg', 'orr', 'intensity'], device=torch.device('cpu'),
                         label='Metastases', mask_on=True)
-    data.normalize_channels('preset')
+    data.augment()
+    data.normalize_method('preset')
     data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
                                    tvt.RandomHorizontalFlip(p=0.25),
                                    tvt.RandomRotation(degrees=(-180, 180))])
-    data.to(torch.device(device))
-    data.augment()
+    data.to(device)
 
     # Random split datasets
     subsampler = torch.utils.data.sampler.SubsetRandomSampler(range(data.patient_count))
