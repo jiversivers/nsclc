@@ -147,12 +147,13 @@ def main():
     except FileExistsError:
         pass
 
-    train_loss, eval_loss = 2 * [len(models) * [[]]]
-    best_score = len(models) * [0]
+    train_loss = [[] for _ in range(len(models))]
+    eval_loss = [[] for _ in range(len(models))]
+    best_score = [0 for _ in range(len(models))]
     # For each epoch
     for ep in range(epochs):
         print(f'Epoch {ep}')
-        epoch_loss = len(models) * [0]
+        epoch_loss = [0 for _ in range(len(models))]
         # Train
         for model in models:
             model.train()
@@ -163,15 +164,15 @@ def main():
                 loss.backward()
                 epoch_loss[i] += loss.item()
                 optimizers[i].step()
-        for running, current in zip(train_loss, epoch_loss):
-            running.append(current)
+        for i, current in enumerate(epoch_loss):
+            train_loss[i].append(current)
 
         # Evaluation
         for i, model in enumerate(models):
             with open(f'outputs/{model.name}/results.txt', 'a') as f:
                 f.write(f'Epoch {ep}\n'
-                        f'{model.name}: Training loss: {train_loss[i]}. Evaluation scores:')
-            print(f'>>> {model.name}: Training loss: {train_loss[i]}. Evaluation scores:')
+                        f'{model.name}: Training loss: {train_loss[i][-1]}. Evaluation scores:')
+            print(f'>>> {model.name}: Training loss: {train_loss[i][-1]}. Evaluation scores:')
             scores = score_model(model, test_loader, loss_fn=loss_function, print_results=True, make_plot=False,
                                  threshold_type='roc')
             eval_loss[i] = scores['Loss']
@@ -184,7 +185,7 @@ def main():
     # Plot epoch-wise outputs
     plt.figure(figsize=(10, 5))
     for i, model in enumerate(models):
-        plt.plot(range(1, epochs + 1), train_loss[i], label=f'{model.name} Training')
+        plt.plot(range(1, epochs + 1), train_loss[i][-1], label=f'{model.name} Training')
         plt.plot(range(1, epochs + 1), eval_loss[i], label=f'{model.name} Evaluation')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')

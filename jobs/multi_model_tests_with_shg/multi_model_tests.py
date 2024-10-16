@@ -165,12 +165,13 @@ def main():
     except FileExistsError:
         pass
 
-    train_loss, eval_loss = 2 * [len(models) * [[]]]
-    best_score = len(models) * [0]
+    train_loss = [[] for _ in range(len(models))]
+    eval_loss = [[] for _ in range(len(models))]
+    best_score = [0 for _ in range(len(models))]
     # For each epoch
     for ep in range(epochs):
         print(f'Epoch {ep}')
-        epoch_loss = len(models) * [0]
+        epoch_loss = [0 for _ in range(len(models))]
         # Train
         for model in models:
             model.train()
@@ -181,8 +182,8 @@ def main():
                 loss.backward()
                 epoch_loss[i] += loss.item()
                 optimizers[i].step()
-        for running, current in zip(train_loss, epoch_loss):
-            running.append(current)
+        for i, current in enumerate(epoch_loss):
+            train_loss[i].append(current)
 
         # Evaluation
         for i, model in enumerate(models):
