@@ -79,7 +79,7 @@ def calculate_auc_roc(model, loader, print_results=False, make_plot=False):
         return auc, best_acc, thresh
 
 
-def score_model(model, loader, print_results=False, make_plot=False, threshold_type='none'):
+def score_model(model, loader, loss_fn=None, print_results=False, make_plot=False, threshold_type='none'):
     def make_the_plots():
         fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 5))
         RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=scores['ROC-AUC']).plot(ax=ax1)
@@ -94,6 +94,7 @@ def score_model(model, loader, print_results=False, make_plot=False, threshold_t
     model.eval()
     outs = torch.tensor([])
     targets = torch.tensor([])
+    loss = 0
     with torch.no_grad():
         for x, target in loader:
             if next(model.parameters()).is_cuda:
@@ -104,6 +105,13 @@ def score_model(model, loader, print_results=False, make_plot=False, threshold_t
             # Clean up for memory
             del x, target
             torch.cuda.empty_cache()
+
+        if loss_fn is not None:
+            try:
+                loss += loss_fn(outs, targets)
+            except Exception as e:
+                loss += loss_fn(outs, target.unsqueeze(1))
+            scores['Loss'] = loss
     # ROC
     fpr, tpr, thresholds = roc_curve(targets, outs, pos_label=1)
     scores['ROC-AUC'] = auc(fpr, tpr)
