@@ -7,8 +7,6 @@ import torchvision.transforms.v2 as tvt
 from matplotlib import pyplot as plt
 import random
 
-from pretrainedmodels import inceptionresnetv2, xception
-
 from my_modules.custom_models import *
 from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import set_seed
@@ -114,20 +112,14 @@ def main():
     models = [ResNet18NPlaned(data.shape, start_width=64, n_classes=1)]
 
     # InceptionResNetV2 Feature Extractor (BigCoMET)
-    feature_extractor = AdaptedInputInceptionResnetv2(data.shape, num_classes=1001, pretrained=False)
-    feature_extractor.load_state_dict(
-        torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth'))
+    feature_extractor = AdaptedInputInceptionResnetv2(data.shape, num_classes=1000, pretrained=False)
     classifier = CometClassifierWithBinaryOutput
     models.append(FeatureExtractorToClassifier(data.shape,
                                                feature_extractor=feature_extractor,
                                                classifier=classifier, layer='conv2d_7b'))
 
     # Xception Feature Extractor
-    feature_extractor = AdaptedInputXception(data.shape)
-    state_dict = torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/xception-43020ad28.pth')
-    state_dict['last_linear.weight'] = state_dict.pop('fc.weight')
-    state_dict['last_linear.bias'] = state_dict.pop('fc.bias')
-    feature_extractor.load_state_dict(state_dict)
+    feature_extractor = AdaptedInputXception(data.shape, num_classes=1000, pretrained=False)
     classifier = torch.nn.Sequential(torch.nn.Linear(2048, 1), torch.nn.Sigmoid())
     models.append(FeatureExtractorToClassifier(data.shape,
                                                feature_extractor=feature_extractor,
