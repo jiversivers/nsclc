@@ -113,6 +113,26 @@ def main():
     # ResNet18
     models = [ResNet18NPlaned(data.shape, start_width=64, n_classes=1)]
 
+    # InceptionResNetV2 Feature Extractor (BigCoMET)
+    feature_extractor = AdaptedInputInceptionResnetv2(data.shape, num_classes=1001, pretrained=False)
+    feature_extractor.load_state_dict(
+        torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/inceptionresnetv2-520b38e4.pth'))
+    classifier = CometClassifierWithBinaryOutput
+    models.append(FeatureExtractorToClassifier(data.shape,
+                                               feature_extractor=feature_extractor,
+                                               classifier=classifier, layer='conv2d_7b'))
+
+    # Xception Feature Extractor
+    feature_extractor = AdaptedInputXception(data.shape)
+    state_dict = torch.load(r'/home/jdivers/data/torch_checkpoints/pretrained_models/xception-43020ad28.pth')
+    state_dict['last_linear.weight'] = state_dict.pop('fc.weight')
+    state_dict['last_linear.bias'] = state_dict.pop('fc.bias')
+    feature_extractor.load_state_dict(state_dict)
+    classifier = torch.nn.Sequential(torch.nn.Linear(2048, 1), torch.nn.Sigmoid())
+    models.append(FeatureExtractorToClassifier(data.shape,
+                                               feature_extractor=feature_extractor,
+                                               classifier=classifier, layer='conv4'))
+
     # Basic CNNs
     models[len(models):] = [CNNet(data.shape),
                             RegularizedCNNet(data.shape),
@@ -152,7 +172,7 @@ def main():
     best_score = [0 for _ in range(len(models))]
     # For each epoch
     for ep in range(epochs):
-        print(f'Epoch {ep}')
+        print(f'\nEpoch {ep + 1}')
         epoch_loss = [0 for _ in range(len(models))]
         # Train
         for model in models:
@@ -165,27 +185,32 @@ def main():
                 epoch_loss[i] += loss.item()
                 optimizers[i].step()
         for i, current in enumerate(epoch_loss):
-            train_loss[i].append(current)
+            train_loss[i].append(current / len(train_set))
 
         # Evaluation
         for i, model in enumerate(models):
-            with open(f'outputs/{model.name}/results.txt', 'a') as f:
-                f.write(f'Epoch {ep}\n'
-                        f'{model.name}: Training loss: {train_loss[i][-1]}. Evaluation scores:')
             print(f'>>> {model.name}: Training loss: {train_loss[i][-1]}. Evaluation scores:')
             scores = score_model(model, test_loader, loss_fn=loss_function, print_results=True, make_plot=False,
                                  threshold_type='roc')
             eval_loss[i] = scores['Loss']
+
+            with open(f'outputs/{model.name}/results.txt', 'a') as f:
+                f.write(f'\n\nEpoch {ep + 1}\n'
+                        f'{model.name}: Training loss: {train_loss[i][-1]}. Evaluation scores:')
+                for key, item in scores.items():
+                    if 'Confusion' not in key:
+                        f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
+
             if scores['ROC-AUC'] > best_score[i]:
                 best_score[i] = scores['ROC-AUC']
                 torch.save(model.state_dict(), f'best_models/Best {model.name}.pth')
                 with open(f'outputs/{model.name}/results.txt', 'a') as f:
-                    f.write(f'New best {model.name} saved at epoch {ep} with ROC-AUC of {scores["ROC-AUC"]}')
+                    f.write(f'New best {model.name} saved at epoch {ep + 1} with ROC-AUC of {scores["ROC-AUC"]}')
 
     # Plot epoch-wise outputs
     plt.figure(figsize=(10, 5))
     for i, model in enumerate(models):
-        plt.plot(range(1, epochs + 1), train_loss[i][-1], label=f'{model.name} Training')
+        plt.plot(range(1, epochs + 1), train_loss[i], label=f'{model.name} Training')
         plt.plot(range(1, epochs + 1), eval_loss[i], label=f'{model.name} Evaluation')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
@@ -198,7 +223,7 @@ def main():
     for model in models:
         print(f'>>> {model.name}...')
         scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
-        fig.savefig(f'outputs/{model.name}/plots/test_results.png')
+        fig.savefig(f'outputs/{model.name}_plots.png')
         plt.close(fig)
         with open(f'outputs/{model.name}/results.txt', 'a') as f:
             f.write(f'\n>>> {model.name}...')
