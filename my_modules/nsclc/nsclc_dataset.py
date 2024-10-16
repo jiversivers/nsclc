@@ -95,6 +95,8 @@ TODO: Update doc
                     'Features file not found,'
                     ' input path manually at dataset initialization using xl_file=<path_to_file>.')
             self.xl_file = xl_file[0]
+        else:
+            self.xl_file = xl_file
         self.features = pd.read_excel(self.xl_file, header=[0, 1])
         self.patient_count = len(self.features)
         """
@@ -745,7 +747,7 @@ TODO: Update doc
                             x = torch.cat((x, data[i][0].unsqueeze(0)), dim=0)
                         x_bar = torch.nanmean(torch.nanmean(torch.nanmean(x, dim=0), dim=1), dim=1)
                         sigma = np.nanstd(np.nanstd(np.nanstd(x, axis=0), axis=1), axis=1)
-                        for mode, bar, s in zip(data.mode, x_bar, sig):
+                        for mode, bar, sig in zip(data.mode, x_bar, sigma):
                             print(f"'{mode}': [{bar}, {sig}],")
 
                     where 'data' is an instance of this class with all modes (note, not 'all' set as the mode, because 
@@ -754,20 +756,20 @@ TODO: Update doc
                     The results for each mode are as  included as a dict below, which will be used to calculate the 
                     ranges for all modes.
                     '''
-                    mean_std_mode_dict = {'nadh': [0.8325826525688171, 0.051511045545339584],
-                                          'fad': [0.38952434062957764, 0.026814082637429237],
-                                          'shg': [0.15079453587532043, 0.057851944118738174],
-                                          'intensity': [0.611053466796875, 0.03482185676693916],
-                                          'orr': [0.35903289914131165, 0.021183252334594727],
-                                          'g': [0.3222281336784363, 0.009898046031594276],
-                                          's': [0.3749162554740906, 0.0024291533045470715],
-                                          'photons': [191.2639617919922, 11.133986473083496],
-                                          'tau1': [786.095458984375, 51.755043029785156],
-                                          'tau2': [4271.404296875, 232.18263244628906],
-                                          'alpha1': [103.16101837158203, 6.902841567993164],
-                                          'alpha2': [78.77812194824219, 4.96993350982666],
-                                          'taumean': [2319.463134765625, 95.37203979492188],
-                                          'boundfraction': [0.44960716366767883, 0.01542571373283863]}
+                    mean_std_mode_dict = {'fad':            [0.21998976171016693, 0.0163725633174181],
+                                          'nadh':           [0.4831325113773346, 0.06519994884729385],
+                                          'shg':            [0.1766463816165924, 0.15144270658493042],
+                                          'intensity':      [0.35156112909317017, 0.03592873364686966],
+                                          'orr':            [0.3561578094959259, 0.022590430453419685],
+                                          'g':              [0.3222281336784363, 0.009898046031594276],
+                                          's':              [0.3749162554740906, 0.0024291533045470715],
+                                          'photons':        [191.2639617919922, 11.133986473083496],
+                                          'tau1':           [786.095458984375, 51.755043029785156],
+                                          'tau2':           [4271.404296875, 232.18263244628906],
+                                          'alpha1':         [103.16101837158203, 6.902841567993164],
+                                          'alpha2':         [78.77812194824219, 4.96993350982666],
+                                          'taumean':        [2319.463134765625, 95.37203979492188],
+                                          'boundfraction':  [0.44960716366767883, 0.01542571373283863]}
 
                     self._preset_values = {}
                     for key, (m, s) in mean_std_mode_dict.items():
