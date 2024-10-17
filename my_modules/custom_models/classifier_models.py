@@ -535,19 +535,58 @@ class MPMShallowClassifier(nn.Module):
         return x
 
 
+def get_ordered_layers(model, x):
+    called_modules = []
+    exception_list = []
+
+    def hook(module, layer_input, layer_output):
+        if module not in called_modules:
+            called_modules.append(module)
+        return
+
+    hooks = []
+    for name, layer in model.named_modules():
+        if not isinstance(layer, (nn.Sequential, nn.ModuleList)) and layer != model:
+            hooks.append(layer.register_forward_hook(hook))
+
+    try:
+        _ = model(x)
+    except RuntimeError as e:
+        # Print the first occurrence of the error type
+        if type(e) not in exception_list:
+            exception_list.append(type(e))
+            print(f'{''.join(traceback.format_tb(e.__traceback__))}\n '
+                  f'Warning {type(e)} error caught during ordered layer search\n'
+                  f'{e}')
+        else:
+            pass
+    finally:
+        # Clean up the hooks
+        for hook in hooks:
+            hook.remove()
+
+    return called_modules
+
+
 class FeatureExtractorToClassifier(nn.Module):
-    def __init__(self, input_size, feature_extractor, feature_extractor_channels=3, classifier=CometClassifier,
+    def __init__(self, input_size, feature_extractor, classifier=CometClassifier,
                  layer=None):
         super().__init__()
         self.input_size = input_size
-        self.expand_to_rgb = (self.input_size[0] != feature_extractor_channels)
+        self.feature_extractor = feature_extractor
+        self.exception_list = []
+
+        x = torch.rand(1, *self.input_size, device=next(feature_extractor.parameters()).device)
+        self.first_layer = get_ordered_layers(feature_extractor, x)[0]
+        self.feature_extractor_channels = self.first_layer.in_channels
+        self.expand_to_match = (self.input_size[0] != self.feature_extractor_channels)
 
         # Parse input layer
         if layer is not None:
             self.layer = layer
         else:
             self.layer = list(feature_extractor.named_children())[-1][0]
-        # model._layer_for_eval = ''.join(['.' + lay for lay in model.layer])
+        # self._layer_for_eval = ''.join(['.' + lay for lay in self.layer])
 
         # Isolate the feature extractor params through the input layer
         self.feature_extractor_params = nn.Module()
@@ -559,12 +598,8 @@ class FeatureExtractorToClassifier(nn.Module):
                 break
             setattr(self.feature_extractor_params, name, module)
 
-        self.exception_list = []
-
         # Dry run for feature dims
-        self.feature_extractor = feature_extractor
-        x = torch.rand(1, *self.input_size, device=next(feature_extractor.parameters()).device)
-        x = x.expand(-1, 3, -1, -1) if self.expand_to_rgb else x
+        x = x.expand(-1, self.feature_extractor_channels, -1, -1) if self.expand_to_match else x
         self.feature_map_dims = self.get_features(x).shape
 
         # Get average value for each feature map
@@ -593,7 +628,7 @@ class FeatureExtractorToClassifier(nn.Module):
 
         # Extract features with nan-masking as 0
         x[torch.isnan(x)] = 0
-        x = x.expand(-1, 3, -1, -1) if self.expand_to_rgb else x
+        x = x.expand(-1, self.feature_extractor_channels, -1, -1) if self.expand_to_match else x
         x = self.get_features(x)
 
         # Pool and flatten feature maps
@@ -610,13 +645,17 @@ class FeatureExtractorToClassifier(nn.Module):
         get = {}
 
         # Create hook for feature extraction
-        def hook(model, input, output):
-            get['features'] = output
+        def hook(module, layer_input, layer_output):
+            get['features'] = layer_output
             return
 
         # Set hook in feature extractor
-        fh = getattr(self.feature_extractor, self.layer).register_forward_hook(hook, always_call=True)
-        # fh = eval(f'model.feature_extractor_params{model._layer_for_eval}.register_forward_hook(hook, always_call=True)')
+        parts = self.layer.split('.')
+        current_module = self.feature_extractor
+        for part in parts[:-1]:
+            current_module = getattr(current_module, part)
+        fh = getattr(current_module, parts[-1]).register_forward_hook(hook, always_call=True)
+        # fh = eval(f'xception.feature_extractor_params{xception._layer_for_eval}.register_forward_hook(hook, always_call=True)')
 
         # Get the features from the specified layer via the hook, even if the image is "too small" for the final avg filter
         try:
@@ -667,7 +706,7 @@ class ResNet18NPlaned(nn.Module):
         self.planes = self.input_size[0]
         self.start_width = start_width
         self.name = f'{self.planes}-Planed ResNet18'
-        self.sigmoid_on = sigmoid
+        self.sigmoid = nn.Sigmoid() if sigmoid else nn.Identity()
 
         self.relu = nn.ReLU(inplace=True)
 
@@ -764,116 +803,125 @@ class ResNet18NPlaned(nn.Module):
         x = self.flat(x)
         x = self.fc(x)
         x = self.out(x)
-        x = self.sigmoid(x) if self.sigmoid_on else x
+        x = self.sigmoid(x)
         return x
 
 
-class AdaptedInputInceptionResnetv2(nn.Module):
+class AdaptedInputInceptionResNetV2(nn.Module):
     def __init__(self, input_size, start_width=32, sigmoid=True, num_classes=1000, pretrained=False):
         super().__init__()
         self.input_size = input_size
         self.planes = self.input_size[0]
         self.start_width = start_width
         self.name = f'InceptionResNetV2 with {self.planes}-Planed Stem'
-        self.sigmoid_on = sigmoid
-        self.sigmoid = nn.Sigmoid()
+        self.sigmoid = nn.Sigmoid() if sigmoid else nn.Identity()
 
-        self.model = inceptionresnetv2(num_classes=num_classes, pretrained=pretrained)
-        setattr(self.model.conv2d_1a, 'conv', nn.Conv2d(in_channels=self.planes,
-                                                        out_channels=self.start_width,
-                                                        kernel_size=self.model.conv2d_1a.conv.kernel_size,
-                                                        stride=self.model.conv2d_1a.conv.stride,
-                                                        padding=self.model.conv2d_1a.conv.padding,
-                                                        dilation=self.model.conv2d_1a.conv.dilation,
-                                                        groups=self.model.conv2d_1a.conv.groups,
-                                                        bias=self.model.conv2d_1a.conv.bias is not None))
-        setattr(self.model.conv2d_1a, 'bn', nn.BatchNorm2d(num_features=self.start_width,
-                                                           eps=self.model.conv2d_1a.bn.eps,
-                                                           momentum=self.model.conv2d_1a.bn.momentum,
-                                                           affine=self.model.conv2d_1a.bn.affine,
-                                                           track_running_stats=self.model.conv2d_1a.bn.track_running_stats))
-        setattr(self.model.conv2d_2a, 'conv', nn.Conv2d(in_channels=self.start_width,
-                                                        out_channels=self.start_width,
-                                                        kernel_size=self.model.conv2d_2a.conv.kernel_size,
-                                                        stride=self.model.conv2d_2a.conv.stride,
-                                                        padding=self.model.conv2d_2a.conv.padding,
-                                                        dilation=self.model.conv2d_2a.conv.dilation,
-                                                        groups=self.model.conv2d_2a.conv.groups,
-                                                        bias=self.model.conv2d_2a.conv.bias is not None))
-        setattr(self.model.conv2d_2a, 'bn', nn.BatchNorm2d(num_features=self.start_width,
-                                                           eps=self.model.conv2d_2a.bn.eps,
-                                                           momentum=self.model.conv2d_2a.bn.momentum,
-                                                           affine=self.model.conv2d_2a.bn.affine,
-                                                           track_running_stats=self.model.conv2d_2a.bn.track_running_stats))
-        setattr(self.model.conv2d_2b, 'conv', nn.Conv2d(in_channels=self.start_width,
-                                                        out_channels=self.model.conv2d_2b.conv.out_channels,
-                                                        kernel_size=self.model.conv2d_2b.conv.kernel_size,
-                                                        stride=self.model.conv2d_2b.conv.stride,
-                                                        padding=self.model.conv2d_2b.conv.padding,
-                                                        dilation=self.model.conv2d_2b.conv.dilation,
-                                                        groups=self.model.conv2d_2b.conv.groups,
-                                                        bias=self.model.conv2d_2b.conv.bias is not None))
-        setattr(self.model.conv2d_2b, 'bn', nn.BatchNorm2d(num_features=self.model.conv2d_2b.conv.out_channels,
-                                                           eps=self.model.conv2d_2b.bn.eps,
-                                                           momentum=self.model.conv2d_2b.bn.momentum,
-                                                           affine=self.model.conv2d_2b.bn.affine,
-                                                           track_running_stats=self.model.conv2d_2b.bn.track_running_stats))
+        self.inceptionresnetv2 = inceptionresnetv2(num_classes=num_classes, pretrained=pretrained)
+
+        self.inceptionresnetv2.conv2d_1a.conv = nn.Conv2d(
+            in_channels=self.planes,
+            out_channels=self.start_width,
+            kernel_size=self.inceptionresnetv2.conv2d_1a.conv.kernel_size,
+            stride=self.inceptionresnetv2.conv2d_1a.conv.stride,
+            padding=self.inceptionresnetv2.conv2d_1a.conv.padding,
+            dilation=self.inceptionresnetv2.conv2d_1a.conv.dilation,
+            groups=self.inceptionresnetv2.conv2d_1a.conv.groups,
+            bias=self.inceptionresnetv2.conv2d_1a.conv.bias is not None)
+        self.inceptionresnetv2.conv2d_1a.bn = nn.BatchNorm2d(
+            num_features=self.start_width,
+            eps=self.inceptionresnetv2.conv2d_1a.bn.eps,
+            momentum=self.inceptionresnetv2.conv2d_1a.bn.momentum,
+            affine=self.inceptionresnetv2.conv2d_1a.bn.affine,
+            track_running_stats=self.inceptionresnetv2.conv2d_1a.bn.track_running_stats)
+        self.inceptionresnetv2.conv2d_2a.conv = nn.Conv2d(
+            in_channels=self.start_width,
+            out_channels=self.start_width,
+            kernel_size=self.inceptionresnetv2.conv2d_2a.conv.kernel_size,
+            stride=self.inceptionresnetv2.conv2d_2a.conv.stride,
+            padding=self.inceptionresnetv2.conv2d_2a.conv.padding,
+            dilation=self.inceptionresnetv2.conv2d_2a.conv.dilation,
+            groups=self.inceptionresnetv2.conv2d_2a.conv.groups,
+            bias=self.inceptionresnetv2.conv2d_2a.conv.bias is not None)
+        self.inceptionresnetv2.conv2d_2a.bn = nn.BatchNorm2d(
+            num_features=self.start_width,
+            eps=self.inceptionresnetv2.conv2d_2a.bn.eps,
+            momentum=self.inceptionresnetv2.conv2d_2a.bn.momentum,
+            affine=self.inceptionresnetv2.conv2d_2a.bn.affine,
+            track_running_stats=self.inceptionresnetv2.conv2d_2a.bn.track_running_stats)
+        self.inceptionresnetv2.conv2d_2b.conv = nn.Conv2d(
+            in_channels=self.start_width,
+            out_channels=self.inceptionresnetv2.conv2d_2b.conv.out_channels,
+            kernel_size=self.inceptionresnetv2.conv2d_2b.conv.kernel_size,
+            stride=self.inceptionresnetv2.conv2d_2b.conv.stride,
+            padding=self.inceptionresnetv2.conv2d_2b.conv.padding,
+            dilation=self.inceptionresnetv2.conv2d_2b.conv.dilation,
+            groups=self.inceptionresnetv2.conv2d_2b.conv.groups,
+            bias=self.inceptionresnetv2.conv2d_2b.conv.bias is not None)
+        self.inceptionresnetv2.conv2d_2b.bn = nn.BatchNorm2d(
+            num_features=self.inceptionresnetv2.conv2d_2b.conv.out_channels,
+            eps=self.inceptionresnetv2.conv2d_2b.bn.eps,
+            momentum=self.inceptionresnetv2.conv2d_2b.bn.momentum,
+            affine=self.inceptionresnetv2.conv2d_2b.bn.affine,
+            track_running_stats=self.inceptionresnetv2.conv2d_2b.bn.track_running_stats)
 
     def forward(self, x):
-        x = self.model(x)
-        x = self.sigmoid(x) if self.sigmoid_on else x
+        x = self.inceptionresnetv2(x)
+        x = self.sigmoid(x)
         return x
 
     def to(self, device):
-        self.model.to(device)
+        self.inceptionresnetv2.to(device)
         self.sigmoid.to(device)
 
 
 class AdaptedInputXception(nn.Module):
-    def __init__(self, input_size, start_width=32, n_classes=1, sigmoid=True, num_classes=1000, pretrained=False):
+    def __init__(self, input_size, start_width=32, sigmoid=True, num_classes=1000, pretrained=False):
         super().__init__()
         self.input_size = input_size
         self.planes = self.input_size[0]
         self.start_width = start_width
         self.name = f'Xception with {self.planes}-Planed Stem'
-        self.sigmoid_on = sigmoid
-        self.sigmoid = nn.Sigmoid()
+        self.sigmoid = nn.Sigmoid() if sigmoid else nn.Identity()
 
-        self.model = xception(num_classes=num_classes, pretrained=pretrained)
-        setattr(self.model, 'conv1', nn.Conv2d(in_channels=self.planes,
-                                               out_channels=self.start_width,
-                                               kernel_size=self.model.conv1.kernel_size,
-                                               stride=self.model.conv1.stride,
-                                               padding=self.model.conv1.padding,
-                                               dilation=self.model.conv1.dilation,
-                                               groups=self.model.conv1.groups,
-                                               bias=self.model.conv1.bias is not None))
-        setattr(self.model, 'bn1', nn.BatchNorm2d(num_features=self.start_width,
-                                                  eps=self.model.bn1.eps,
-                                                  momentum=self.model.bn1.momentum,
-                                                  affine=self.model.bn1.affine,
-                                                  track_running_stats=self.model.bn1.track_running_stats))
-        setattr(self.model, 'conv2', nn.Conv2d(in_channels=self.start_width,
-                                               out_channels=self.model.conv2.out_channels,
-                                               kernel_size=self.model.conv2.kernel_size,
-                                               stride=self.model.conv2.stride,
-                                               padding=self.model.conv2.padding,
-                                               dilation=self.model.conv2.dilation,
-                                               groups=self.model.conv2.groups,
-                                               bias=self.model.conv2.bias is not None))
-        setattr(self.model, 'bn2', nn.BatchNorm2d(num_features=self.model.conv2.out_channels,
-                                                  eps=self.model.bn2.eps,
-                                                  momentum=self.model.bn2.momentum,
-                                                  affine=self.model.bn2.affine,
-                                                  track_running_stats=self.model.bn2.track_running_stats))
+        self.xception = xception(num_classes=num_classes, pretrained=pretrained)
+        self.xception.conv1 = nn.Conv2d(
+            in_channels=self.planes,
+            out_channels=self.start_width,
+            kernel_size=self.xception.conv1.kernel_size,
+            stride=self.xception.conv1.stride,
+            padding=self.xception.conv1.padding,
+            dilation=self.xception.conv1.dilation,
+            groups=self.xception.conv1.groups,
+            bias=self.xception.conv1.bias is not None)
+        self.xception.bn1 = nn.BatchNorm2d(
+            num_features=self.start_width,
+            eps=self.xception.bn1.eps,
+            momentum=self.xception.bn1.momentum,
+            affine=self.xception.bn1.affine,
+            track_running_stats=self.xception.bn1.track_running_stats)
+        self.xception.conv2 = nn.Conv2d(
+            in_channels=self.start_width,
+            out_channels=self.xception.conv2.out_channels,
+            kernel_size=self.xception.conv2.kernel_size,
+            stride=self.xception.conv2.stride,
+            padding=self.xception.conv2.padding,
+            dilation=self.xception.conv2.dilation,
+            groups=self.xception.conv2.groups,
+            bias=self.xception.conv2.bias is not None)
+        self.xception.bn2 = nn.BatchNorm2d(
+            num_features=self.xception.conv2.out_channels,
+            eps=self.xception.bn2.eps,
+            momentum=self.xception.bn2.momentum,
+            affine=self.xception.bn2.affine,
+            track_running_stats=self.xception.bn2.track_running_stats)
 
     def forward(self, x):
-        x = self.model(x)
-        x = self.sigmoid(x) if self.sigmoid_on else x
+        x = self.xception(x)
+        x = self.sigmoid(x)
         return x
 
     def to(self, device):
-        self.model.to(device)
+        self.xception.to(device)
         self.sigmoid.to(device)
 
 
