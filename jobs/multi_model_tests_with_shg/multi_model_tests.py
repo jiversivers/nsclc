@@ -211,9 +211,15 @@ def main():
     plt.grid(True)
     plt.savefig(f'outputs/losses.png')
 
+    with open(f'outputs/results.txt', 'w') as f:
+        f.write(f'Best ROC-AUC\n')
+        for model, score in zip(models, best_score):
+            f.write(f'{model.name}: {score:.4f}\n')
+
     # Testing
     for model in models:
         print(f'>>> {model.name}...')
+        model.load_state_dict(torch.load(f'best_models/Best {model.name}.pth'))
         scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
         fig.savefig(f'outputs/{model.name}_plots.png')
         plt.close(fig)
@@ -223,6 +229,7 @@ def main():
                 if 'Confusion' not in key:
                     f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
             f.write('_____________________________________________________\n')
+
 
 # Run
 if __name__ == '__main__':

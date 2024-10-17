@@ -112,18 +112,18 @@ def main():
     models = [ResNet18NPlaned(data.shape, start_width=64, n_classes=1)]
 
     # InceptionResNetV2 Feature Extractor (BigCoMET)
-    feature_extractor = AdaptedInputInceptionResnetv2(data.shape, num_classes=1000, pretrained=False)
+    feature_extractor = AdaptedInputInceptionResNetV2(data.shape, num_classes=1000, pretrained=False)
     classifier = CometClassifierWithBinaryOutput
     models.append(FeatureExtractorToClassifier(data.shape,
                                                feature_extractor=feature_extractor,
-                                               classifier=classifier, layer='conv2d_7b'))
+                                               classifier=classifier, layer='inceptionresnetv2.conv2d_7b'))
 
     # Xception Feature Extractor
     feature_extractor = AdaptedInputXception(data.shape, num_classes=1000, pretrained=False)
     classifier = torch.nn.Sequential(torch.nn.Linear(2048, 1), torch.nn.Sigmoid())
     models.append(FeatureExtractorToClassifier(data.shape,
                                                feature_extractor=feature_extractor,
-                                               classifier=classifier, layer='conv4'))
+                                               classifier=classifier, layer='xception.conv4'))
 
     # Basic CNNs
     models[len(models):] = [CNNet(data.shape),
@@ -211,9 +211,15 @@ def main():
     plt.grid(True)
     plt.savefig(f'outputs/losses.png')
 
+    with open(f'outputs/results.txt', 'w') as f:
+        f.write(f'Best ROC-AUC\n')
+        for model, score in zip(models, best_score):
+            f.write(f'{model.name}: {score:.4f}\n')
+
     # Testing
     for model in models:
         print(f'>>> {model.name}...')
+        model.load_state_dict(torch.load(f'best_models/Best {model.name}.pth'))
         scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
         fig.savefig(f'outputs/{model.name}_plots.png')
         plt.close(fig)
@@ -223,6 +229,7 @@ def main():
                 if 'Confusion' not in key:
                     f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
             f.write('_____________________________________________________\n')
+
 
 # Run
 if __name__ == '__main__':
