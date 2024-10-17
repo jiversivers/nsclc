@@ -112,14 +112,14 @@ def main():
     models = [ResNet18NPlaned(data.shape, start_width=64, n_classes=1)]
 
     # InceptionResNetV2 Feature Extractor (BigCoMET)
-    feature_extractor = inceptionresnetv2(data.shape, num_classes=1000, pretrained=False)
+    feature_extractor = inceptionresnetv2(num_classes=1000, pretrained=False)
     classifier = CometClassifierWithBinaryOutput
     models.append(FeatureExtractorToClassifier(data.shape,
                                                feature_extractor=feature_extractor,
                                                classifier=classifier, layer='conv2d_7b'))
 
     # Xception Feature Extractor
-    feature_extractor = xception(data.shape, num_classes=1000, pretrained=False)
+    feature_extractor = xception(num_classes=1000, pretrained=False)
     classifier = torch.nn.Sequential(torch.nn.Linear(2048, 1), torch.nn.Sigmoid())
     models.append(FeatureExtractorToClassifier(data.shape,
                                                feature_extractor=feature_extractor,
