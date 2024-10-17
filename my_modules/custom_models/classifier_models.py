@@ -555,8 +555,6 @@ def get_ordered_layers(model, x):
             xx = x.expand(-1, c, -1, -1)
             _ = model(xx)
         except RuntimeError as e:
-            if called_modules:
-                break
             c += 1
             # Print the first occurrence of the error type
             if type(e) not in exception_list:
@@ -566,6 +564,9 @@ def get_ordered_layers(model, x):
                 raise RuntimeError(
                     f'Failed to find channel count for feature extractor (tested from {x.shape[1]} to 100).\n'
                     f'Consider manually expanding data to match if channel count is known.')
+        finally:
+            if called_modules:
+                break
 
     # Clean up the hooks
     for hook in hooks:
