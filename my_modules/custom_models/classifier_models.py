@@ -549,21 +549,27 @@ def get_ordered_layers(model, x):
         if not isinstance(layer, (nn.Sequential, nn.ModuleList)) and layer != model:
             hooks.append(layer.register_forward_hook(hook))
 
-    try:
-        _ = model(x)
-    except RuntimeError as e:
-        # Print the first occurrence of the error type
-        if type(e) not in exception_list:
-            exception_list.append(type(e))
-            print(f'{''.join(traceback.format_tb(e.__traceback__))}\n '
-                  f'Warning {type(e)} error caught during ordered layer search\n'
-                  f'{e}')
-        else:
-            pass
-    finally:
-        # Clean up the hooks
-        for hook in hooks:
-            hook.remove()
+    c = x.shape[1]
+    while True:
+        try:
+            xx = x.expand(-1, c, -1, -1)
+            _ = model(xx)
+        except RuntimeError as e:
+            if called_modules:
+                break
+            c += 1
+            # Print the first occurrence of the error type
+            if type(e) not in exception_list:
+                exception_list.append(type(e))
+                warnings.warn(f'\n{type(e)} error caught during ordered layer search\n{e}', RuntimeWarning)
+            if c == 100:
+                raise RuntimeError(
+                    f'Failed to find channel count for feature extractor (tested from {x.shape[1]} to 100).\n'
+                    f'Consider manually expanding data to match if channel count is known.')
+
+    # Clean up the hooks
+    for hook in hooks:
+        hook.remove()
 
     return called_modules
 
@@ -580,6 +586,10 @@ class FeatureExtractorToClassifier(nn.Module):
         self.first_layer = get_ordered_layers(feature_extractor, x)[0]
         self.feature_extractor_channels = self.first_layer.in_channels
         self.expand_to_match = (self.input_size[0] != self.feature_extractor_channels)
+        if self.expand_to_match:
+            warnings.warn(f'\nInput channels {self.input_size[0]} does not match default feature extractor input.'
+                          f'\nInput will be expanded to {self.feature_extractor_channels} channels to match.',
+                          RuntimeWarning)
 
         # Parse input layer
         if layer is not None:
@@ -616,7 +626,7 @@ class FeatureExtractorToClassifier(nn.Module):
             self.classifier = classifier
             # Check for device compatibility
             if next(self.classifier.parameters()).device != next(self.feature_extractor_params.parameters()).device:
-                warnings.warn('Model classifier and feature extractor appear to be on different devices.',
+                warnings.warn(f'\nModel classifier and feature extractor appear to be on different devices.',
                               RuntimeWarning)
 
         self.name = f'{type(feature_extractor).__name__} Features to {type(classifier).__name__} Classifier'
@@ -665,9 +675,7 @@ class FeatureExtractorToClassifier(nn.Module):
             # Print the first occurrence of the error type
             if type(e) not in self.exception_list:
                 self.exception_list.append(type(e))
-                print(f'{''.join(traceback.format_tb(e.__traceback__))}\n '
-                      f'Warning {type(e)} error caught during feature extraction\n'
-                      f'{e}')
+                warnings.warn(f'\n{type(e)} error caught during feature extraction\n{e}', RuntimeWarning)
             else:
                 pass
 
