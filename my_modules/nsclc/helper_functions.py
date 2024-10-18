@@ -9,7 +9,8 @@ import numpy as np
 
 # Function to load TIFFs
 def load_tiff(load_fns_and_img_paths):
-    x = transforms.ToTensor()(Image.open(load_fns_and_img_paths[1])).to(torch.float32)
+    toTensor = transforms.Compose([transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True)])
+    x = toTensor(Image.open(load_fns_and_img_paths[1])).to(torch.float32)
     return x
 
 
