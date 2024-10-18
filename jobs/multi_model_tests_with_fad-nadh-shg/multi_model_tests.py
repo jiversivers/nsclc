@@ -81,8 +81,8 @@ def main():
         label = data.get_patient_label(idx)
         image_counts[int(label)] += len(data.get_patient_subset(idx))
 
-    test_pts = shuffled_zeros[-1] + shuffled_ones[-1]
-    test_idx = data.get_patient_subset(i)
+    test_pts = [shuffled_zeros[-1], shuffled_ones[-1]]
+    test_idx = [data.get_patient_subset(i) for i in train_pts]
     test_idx = [im for i in test_idx for im in i]
     random.shuffle(test_idx)
     image_counts = [0, 0]
