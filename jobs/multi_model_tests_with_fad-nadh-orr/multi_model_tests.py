@@ -62,23 +62,17 @@ def main():
     print(f'Total non-metastatic patients: {len(shuffled_ones)} with {image_counts[1]} images')
     print(f'Total metastatic patients: {len(shuffled_zeros)} with {image_counts[0]} images')
 
-    # Split train and test sets
-    # Test set from first three patients (of shuffled groups) for each class
-    test_pts = shuffled_zeros[0:3] + shuffled_ones[0:3]
-    test_idx = [data.get_patient_subset(i) for i in test_pts]
-    test_idx = [im for i in test_idx for im in i]
-    random.shuffle(test_idx)
+    # Split train, eval, and test sets
+    eval_pts = shuffled_zeros[0:3] + shuffled_ones[0:3]
+    eval_idx = [data.get_patient_subset(i) for i in eval_pts]
+    eval_idx = [im for i in eval_idx for im in i]
+    random.shuffle(eval_idx)
     image_counts = [0, 0]
-    for idx in test_pts:
+    for idx in eval_pts:
         label = data.get_patient_label(idx)
         image_counts[int(label)] += len(data.get_patient_subset(idx))
-    print(f'Testing set\n'
-          f'___________\n'
-          f'Non-metastatic: {len(shuffled_ones[0:3])} with {image_counts[1]} images.\n'
-          f'Metastatic: {len(shuffled_zeros[0:3])} with {image_counts[0]} images.\n'
-          f'Total: {len(test_pts)} Patients with {len(test_idx)} images.\n')
 
-    train_pts = shuffled_zeros[3:] + shuffled_ones[3:]
+    train_pts = shuffled_zeros[3:-1] + shuffled_ones[3:-1]
     train_idx = [data.get_patient_subset(i) for i in train_pts]
     train_idx = [im for i in train_idx for im in i]
     random.shuffle(train_idx)
@@ -86,24 +80,48 @@ def main():
     for idx in train_pts:
         label = data.get_patient_label(idx)
         image_counts[int(label)] += len(data.get_patient_subset(idx))
+
+    test_pts = shuffled_zeros[-1] + shuffled_ones[-1]
+    test_idx = [data.get_patient_subset(i) for i in test_pts]
+    test_idx = [im for i in test_idx for im in i]
+    random.shuffle(test_idx)
+    image_counts = [0, 0]
+    for idx in test_pts:
+        label = data.get_patient_label(idx)
+        image_counts[int(label)] += len(data.get_patient_subset(idx))
+
     print(f'Training set\n'
           f'____________\n'
-          f'Non-metastatic: {len(shuffled_ones[3:])} with {image_counts[1]} images.\n'
-          f'Metastatic: {len(shuffled_zeros[3:])} with {image_counts[0]} images.\n'
+          f'Non-metastatic: {len(shuffled_ones[3:-1])} with {image_counts[1]} images.\n'
+          f'Metastatic: {len(shuffled_zeros[3:-1])} with {image_counts[0]} images.\n'
           f'Total: {len(train_pts)} Patients with {len(train_idx)} images.\n')
+    print(f'Evaluation set\n'
+          f'______________\n'
+          f'Non-metastatic: {len(shuffled_ones[0:3])} with {image_counts[1]} images.\n'
+          f'Metastatic: {len(shuffled_zeros[0:3])} with {image_counts[0]} images.\n'
+          f'Total: {len(eval_pts)} Patients with {len(eval_idx)} images.\n')
+    print(f'Testing set\n'
+          f'____________\n'
+          f'Non-metastatic: {len(shuffled_ones[-1])} with {image_counts[1]} images.\n'
+          f'Metastatic: {len(shuffled_zeros[-1])} with {image_counts[0]} images.\n'
+          f'Total: {len(test_pts)} Patients with {len(test_idx)} images.\n')
 
-    print(f'Testing patients: {test_pts}.\nTraining patients: {train_pts}.')
+    print(f'Training patients: {train_pts}.\nEvaluation patients: {eval_pts}.\nTest patients: {test_pts}.\n')
 
     # Create dataloaders for fold
     batch_size = 64
     train_set = torch.utils.data.Subset(data, train_idx)
-    test_set = torch.utils.data.Subset(data, test_idx)
+    eval_set = torch.utils.data.Subset(data, eval_idx)
+    test_set = torch.utils.data.Subset(data, eval_idx)
     train_loader = torch.utils.data.DataLoader(train_set,
                                                batch_size=batch_size, shuffle=True, num_workers=0,
                                                drop_last=(True if len(train_idx) % batch_size == 1 else False))
+    eval_loader = torch.utils.data.DataLoader(eval_set,
+                                              batch_size=batch_size, shuffle=False, num_workers=0,
+                                              drop_last=(True if len(eval_idx) % batch_size == 1 else False))
     test_loader = torch.utils.data.DataLoader(test_set,
                                               batch_size=batch_size, shuffle=False, num_workers=0,
-                                              drop_last=(True if len(test_idx) % batch_size == 1 else False))
+                                              drop_last=(True if len(eval_idx) % batch_size == 1 else False))
 
     #####################
     # Prepare model zoo #
@@ -152,6 +170,8 @@ def main():
         os.makedirs(f'outputs/{model.name}/plots', exist_ok=True)
         with open(f'outputs/{model.name}/results.txt', 'w') as f:
             f.write(f'{model.name} Results\n')
+        with open(f'outputs/results.txt', 'w') as f:
+            f.write('Overall Results\n')
 
     # Model path
     try:
@@ -182,9 +202,9 @@ def main():
         # Evaluation
         for i, model in enumerate(models):
             print(f'>>> {model.name}: Training loss: {train_loss[i][-1]}. Evaluation scores:')
-            scores = score_model(model, test_loader, loss_fn=loss_function, print_results=True, make_plot=False,
+            scores = score_model(model, eval_loader, loss_fn=loss_function, print_results=True, make_plot=False,
                                  threshold_type='roc')
-            eval_loss[i] = scores['Loss']
+            eval_loss[i].append(scores['Loss'])
 
             with open(f'outputs/{model.name}/results.txt', 'a') as f:
                 f.write(f'\n\nEpoch {ep + 1}\n'
@@ -198,21 +218,11 @@ def main():
                 torch.save(model.state_dict(), f'best_models/Best {model.name}.pth')
                 with open(f'outputs/{model.name}/results.txt', 'a') as f:
                     f.write(f'New best {model.name} saved at epoch {ep + 1} with ROC-AUC of {scores["ROC-AUC"]}')
+                with open(f'outputs/results.txt', 'a') as f:
+                    f.write(f'New best {model.name} saved at epoch {ep + 1} with ROC-AUC of {scores["ROC-AUC"]}')
 
-    # Plot epoch-wise outputs
-    plt.figure(figsize=(10, 5))
-    for i, model in enumerate(models):
-        plt.plot(range(1, epochs + 1), train_loss[i], label=f'{model.name} Training')
-        plt.plot(range(1, epochs + 1), eval_loss[i], label=f'{model.name} Evaluation')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.title('Training and Evaluation Losses')
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(f'outputs/losses.png')
-
-    with open(f'outputs/results.txt', 'w') as f:
-        f.write(f'Best ROC-AUC\n')
+    with open(f'outputs/results.txt', 'a') as f:
+        f.write(f'\nBest ROC-AUC\n')
         for model, score in zip(models, best_score):
             f.write(f'{model.name}: {score:.4f}\n')
 
@@ -229,6 +239,18 @@ def main():
                 if 'Confusion' not in key:
                     f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
             f.write('_____________________________________________________\n')
+
+    # Plot epoch-wise outputs
+    plt.figure(figsize=(10, 5))
+    for i, model in enumerate(models):
+        plt.plot(range(1, epochs + 1), train_loss[i], label=f'{model.name} Training')
+        plt.plot(range(1, epochs + 1), eval_loss[i], label=f'{model.name} Evaluation')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.title('Training and Evaluation Losses')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(f'outputs/losses.png')
 
 
 # Run
