@@ -102,8 +102,8 @@ def main():
           f'Total: {len(eval_pts)} Patients with {len(eval_idx)} images.\n')
     print(f'Testing set\n'
           f'____________\n'
-          f'Non-metastatic: {len(shuffled_ones[-1])} with {image_counts[1]} images.\n'
-          f'Metastatic: {len(shuffled_zeros[-1])} with {image_counts[0]} images.\n'
+          f'Non-metastatic: {1} with {image_counts[1]} images.\n'
+          f'Metastatic: {1} with {image_counts[0]} images.\n'
           f'Total: {len(test_pts)} Patients with {len(test_idx)} images.\n')
 
     print(f'Training patients: {train_pts}.\nEvaluation patients: {eval_pts}.\nTest patients: {test_pts}.\n')
