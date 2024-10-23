@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from sklearn.metrics import precision_recall_curve, PrecisionRecallDisplay, average_precision_score, roc_curve, auc, \
-    accuracy_score, balanced_accuracy_score, RocCurveDisplay, confusion_matrix, ConfusionMatrixDisplay
+    accuracy_score, balanced_accuracy_score, RocCurveDisplay, confusion_matrix, ConfusionMatrixDisplay, roc_auc_score
 
 
 def calculate_auc_roc(model, loader, print_results=False, make_plot=False):
@@ -114,7 +114,7 @@ def score_model(model, loader, loss_fn=None, print_results=False, make_plot=Fals
             scores['Loss'] = loss / len(loader.sampler)
     # ROC
     fpr, tpr, thresholds = roc_curve(targets, outs, pos_label=1)
-    scores['ROC-AUC'] = auc(fpr, tpr)
+    scores['ROC-AUC'] = roc_auc_score(targets, outs)
     scores['Optimal Threshold from ROC'] = thresholds[np.argmax(tpr - fpr)]
 
     # Precision-Recall
