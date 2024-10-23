@@ -210,7 +210,7 @@ def main():
                 optimizers[i].step()
         for i, current in enumerate(epoch_loss):
             train_loss[i].append(current / len(train_set))
-            train_auc[i].append(roc_auc_score(targets, outs))
+            train_auc[i].append(roc_auc_score(targets[i], outs[i]))
             print(f'>>> {model.name}: Train - Loss: {train_loss[i][-1]}. AUC: {train_auc[i][-1]}.')
 
         # Evaluation
