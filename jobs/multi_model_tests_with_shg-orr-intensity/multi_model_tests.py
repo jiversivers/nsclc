@@ -65,6 +65,20 @@ def main():
     print(f'Total metastatic patients: {len(shuffled_zeros)} with {image_counts[0]} images')
 
     # Split train, eval, and test sets
+    train_pts = shuffled_zeros[3:-1] + shuffled_ones[3:-1]
+    train_idx = [data.get_patient_subset(i) for i in train_pts]
+    train_idx = [im for i in train_idx for im in i]
+    random.shuffle(train_idx)
+    image_counts = [0, 0]
+    for idx in train_pts:
+        label = data.get_patient_label(idx)
+        image_counts[int(label)] += len(data.get_patient_subset(idx))
+    print(f'Training set\n'
+          f'____________\n'
+          f'Non-metastatic: {len(shuffled_ones[3:-1])} with {image_counts[1]} images.\n'
+          f'Metastatic: {len(shuffled_zeros[3:-1])} with {image_counts[0]} images.\n'
+          f'Total: {len(train_pts)} Patients with {len(train_idx)} images.\n')
+
     eval_pts = shuffled_zeros[0:3] + shuffled_ones[0:3]
     eval_idx = [data.get_patient_subset(i) for i in eval_pts]
     eval_idx = [im for i in eval_idx for im in i]
@@ -74,14 +88,11 @@ def main():
         label = data.get_patient_label(idx)
         image_counts[int(label)] += len(data.get_patient_subset(idx))
 
-    train_pts = shuffled_zeros[3:-1] + shuffled_ones[3:-1]
-    train_idx = [data.get_patient_subset(i) for i in train_pts]
-    train_idx = [im for i in train_idx for im in i]
-    random.shuffle(train_idx)
-    image_counts = [0, 0]
-    for idx in train_pts:
-        label = data.get_patient_label(idx)
-        image_counts[int(label)] += len(data.get_patient_subset(idx))
+    print(f'Evaluation set\n'
+          f'______________\n'
+          f'Non-metastatic: {len(shuffled_ones[0:3])} with {image_counts[1]} images.\n'
+          f'Metastatic: {len(shuffled_zeros[0:3])} with {image_counts[0]} images.\n'
+          f'Total: {len(eval_pts)} Patients with {len(eval_idx)} images.\n')
 
     test_pts = [shuffled_zeros[-1], shuffled_ones[-1]]
     test_idx = [data.get_patient_subset(i) for i in test_pts]
@@ -92,16 +103,6 @@ def main():
         label = data.get_patient_label(idx)
         image_counts[int(label)] += len(data.get_patient_subset(idx))
 
-    print(f'Training set\n'
-          f'____________\n'
-          f'Non-metastatic: {len(shuffled_ones[3:-1])} with {image_counts[1]} images.\n'
-          f'Metastatic: {len(shuffled_zeros[3:-1])} with {image_counts[0]} images.\n'
-          f'Total: {len(train_pts)} Patients with {len(train_idx)} images.\n')
-    print(f'Evaluation set\n'
-          f'______________\n'
-          f'Non-metastatic: {len(shuffled_ones[0:3])} with {image_counts[1]} images.\n'
-          f'Metastatic: {len(shuffled_zeros[0:3])} with {image_counts[0]} images.\n'
-          f'Total: {len(eval_pts)} Patients with {len(eval_idx)} images.\n')
     print(f'Testing set\n'
           f'____________\n'
           f'Non-metastatic: {1} with {image_counts[1]} images.\n'
@@ -202,7 +203,7 @@ def main():
             for i, model in enumerate(models):
                 out = model(x)
                 outs[i] = torch.cat((outs[i], out.cpu().detach()), dim=0)
-                target[i] = torch.cat((targets[i], target.cpu().detach()), dim=0)
+                targets[i] = torch.cat((targets[i], target.cpu().detach()), dim=0)
                 loss = loss_function(out, target.unsqueeze(1))
                 loss.backward()
                 epoch_loss[i] += loss.item()
