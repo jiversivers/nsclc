@@ -137,14 +137,14 @@ def main():
     classifier = CometClassifierWithBinaryOutput
     models.append(FeatureExtractorToClassifier(data.shape,
                                                feature_extractor=feature_extractor,
-                                               classifier=classifier, layer='inceptionresnetv2.conv2d_7b'))
+                                               classifier=classifier, layer='conv2d_7b'))
 
     # Xception Feature Extractor
     feature_extractor = xception(num_classes=1000, pretrained=False)
     classifier = torch.nn.Sequential(torch.nn.Linear(2048, 1), torch.nn.Sigmoid())
     models.append(FeatureExtractorToClassifier(data.shape,
                                                feature_extractor=feature_extractor,
-                                               classifier=classifier, layer='xception.conv4'))
+                                               classifier=classifier, layer='conv4'))
 
     # Basic CNNs
     models[len(models):] = [CNNet(data.shape),
