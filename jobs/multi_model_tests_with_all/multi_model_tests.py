@@ -210,7 +210,7 @@ def main():
             print(f'>>> {model.name}: Train - Loss: {tl[-1]}. AUC: {ta[-1]}.')
 
         # Evaluation
-        for model, el, ea, tl, bs in zip(models, eval_loss, eval_auc, train_loss, best_score):
+        for i, (model, el, ea, tl) in enumerate(zip(models, eval_loss, eval_auc, train_loss)):
             scores = score_model(model, eval_loader, loss_fn=loss_function, print_results=False, make_plot=False,
                                  threshold_type='roc')
             el.append(scores['Loss'])
@@ -222,8 +222,8 @@ def main():
                         f'>>> {model.name}: Train - Loss: {tl[-1]}. AUC: {ta[-1]}.'
                         f'--> Eval - Loss: {el[-1]}. AUC: {ea[-1]}.')
 
-            if scores['ROC-AUC'] > bs:
-                bs = scores['ROC-AUC']
+            if scores['ROC-AUC'] > best_score[i]:
+                best_score[i] = scores['ROC-AUC']
                 torch.save(model.state_dict(), f'models/best_models/Best {model.name}.pth')
                 with open(f'outputs/{model.name}/results.txt', 'a') as f:
                     f.write(f'\nNew best {model.name} saved at epoch {ep + 1} with ROC-AUC of {scores["ROC-AUC"]}')
