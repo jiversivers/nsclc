@@ -114,7 +114,7 @@ def score_model(model, loader, loss_fn=None, print_results=False, make_plot=Fals
             scores['Loss'] = loss / len(loader.sampler)
     # ROC
     fpr, tpr, thresholds = roc_curve(targets, outs, pos_label=1)
-    scores['ROC-AUC'] = roc_auc_score(targets, outs)
+    scores['ROC-AUC'] = auc(fpr, tpr)
     scores['Optimal Threshold from ROC'] = thresholds[np.argmax(tpr - fpr)]
 
     # Precision-Recall
