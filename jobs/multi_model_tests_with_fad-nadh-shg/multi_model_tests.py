@@ -223,7 +223,7 @@ def main():
                         f'--> Eval - Loss: {el[-1]}. AUC: {ea[-1]}.')
 
             if scores['ROC-AUC'] > bs:
-                best_score[i] = scores['ROC-AUC']
+                bs = scores['ROC-AUC']
                 torch.save(model.state_dict(), f'models/best_models/Best {model.name}.pth')
                 with open(f'outputs/{model.name}/results.txt', 'a') as f:
                     f.write(f'\nNew best {model.name} saved at epoch {ep + 1} with ROC-AUC of {scores["ROC-AUC"]}')
