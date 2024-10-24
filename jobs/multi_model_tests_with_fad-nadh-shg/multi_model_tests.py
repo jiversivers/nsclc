@@ -116,7 +116,6 @@ def main():
     train_set = torch.utils.data.Subset(data, train_idx)
     eval_set = torch.utils.data.Subset(data, eval_idx)
     test_set = torch.utils.data.Subset(data, test_idx)
-    comb_set = torch.utils.data.ConcatDataset([eval_set, test_set])
     train_loader = torch.utils.data.DataLoader(train_set,
                                                batch_size=batch_size, shuffle=True, num_workers=0,
                                                drop_last=(True if len(train_idx) % batch_size == 1 else False))
@@ -126,9 +125,6 @@ def main():
     test_loader = torch.utils.data.DataLoader(test_set,
                                               batch_size=batch_size, shuffle=False, num_workers=0,
                                               drop_last=(True if len(test_idx) % batch_size == 1 else False))
-    comb_loader = torch.utils.data.DataLoader(comb_set,
-                                              batch_size=batch_size, shuffle=False, num_workers=0,
-                                              drop_last=(True if len(comb_set) % batch_size == 1 else False))
 
     #####################
     # Prepare model zoo #
@@ -141,14 +137,14 @@ def main():
     classifier = CometClassifierWithBinaryOutput
     models.append(FeatureExtractorToClassifier(data.shape,
                                                feature_extractor=feature_extractor,
-                                               classifier=classifier, layer='conv2d_7b'))
+                                               classifier=classifier, layer='inceptionresnetv2.conv2d_7b'))
 
     # Xception Feature Extractor
     feature_extractor = xception(num_classes=1000, pretrained=False)
     classifier = torch.nn.Sequential(torch.nn.Linear(2048, 1), torch.nn.Sigmoid())
     models.append(FeatureExtractorToClassifier(data.shape,
                                                feature_extractor=feature_extractor,
-                                               classifier=classifier, layer='conv4'))
+                                               classifier=classifier, layer='xception.conv4'))
 
     # Basic CNNs
     models[len(models):] = [CNNet(data.shape),
@@ -208,50 +204,55 @@ def main():
                 loss.backward()
                 epoch_loss[i] += loss.item()
                 optimizers[i].step()
-        for i, current in enumerate(epoch_loss):
-            train_loss[i].append(current / len(train_set))
-            train_auc[i].append(roc_auc_score(targets[i], outs[i]))
-            print(f'>>> {model.name}: Train - Loss: {train_loss[i][-1]}. AUC: {train_auc[i][-1]}.')
+        for el, tl, ta, tx, ot, model in zip(epoch_loss, train_loss, train_auc, targets, outs, models):
+            tl.append(el / len(train_set))
+            ta.append(roc_auc_score(tx, ot))
+            print(f'>>> {model.name}: Train - Loss: {tl[-1]}. AUC: {ta[-1]}.')
 
         # Evaluation
-        for i, model in enumerate(models):
+        for model, el, ea, tl, bs in zip(models, eval_loss, eval_auc, train_loss, best_score):
             scores = score_model(model, eval_loader, loss_fn=loss_function, print_results=False, make_plot=False,
                                  threshold_type='roc')
-            eval_loss[i].append(scores['Loss'])
-            eval_auc[i].append(scores['ROC-AUC'])
-            print(f' --> Eval - Loss: {eval_loss[i][-1]}. AUC: {eval_auc[i][-1]}.')
+            el.append(scores['Loss'])
+            ea.append(scores['ROC-AUC'])
+            print(f' --> Eval - Loss: {el[-1]}. AUC: {ea[-1]}.')
 
             with open(f'outputs/{model.name}/results.txt', 'a') as f:
-                f.write(f'\n\nEpoch {ep + 1}\n'
-                        f'{model.name}: Training loss: {train_loss[i][-1]}. Evaluation scores:')
-                for key, item in scores.items():
-                    if 'Confusion' not in key:
-                        f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|')
+                f.write(f'\nEpoch {ep + 1}'
+                        f'>>> {model.name}: Train - Loss: {tl[-1]}. AUC: {ta[-1]}.'
+                        f'--> Eval - Loss: {el[-1]}. AUC: {ea[-1]}.')
 
-            if scores['ROC-AUC'] > best_score[i]:
+            if scores['ROC-AUC'] > bs:
                 best_score[i] = scores['ROC-AUC']
                 torch.save(model.state_dict(), f'models/best_models/Best {model.name}.pth')
                 with open(f'outputs/{model.name}/results.txt', 'a') as f:
-                    f.write(f'New best {model.name} saved at epoch {ep + 1} with ROC-AUC of {scores["ROC-AUC"]}')
+                    f.write(f'\nNew best {model.name} saved at epoch {ep + 1} with ROC-AUC of {scores["ROC-AUC"]}')
                 with open(f'outputs/results.txt', 'a') as f:
-                    f.write(f'New best {model.name} saved at epoch {ep + 1} with ROC-AUC of {scores["ROC-AUC"]}')
+                    f.write(f'\nNew best {model.name} saved at epoch {ep + 1} with ROC-AUC of {scores["ROC-AUC"]}')
 
     # Save full training regimen models
     for model in models:
         torch.save(model.state_dict(), f'models/full_models/Full {model.name}.pth')
 
     with open(f'outputs/results.txt', 'a') as f:
-        f.write(f'\n Final ROC-AUC Results\n')
-        for model, score, t_auc, e_auc in zip(models, best_score, train_auc, eval_auc):
+        f.write(f'\n\nFinal ROC-AUC Results\n')
+        for model, bs, ta, ea in zip(models, best_score, train_auc, eval_auc):
             f.write(
-                f'{model.name}: Best eval AUC - {score:.4f}. '
-                f'Final Train AUC - {t_auc[-1]}. Final Eval AUC - {e_auc[-1]}\n')
+                f'{model.name}: Best eval AUC - {bs:.4f}. '
+                f'Final Train AUC - {ta[-1]:.4f}. Final Eval AUC - {ea[-1]:.4f}\n')
 
     # Testing
+    # Combination dataset of testing and eval sets
+    comb_set = torch.utils.data.ConcatDataset([eval_set, test_set])
+    comb_loader = torch.utils.data.DataLoader(comb_set,
+                                              batch_size=batch_size, shuffle=False, num_workers=0,
+                                              drop_last=(True if len(comb_set) % batch_size == 1 else False))
     for model in models:
+        # full training model
+        # on test set
         print(f'\n>>> {model.name} at full training regimen on test set...')
         scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
-        fig.savefig(f'outputs/full_train_{model.name}_on_test_plots.png')
+        fig.savefig(f'outputs/{model.name}/plots/full_train_{model.name}_on_test_plots.png')
         plt.close(fig)
         with open(f'outputs/{model.name}/results.txt', 'a') as f:
             f.write(f'\n>>> {model.name} at full training regimen on test set...')
@@ -260,9 +261,10 @@ def main():
                     f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
             f.write('_____________________________________________________\n')
 
+        # On test-eval set
         print(f'\n>>> {model.name} at full training regimen on eval and test sets...')
         scores, fig = score_model(model, comb_loader, print_results=True, make_plot=True, threshold_type='roc')
-        fig.savefig(f'outputs/full_train_{model.name}_on_eval-test_plots.png')
+        fig.savefig(f'outputs/{model.name}/plots/full_train_{model.name}_on_eval-test_plots.png')
         plt.close(fig)
         with open(f'outputs/{model.name}/results.txt', 'a') as f:
             f.write(f'\n>>> {model.name} at full training regimen on eval and test sets...')
@@ -271,10 +273,12 @@ def main():
                     f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
             f.write('_____________________________________________________\n')
 
+        # best eval model
+        # on test set
         print(f'\n>>> {model.name} at best evaluated on test set...')
         model.load_state_dict(torch.load(f'models/best_models/Best {model.name}.pth'))
         scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
-        fig.savefig(f'outputs/best_eval_{model.name}_on_test_plots.png')
+        fig.savefig(f'outputs/{model.name}/plots/best_eval_{model.name}_on_test_plots.png')
         plt.close(fig)
         with open(f'outputs/{model.name}/results.txt', 'a') as f:
             f.write(f'\n>>> {model.name} at best evaluated on test set...')
@@ -283,10 +287,10 @@ def main():
                     f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
             f.write('_____________________________________________________\n')
 
+        # on eval-test set
         print(f'\n>>> {model.name} at best evaluated on eval and test sets...')
-        model.load_state_dict(torch.load(f'models/best_models/Best {model.name}.pth'))
         scores, fig = score_model(model, comb_loader, print_results=True, make_plot=True, threshold_type='roc')
-        fig.savefig(f'outputs/best_eval_{model.name}_on_eval-test_plots.png')
+        fig.savefig(f'outputs/{model.name}/plots/best_eval_{model.name}_on_eval-test_plots.png')
         plt.close(fig)
         with open(f'outputs/{model.name}/results.txt', 'a') as f:
             f.write(f'\n>>> {model.name} at best evaluated on eval and test sets...')
@@ -296,20 +300,21 @@ def main():
             f.write('_____________________________________________________\n')
 
     # Plot epoch-wise outputs
-    for i, model in enumerate(models):
+    for (model, tl, el, ta, ea) in zip(models, train_loss, eval_loss, train_auc, eval_auc):
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 5))
-        ax1.plot(range(1, epochs + 1), train_loss[i], label=f'{model.name} Training')
-        ax1.plot(range(1, epochs + 1), eval_loss[i], label=f'{model.name} Evaluation')
-        ax1.xlabel('Epochs')
-        ax1.ylabel('Loss')
-        ax1.set.title('Training and Evaluation Losses')
+        plt.supxlabel('Epochs')
+        plt.suptitle(model.name)
+
+        ax1.plot(range(1, epochs + 1), tl, label=f'{model.name} Training')
+        ax1.plot(range(1, epochs + 1), el, label=f'{model.name} Evaluation')
+        ax1.set_ylabel('Loss')
+        ax1.set_title('Training and Evaluation Losses')
         ax1.legend()
 
-        ax2.plot(range(1, epochs + 1), train_auc[i], label=f'{model.name} Training')
-        ax2.plot(range(1, epochs + 1), eval_auc[i], label=f'{model.name} Evaluation')
-        ax2.xlabel('Epochs')
-        ax2.ylabel('AUC')
-        ax2.set.title('Training and Evaluation ROC-AUC')
+        ax2.plot(range(1, epochs + 1), ta, label=f'{model.name} Training')
+        ax2.plot(range(1, epochs + 1), ea, label=f'{model.name} Evaluation')
+        ax2.set_ylabel('AUC')
+        ax2.set_title('Training and Evaluation ROC-AUC')
         ax2.legend()
 
         fig.savefig(f'outputs/{model.name}/plots/losses_and_aucs.png')
