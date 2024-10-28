@@ -527,6 +527,12 @@ TODO: Update doc
                     'An unrecognized label is in use. Update label attribute of dataset and try again.')
         return y
 
+    def get_patient_ID(self, pt_index):
+        if type(pt_index) is int:
+            return self.features['ID'].at[pt_index, 'Subject']
+        elif type(pt_index) is str:
+            return list(self.features.index[self.features['ID']['Subject'] == pt_index])[0]
+
     def is_bad_data(self, x):
         return (torch.sum(x <= 0.1).item() + torch.sum(x >= 0.9).item()) > (0.60 * np.prod(x.shape))
 
