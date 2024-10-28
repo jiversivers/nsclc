@@ -18,7 +18,7 @@ from my_modules.nsclc.nsclc_dataset import NSCLCDataset
 
 def main():
     # Set random seed for reproducibility
-    set_seed(42)
+    set_seed(21)
 
     # Set up multiprocessing
     print(f'Num cores: {mp.cpu_count()}')
