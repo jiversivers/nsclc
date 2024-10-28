@@ -1,6 +1,7 @@
 # Import packages
 import os
 
+import pandas as pd
 import torch.multiprocessing as mp
 import torch.utils.data
 import torchvision.transforms.v2 as tvt
@@ -322,8 +323,16 @@ def main():
                     f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
             f.write('_____________________________________________________\n')
 
-    # Plot epoch-wise outputs
+    # Plot and save epoch-wise outputs
+    headers = ['Epoch', 'Training Loss (average per sample)', 'Evaluation Loss (average per sample)',
+               'Training ROC-AUC', 'Evaluation ROC-AUC']
     for (model, tl, el, ta, ea) in zip(models, train_loss, eval_loss, train_auc, eval_auc):
+        # Save raw data
+        outputs = [[a, b, c, d] for (a, b, c, d) in zip(tl, el, ta, ea)]
+        output_table = pd.DataFrame(data=outputs, index=range(1, epochs + 1), columns=headers)
+        output_table.to_csv(f'outputs/{model.name} tabular.csv', index_label='Epoch')
+
+        # Plot data
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 5))
         plt.suptitle(model.name)
 
