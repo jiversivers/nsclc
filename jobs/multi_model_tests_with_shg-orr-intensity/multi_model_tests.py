@@ -324,7 +324,7 @@ def main():
             f.write('_____________________________________________________\n')
 
     # Plot and save epoch-wise outputs
-    headers = ['Epoch', 'Training Loss (average per sample)', 'Evaluation Loss (average per sample)',
+    headers = ['Training Loss (average per sample)', 'Evaluation Loss (average per sample)',
                'Training ROC-AUC', 'Evaluation ROC-AUC']
     for (model, tl, el, ta, ea) in zip(models, train_loss, eval_loss, train_auc, eval_auc):
         # Save raw data
