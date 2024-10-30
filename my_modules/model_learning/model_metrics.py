@@ -111,7 +111,7 @@ def score_model(model, loader, loss_fn=None, print_results=False, make_plot=Fals
                 loss += loss_fn(outs, targets)
             except Exception as e:
                 loss += loss_fn(outs, targets.unsqueeze(1))
-            scores['Loss'] = loss / len(loader.sampler)
+            scores['Loss'] = loss
     # ROC
     fpr, tpr, thresholds = roc_curve(targets, outs, pos_label=1)
     scores['ROC-AUC'] = auc(fpr, tpr)
