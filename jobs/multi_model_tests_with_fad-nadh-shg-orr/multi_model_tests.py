@@ -197,12 +197,11 @@ def main():
     # Prep results file
     for model in models:
         os.makedirs(f'outputs/{model.name}/plots', exist_ok=True)
+        os.makedirs(f'outputs/{model.name}/models', exist_ok=True)
         with open(f'outputs/{model.name}/results.txt', 'w') as f:
             f.write(f'{model.name} Results\n')
         with open(f'outputs/results.txt', 'w') as f:
             f.write('Overall Results\n')
-    os.makedirs('models/best_models', exist_ok=True)
-    os.makedirs('models/full_models', exist_ok=True)
 
     train_loss = [[] for _ in range(len(models))]
     train_auc = [[] for _ in range(len(models))]
@@ -272,18 +271,14 @@ def main():
 
             if ea[-1] > best_score[i]:
                 best_score[i] = ea[-1]
-                torch.save(model.state_dict(), f'models/best_models/Best {model.name}.pth')
+                torch.save(model.state_dict(), f'outputs/{model.name}/models/Best {model.name}.pth')
                 with open(f'outputs/{model.name}/results.txt', 'a') as f:
                     f.write(f'\nNew best {model.name} saved at epoch {ep + 1} with ROC-AUC of {ea[-1]}')
                 with open(f'outputs/results.txt', 'a') as f:
                     f.write(f'\nNew best {model.name} saved at epoch {ep + 1} with ROC-AUC of {ea[-1]}')
 
             if ep + 1 in epochs:
-                torch.save(model.state_dict(), f'models/best_models/Epochs {ep + 1} {model.name}.pth')
-
-    # Save full training regimen models
-    for model in models:
-        torch.save(model.state_dict(), f'models/full_models/Full {model.name}.pth')
+                torch.save(model.state_dict(), f'outputs/{model.name}/models/Epochs {ep + 1} {model.name}.pth')
 
     with open(f'outputs/results.txt', 'a') as f:
         f.write(f'\n\nFinal ROC-AUC Results\n')
@@ -302,7 +297,7 @@ def main():
         # best eval model
         # on test set
         print(f'\n>>> {model.name} at best evaluated on test set...')
-        model.load_state_dict(torch.load(f'models/best_models/Best {model.name}.pth'))
+        model.load_state_dict(torch.load(f'outputs/{model.name}/models/Best {model.name}.pth'))
         scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
         fig.savefig(f'outputs/{model.name}/plots/best_eval_{model.name}_on_test_plots.png')
         plt.close(fig)
@@ -332,7 +327,7 @@ def main():
             # best eval model
             # on test set
             print(f'\n>>> {model.name} at {ep} on test set...')
-            model.load_state_dict(torch.load(f'models/best_models/Epochs {ep + 1} {model.name}.pth'))
+            model.load_state_dict(torch.load(f'outputs/{model.name}/models/Epochs {ep} {model.name}.pth'))
             scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
             fig.savefig(f'outputs/{model.name}/plots/best_eval_{model.name}_on_test_plots.png')
             plt.close(fig)
@@ -389,7 +384,7 @@ def main():
         fig.savefig(f'outputs/{model.name}/plots/losses_and_aucs.png')
         plt.close(fig)
 
+
 # Run
 if __name__ == '__main__':
     main()
-
