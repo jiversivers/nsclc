@@ -18,7 +18,7 @@ from my_modules.nsclc.nsclc_dataset import NSCLCDataset
 
 def main():
     # Set random seed for reproducibility
-    set_seed(21)
+    set_seed(42)
 
     # Set up multiprocessing
     print(f'Num cores: {mp.cpu_count()}')
@@ -360,22 +360,22 @@ def main():
     for (model, tl, el, ta, ea) in zip(models, train_loss, eval_loss, train_auc, eval_auc):
         # Save raw data
         outputs = [[a, b, c, d] for (a, b, c, d) in zip(tl, el, ta, ea)]
-        output_table = pd.DataFrame(data=outputs, index=range(1, epochs + 1), columns=headers)
+        output_table = pd.DataFrame(data=outputs, index=range(1, epochs[-1] + 1), columns=headers)
         output_table.to_csv(f'outputs/{model.name}/tabular.csv', index_label='Epoch')
 
         # Plot data
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 5))
         plt.suptitle(model.name)
 
-        ax1.plot(range(1, epochs + 1), tl, label=f'{model.name} Training')
-        ax1.plot(range(1, epochs + 1), el, label=f'{model.name} Evaluation')
+        ax1.plot(range(1, epochs[-1] + 1), tl, label=f'{model.name} Training')
+        ax1.plot(range(1, epochs[-1] + 1), el, label=f'{model.name} Evaluation')
         ax1.set_xlabel('Epochs')
         ax1.set_ylabel('Loss')
         ax1.set_title('Training and Evaluation Losses')
         ax1.legend()
 
-        ax2.plot(range(1, epochs + 1), ta, label=f'{model.name} Training')
-        ax2.plot(range(1, epochs + 1), ea, label=f'{model.name} Evaluation')
+        ax2.plot(range(1, epochs[-1] + 1), ta, label=f'{model.name} Training')
+        ax2.plot(range(1, epochs[-1] + 1), ea, label=f'{model.name} Evaluation')
         ax1.set_ylabel('Epochs')
         ax2.set_ylabel('AUC')
         ax2.set_title('Training and Evaluation ROC-AUC')
