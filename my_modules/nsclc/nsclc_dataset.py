@@ -397,7 +397,7 @@ TODO: Update doc
                 x[ch, sat_mask] = self._preset_values[mode][1]
 
         # Scale by the scalars from normalization method
-        if self.normalize_method:
+        if self.normalize_method is not None:
             for ch in range(self.stack_height):
                 lower, upper = self.scalars[self.normalize_method][ch, :]
                 x[ch] = ((x[ch] - lower) / (upper - lower))
@@ -479,7 +479,7 @@ TODO: Update doc
                 self.shared_y[i] = y.to(device)
 
         # Move any self-held tensors to device for ops compatibility
-        if self.scalars[self.normalize_method] is not None:
+        if self.normalize_method is not None:
             self.scalars[self.normalize_method] = self.scalars[self.normalize_method].to(device)
 
         # Update device for future items
@@ -698,7 +698,7 @@ TODO: Update doc
                 raise Exception(f"Invalid normalization method: {method}. Use 'minmax' or 'preset'.")
 
         # Determine appropriate scalars if a normalization method was set
-        if self.normalize_method not in self.scalars:
+        if self.normalize_method not in list(self.scalars.keys()):
             match self.normalize_method:
                 case 'minmax':
                     # Find the max for each mode across the entire dataset. This is mildly time-consuming,
