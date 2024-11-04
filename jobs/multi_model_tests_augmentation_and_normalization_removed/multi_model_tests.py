@@ -127,7 +127,7 @@ def main():
     print(f'Training patients: {train_pts}.\nEvaluation patients: {eval_pts}.\nTest patients: {test_pts}.\n')
 
     # Create dataloaders for fold
-    batch_size = 64
+    batch_size = 16
     train_set = torch.utils.data.Subset(train_data, train_idx)
     eval_set = torch.utils.data.Subset(eval_test_data, eval_idx)
     test_set = torch.utils.data.Subset(eval_test_data, test_idx)
