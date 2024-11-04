@@ -187,7 +187,7 @@ def main():
     ###################
     epochs = [250, 500]
     learning_rate =1e-8
-    loss_function = nn.BCELoss()
+    loss_function = FocalLoss()
     optimizers = [torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=0.01) for model in models]
 
     ###############
@@ -287,10 +287,7 @@ def main():
                 f'Final Train AUC - {ta[-1]:.4f}. Final Eval AUC - {ea[-1]:.4f}\n')
 
         # Testing
-    headers = ['Best Test', 'Best Eval & Test',
-               '250 Epoch Test', '250 Epoch Eval & Test',
-               '500 Epoch Test', '500 Epoch Eval & Test',
-               '1500 Epoch Test', '1500 Epoch Eval & Test']
+    headers = ['Best Test', 'Best Eval & Test']
     data = [[] for _ in range(len(models))]
     for i, model in enumerate(models):
         # best eval model
@@ -323,6 +320,7 @@ def main():
 
         # At checkpoint epochs
         for ep in epochs:
+            headers.append(f'Test for {ep} epochs')
             # best eval model
             # on test set
             print(f'\n>>> {model.name} at {ep} on test set...')
@@ -339,6 +337,7 @@ def main():
             data[i].append(scores['ROC-AUC'])
 
             # on eval-test set
+            headers.append(f'Eval & Test for {ep} epochs')
             print(f'\n>>> {model.name} at {ep} on eval and test sets...')
             scores, fig = score_model(model, comb_loader, print_results=True, make_plot=True, threshold_type='roc')
             fig.savefig(f'outputs/{model.name}/plots/best_eval_{model.name}_on_eval-test_plots.png')
