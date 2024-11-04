@@ -238,15 +238,15 @@ def main():
             tl.append(el / len(train_set))
             ta.append(roc_auc_score(tx, ot))
 
-        # Evaluation # Train
+        # Evaluation
         epoch_loss = [0 for _ in range(len(models))]
 
         # Preds and ground truth to calculate training AUC without having to re-run full set
         outs = [torch.tensor([]) for _ in range(len(models))]
         targets = [torch.tensor([]) for _ in range(len(models))]
 
-        for model in models:
-            model.eval()
+        # for model in models:
+        #     model.eval()
         with torch.no_grad():
             for x, target in eval_loader:
                 x = x.to(device)
@@ -288,7 +288,7 @@ def main():
                 f'{model.name}: Best eval AUC - {bs:.4f}. '
                 f'Final Train AUC - {ta[-1]:.4f}. Final Eval AUC - {ea[-1]:.4f}\n')
 
-    # Testing'
+    # Testing
     headers = ['Best Test', 'Best Eval & Test',
                '250 Epoch Test', '250 Epoch Eval & Test',
                '500 Epoch Test', '500 Epoch Eval & Test',
@@ -333,7 +333,7 @@ def main():
             fig.savefig(f'outputs/{model.name}/plots/best_eval_{model.name}_on_test_plots.png')
             plt.close(fig)
             with open(f'outputs/{model.name}/results.txt', 'a') as f:
-                f.write(f'\n>>> {model.name} at best evaluated on test set...')
+                f.write(f'\n>>> {model.name} at {ep} epochs on test set...')
                 for key, item in scores.items():
                     if 'Confusion' not in key:
                         f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
@@ -346,14 +346,14 @@ def main():
             fig.savefig(f'outputs/{model.name}/plots/best_eval_{model.name}_on_eval-test_plots.png')
             plt.close(fig)
             with open(f'outputs/{model.name}/results.txt', 'a') as f:
-                f.write(f'\n>>> {model.name} at best evaluated on eval and test sets...')
+                f.write(f'\n>>> {model.name} at {ep} epochs on eval and test sets...')
                 for key, item in scores.items():
                     if 'Confusion' not in key:
                         f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
                 f.write('_____________________________________________________\n')
             data[i].append(scores['ROC-AUC'])
     auc_table = pd.DataFrame(data=data, index=[model.name for model in models], columns=headers)
-    auc_table.to_csv(f'outputs/auc_summary.csv', index_label='Epoch')
+    auc_table.to_csv(f'outputs/auc_summary.csv', index_label='Model')
 
     # Plot and save epoch-wise outputs
     headers = ['Training Loss (average per sample)', 'Evaluation Loss (average per sample)',
