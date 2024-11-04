@@ -186,7 +186,7 @@ def main():
     # Hyperparameters #
     ###################
     epochs = [250, 500]
-    learning_rate =0.01
+    learning_rate =1e-8
     loss_function = nn.BCELoss()
     optimizers = [torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=0.01) for model in models]
 
