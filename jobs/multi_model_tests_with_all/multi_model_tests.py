@@ -186,8 +186,8 @@ def main():
     # Hyperparameters #
     ###################
     epochs = [250, 500, 1500]
-    learning_rate = 1e-5
-    loss_function = FocalLoss()
+    learning_rate = 1e-8
+    loss_function = nn.BCELoss()
     optimizers = [torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=0.01) for model in models]
 
     ###############
@@ -243,8 +243,8 @@ def main():
         outs = [torch.tensor([]) for _ in range(len(models))]
         targets = [torch.tensor([]) for _ in range(len(models))]
 
-        # for model in models:
-        #     model.eval()
+        for model in models:
+            model.eval()
         with torch.no_grad():
             for x, target in eval_loader:
                 x = x.to(device)
@@ -286,11 +286,8 @@ def main():
                 f'{model.name}: Best eval AUC - {bs:.4f}. '
                 f'Final Train AUC - {ta[-1]:.4f}. Final Eval AUC - {ea[-1]:.4f}\n')
 
-        # Testing
-    headers = ['Best Test', 'Best Eval & Test',
-               '250 Epoch Test', '250 Epoch Eval & Test',
-               '500 Epoch Test', '500 Epoch Eval & Test',
-               '1500 Epoch Test', '1500 Epoch Eval & Test']
+    # Testing
+    headers = ['Best Test', 'Best Eval & Test']
     data = [[] for _ in range(len(models))]
     for i, model in enumerate(models):
         # best eval model
@@ -323,6 +320,7 @@ def main():
 
         # At checkpoint epochs
         for ep in epochs:
+            headers.append(f'{ep} Epoch Test')
             # best eval model
             # on test set
             print(f'\n>>> {model.name} at {ep} on test set...')
@@ -339,6 +337,7 @@ def main():
             data[i].append(scores['ROC-AUC'])
 
             # on eval-test set
+            headers.append(f'{ep} Epoch Eval & Test')
             print(f'\n>>> {model.name} at {ep} on eval and test sets...')
             scores, fig = score_model(model, comb_loader, print_results=True, make_plot=True, threshold_type='roc')
             fig.savefig(f'outputs/{model.name}/plots/best_eval_{model.name}_on_eval-test_plots.png')
