@@ -187,7 +187,7 @@ def main():
     ###################
     epochs = [250, 500, 1500]
     learning_rate =1e-10
-    loss_function = FocalLoss()
+    loss_function = nn.BCELoss()
     optimizers = [torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=0.01) for model in models]
 
     ###############
