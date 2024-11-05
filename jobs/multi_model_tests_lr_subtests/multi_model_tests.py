@@ -19,7 +19,7 @@ from my_modules.custom_models.loss_functions import FocalLoss
 
 def main():
     # Set random seed for reproducibility
-    set_seed(42)
+    set_seed(21)
 
     # Set up multiprocessing
     print(f'Num cores: {mp.cpu_count()}')
@@ -185,8 +185,8 @@ def main():
     ###################
     # Hyperparameters #
     ###################
-    epochs = [250, 500]
-    learning_rate =1e-8
+    epochs = [250, 500, 1500]
+    learning_rate =1e-10
     loss_function = FocalLoss()
     optimizers = [torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=0.01) for model in models]
 
@@ -286,7 +286,7 @@ def main():
                 f'{model.name}: Best eval AUC - {bs:.4f}. '
                 f'Final Train AUC - {ta[-1]:.4f}. Final Eval AUC - {ea[-1]:.4f}\n')
 
-        # Testing
+    # Testing
     headers = ['Best Test', 'Best Eval & Test']
     data = [[] for _ in range(len(models))]
     for i, model in enumerate(models):
