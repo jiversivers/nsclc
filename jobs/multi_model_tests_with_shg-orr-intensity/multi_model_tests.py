@@ -19,7 +19,7 @@ from my_modules.nsclc.nsclc_dataset import NSCLCDataset
 
 def main():
     # Set random seed for reproducibility
-    set_seed(21)
+    set_seed(42)
 
     # Set up multiprocessing
     print(f'Num cores: {mp.cpu_count()}')
@@ -187,7 +187,7 @@ def main():
     ###################
     # Hyperparameters #
     ###################
-    epochs = [250, 500, 1500]
+    epochs = [250, 500, 1500, 2000, 2500]
     learning_rate = 1e-8
     loss_function = nn.BCELoss()
     optimizers = [torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=0.01) for model in models]
