@@ -288,19 +288,50 @@ def main():
                 f'{model.name}: Best eval AUC - {bs:.4f}. '
                 f'Final Train AUC - {ta[-1]:.4f}. Final Eval AUC - {ea[-1]:.4f}\n')
 
-        # Testing
-        headers = ['Best Test', 'Best Eval & Test']
-        data = [[] for _ in range(len(models))]
-        for i, model in enumerate(models):
+    # Testing
+    headers = ['Best Test', 'Best Eval & Test']
+    data = [[] for _ in range(len(models))]
+    for i, model in enumerate(models):
+        # best eval model
+        # on test set
+        print(f'\n>>> {model.name} at best evaluated on test set...')
+        model.load_state_dict(torch.load(f'outputs/{model.name}/models/Best {model.name}.pth'))
+        scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
+        fig.savefig(f'outputs/{model.name}/plots/best_eval_{model.name}_on_test_plots.png')
+        plt.close(fig)
+        with open(f'outputs/{model.name}/results.txt', 'a') as f:
+            f.write(f'\n>>> {model.name} at best evaluated on test set...')
+            for key, item in scores.items():
+                if 'Confusion' not in key:
+                    f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
+            f.write('_____________________________________________________\n')
+        data[i].append(scores['ROC-AUC'])
+
+        # on eval-test set
+        print(f'\n>>> {model.name} at best evaluated on eval and test sets...')
+        scores, fig = score_model(model, comb_loader, print_results=True, make_plot=True, threshold_type='roc')
+        fig.savefig(f'outputs/{model.name}/plots/best_eval_{model.name}_on_eval-test_plots.png')
+        plt.close(fig)
+        with open(f'outputs/{model.name}/results.txt', 'a') as f:
+            f.write(f'\n>>> {model.name} at best evaluated on eval and test sets...')
+            for key, item in scores.items():
+                if 'Confusion' not in key:
+                    f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
+            f.write('_____________________________________________________\n')
+        data[i].append(scores['ROC-AUC'])
+
+        # At checkpoint epochs
+        for ep in epochs:
+            headers.append(f'{ep} Epoch Test') if f'{ep} Epoch Test' not in headers else None
             # best eval model
             # on test set
-            print(f'\n>>> {model.name} at best evaluated on test set...')
-            model.load_state_dict(torch.load(f'outputs/{model.name}/models/Best {model.name}.pth'))
+            print(f'\n>>> {model.name} at {ep} on test set...')
+            model.load_state_dict(torch.load(f'outputs/{model.name}/models/Epochs {ep} {model.name}.pth'))
             scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
             fig.savefig(f'outputs/{model.name}/plots/best_eval_{model.name}_on_test_plots.png')
             plt.close(fig)
             with open(f'outputs/{model.name}/results.txt', 'a') as f:
-                f.write(f'\n>>> {model.name} at best evaluated on test set...')
+                f.write(f'\n>>> {model.name} at {ep} epochs on test set...')
                 for key, item in scores.items():
                     if 'Confusion' not in key:
                         f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
@@ -308,82 +339,51 @@ def main():
             data[i].append(scores['ROC-AUC'])
 
             # on eval-test set
-            print(f'\n>>> {model.name} at best evaluated on eval and test sets...')
+            headers.append(f'{ep} Epoch Eval & Test') if f'{ep} Epoch Eval & Test' not in headers else None
+            print(f'\n>>> {model.name} at {ep} on eval and test sets...')
             scores, fig = score_model(model, comb_loader, print_results=True, make_plot=True, threshold_type='roc')
             fig.savefig(f'outputs/{model.name}/plots/best_eval_{model.name}_on_eval-test_plots.png')
             plt.close(fig)
             with open(f'outputs/{model.name}/results.txt', 'a') as f:
-                f.write(f'\n>>> {model.name} at best evaluated on eval and test sets...')
+                f.write(f'\n>>> {model.name} at {ep} epochs on eval and test sets...')
                 for key, item in scores.items():
                     if 'Confusion' not in key:
                         f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
                 f.write('_____________________________________________________\n')
             data[i].append(scores['ROC-AUC'])
+    auc_table = pd.DataFrame(data=data, index=[model.name for model in models], columns=headers)
+    auc_table.to_csv(f'outputs/auc_summary.csv', index_label='Model')
 
-            # At checkpoint epochs
-            for ep in epochs:
-                headers.append(f'{ep} Epoch Test') if f'{ep} Epoch Test' not in headers else None
-                # best eval model
-                # on test set
-                print(f'\n>>> {model.name} at {ep} on test set...')
-                model.load_state_dict(torch.load(f'outputs/{model.name}/models/Epochs {ep} {model.name}.pth'))
-                scores, fig = score_model(model, test_loader, print_results=True, make_plot=True, threshold_type='roc')
-                fig.savefig(f'outputs/{model.name}/plots/best_eval_{model.name}_on_test_plots.png')
-                plt.close(fig)
-                with open(f'outputs/{model.name}/results.txt', 'a') as f:
-                    f.write(f'\n>>> {model.name} at {ep} epochs on test set...')
-                    for key, item in scores.items():
-                        if 'Confusion' not in key:
-                            f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
-                    f.write('_____________________________________________________\n')
-                data[i].append(scores['ROC-AUC'])
+    # Plot and save epoch-wise outputs
+    headers = ['Training Loss (average per sample)', 'Evaluation Loss (average per sample)',
+               'Training ROC-AUC', 'Evaluation ROC-AUC']
+    for (model, tl, el, ta, ea) in zip(models, train_loss, eval_loss, train_auc, eval_auc):
+        # Save raw data
+        outputs = [[a, b, c, d] for (a, b, c, d) in zip(tl, el, ta, ea)]
+        output_table = pd.DataFrame(data=outputs, index=range(1, epochs[-1] + 1), columns=headers)
+        output_table.to_csv(f'outputs/{model.name}/tabular.csv', index_label='Epoch')
 
-                # on eval-test set
-                headers.append(f'{ep} Epoch Eval & Test') if f'{ep} Epoch Eval & Test' not in headers else None
-                print(f'\n>>> {model.name} at {ep} on eval and test sets...')
-                scores, fig = score_model(model, comb_loader, print_results=True, make_plot=True, threshold_type='roc')
-                fig.savefig(f'outputs/{model.name}/plots/best_eval_{model.name}_on_eval-test_plots.png')
-                plt.close(fig)
-                with open(f'outputs/{model.name}/results.txt', 'a') as f:
-                    f.write(f'\n>>> {model.name} at {ep} epochs on eval and test sets...')
-                    for key, item in scores.items():
-                        if 'Confusion' not in key:
-                            f.write(f'|\t{key:<35} {f'{item:.4f}':>10}\t|\n')
-                    f.write('_____________________________________________________\n')
-                data[i].append(scores['ROC-AUC'])
-        auc_table = pd.DataFrame(data=data, index=[model.name for model in models], columns=headers)
-        auc_table.to_csv(f'outputs/auc_summary.csv', index_label='Model')
+        # Plot data
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 5))
+        plt.suptitle(model.name)
 
-        # Plot and save epoch-wise outputs
-        headers = ['Training Loss (average per sample)', 'Evaluation Loss (average per sample)',
-                   'Training ROC-AUC', 'Evaluation ROC-AUC']
-        for (model, tl, el, ta, ea) in zip(models, train_loss, eval_loss, train_auc, eval_auc):
-            # Save raw data
-            outputs = [[a, b, c, d] for (a, b, c, d) in zip(tl, el, ta, ea)]
-            output_table = pd.DataFrame(data=outputs, index=range(1, epochs[-1] + 1), columns=headers)
-            output_table.to_csv(f'outputs/{model.name}/tabular.csv', index_label='Epoch')
+        ax1.plot(range(1, epochs[-1] + 1), tl, label=f'{model.name} Training')
+        ax1.plot(range(1, epochs[-1] + 1), el, label=f'{model.name} Evaluation')
+        ax1.set_xlabel('Epochs')
+        ax1.set_ylabel('Loss')
+        ax1.set_title('Training and Evaluation Losses')
+        ax1.legend()
 
-            # Plot data
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 5))
-            plt.suptitle(model.name)
+        ax2.plot(range(1, epochs[-1] + 1), ta, label=f'{model.name} Training')
+        ax2.plot(range(1, epochs[-1] + 1), ea, label=f'{model.name} Evaluation')
+        ax1.set_ylabel('Epochs')
+        ax2.set_ylabel('AUC')
+        ax2.set_title('Training and Evaluation ROC-AUC')
+        ax2.legend()
 
-            ax1.plot(range(1, epochs[-1] + 1), tl, label=f'{model.name} Training')
-            ax1.plot(range(1, epochs[-1] + 1), el, label=f'{model.name} Evaluation')
-            ax1.set_xlabel('Epochs')
-            ax1.set_ylabel('Loss')
-            ax1.set_title('Training and Evaluation Losses')
-            ax1.legend()
+        fig.savefig(f'outputs/{model.name}/plots/losses_and_aucs.png')
+        plt.close(fig)
 
-            ax2.plot(range(1, epochs[-1] + 1), ta, label=f'{model.name} Training')
-            ax2.plot(range(1, epochs[-1] + 1), ea, label=f'{model.name} Evaluation')
-            ax1.set_ylabel('Epochs')
-            ax2.set_ylabel('AUC')
-            ax2.set_title('Training and Evaluation ROC-AUC')
-            ax2.legend()
-
-            fig.savefig(f'outputs/{model.name}/plots/losses_and_aucs.png')
-            plt.close(fig)
-
-    # Run
-    if __name__ == '__main__':
-        main()
+# Run
+if __name__ == '__main__':
+    main()
