@@ -19,7 +19,7 @@ from my_modules.nsclc.nsclc_dataset import NSCLCDataset
 
 def main():
     # Set random seed for reproducibility
-    set_seed(42)
+    set_seed(21)
 
     # Set up multiprocessing
     print(f'Num cores: {mp.cpu_count()}')
@@ -322,7 +322,7 @@ def main():
 
                 # At checkpoint epochs
                 for ep in epochs:
-                    headers.append(f'{ep} Epoch Test')
+                    headers.append(f'{ep} Epoch Test') if f'{ep} Epoch Test' not in headers else None
                     # best eval model
                     # on test set
                     print(f'\n>>> {model.name} at {ep} on test set...')
@@ -340,7 +340,7 @@ def main():
                     data[i].append(scores['ROC-AUC'])
 
                     # on eval-test set
-                    headers.append(f'{ep} Epoch Eval & Test')
+                    headers.append(f'{ep} Epoch Eval & Test') if f'{ep} Epoch Eval & Test' not in headers else None
                     print(f'\n>>> {model.name} at {ep} on eval and test sets...')
                     scores, fig = score_model(model, comb_loader, print_results=True, make_plot=True,
                                               threshold_type='roc')
