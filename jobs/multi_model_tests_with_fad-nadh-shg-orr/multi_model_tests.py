@@ -378,7 +378,7 @@ def main():
 
         ax2.plot(range(1, epochs[-1] + 1), ta, label=f'{model.name} Training')
         ax2.plot(range(1, epochs[-1] + 1), ea, label=f'{model.name} Evaluation')
-        ax1.set_ylabel('Epochs')
+        ax2.set_xlabel('Epochs')
         ax2.set_ylabel('AUC')
         ax2.set_title('Training and Evaluation ROC-AUC')
         ax2.legend()
