@@ -22,8 +22,6 @@ module load python/anaconda-3.14
 conda activate /home/jdivers/.conda/envs/dl_env
 echo $SLURM_JOB_ID
 nvidia-smi
-export CUDA_LAUNCH_BLOCKING=1
-export TORCH_USE_CUDA_DSA=1
 
 cd $SLURM_SUBMIT_DIR || exit
 # input files needed for job
@@ -39,6 +37,8 @@ wait
 cd /scratch/$SLURM_JOB_ID/ || exit
 
 echo "Python script initiating..."
+export CUDA_LAUNCH_BLOCKING=1
+export TORCH_USE_CUDA_DSA=1
 python3 multi_model_tests.py
 
 rsync -av -q /scratch/$SLURM_JOB_ID/ $SLURM_SUBMIT_DIR/

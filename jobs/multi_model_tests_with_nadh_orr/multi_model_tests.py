@@ -14,8 +14,9 @@ from my_modules.custom_models import *
 from my_modules.model_learning.model_metrics import score_model
 from my_modules.nsclc import set_seed
 from my_modules.nsclc.nsclc_dataset import NSCLCDataset
-from my_modules.custom_models.loss_functions import FocalLoss
 
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+os.environ["TORCH_USE_CUDA_DSA"] = "1"
 
 def main():
     # Set random seed for reproducibility
