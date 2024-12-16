@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=multi_model_tests_with_nadh_orr
+#SBATCH --job-name=multi_model_tests_with_all
 #SBATCH --partition=agpu06
 #SBATCH --output=nsclc_main.txt
 #SBATCH --error=nsclc_main.err
@@ -21,6 +21,9 @@ module load python/anaconda-3.14
 # Activate venv
 conda activate /home/jdivers/.conda/envs/dl_env
 echo $SLURM_JOB_ID
+nvidia-smi
+export CUDA_LAUNCH_BLOCKING=1
+export TORCH_USE_CUDA_DSA=1
 
 cd $SLURM_SUBMIT_DIR || exit
 # input files needed for job
