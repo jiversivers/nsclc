@@ -259,11 +259,11 @@ TODO: Update doc
                                 break
 
         # Remove empty patients entirely
-        self.good_patient_count = 0
+        self.patient_count = 0
         for_removal = []
         for pt in range(self.total_patient_count):
             if len(self.get_patient_subset(pt)) > 0:
-                self.good_patient_count += 1
+                self.patient_count += 1
             else:
                 for_removal.append(pt)
 
@@ -287,9 +287,9 @@ TODO: Update doc
                 return atlas_len
         elif self.pool_patients:
             if self.augment_patients:
-                return 5 * self.good_patient_count
+                return 5 * self.patient_count
             else:
-                return self.good_patient_count
+                return self.patient_count
         else:
             if self.augmented:
                 return 5 * len(self.all_fovs)
@@ -733,7 +733,7 @@ TODO: Update doc
 
     @augment_patients.setter
     def augment_patients(self, augment_patients):
-        self.augmented = augment_patients
+        self.augmented = augment_patients if augment_patients else self.augmented
         self._augment_patients = augment_patients
 
     #endregion
