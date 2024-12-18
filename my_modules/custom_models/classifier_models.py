@@ -966,8 +966,9 @@ class MultiSamplePooler(nn.Module):
         self.name = f'{self.model.name} with {type(pooler).__name__} Pooling'
 
     def forward(self, xs):
-        y = torch.tensor([])
-        for x in xs:
-            y = torch.cat(y, self.model(x))
-        y = self.pooler(y)
+        x = torch.tensor([])
+        for i in range(xs.shape[-1]):
+            x = torch.cat((x, self.model(xs[..., i])))
+        x = self.pooler(x)
+        return x
 
