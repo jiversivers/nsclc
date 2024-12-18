@@ -955,4 +955,19 @@ def update_layer_channels(model, new_channels, old_channels):
             current_module = getattr(current_module, part)
         setattr(current_module, parts[-1], layer)
 
+
 # endregion
+
+class MultiSamplePooler(nn.Module):
+    def __init__(self, model, pooler=lambda x: x):
+        super().__init__()
+        self.model = model
+        self.pooler = pooler  # Default is pass
+        self.name = f'{self.model.name} with {type(pooler).__name__} Pooling'
+
+    def forward(self, xs):
+        y = torch.tensor([])
+        for x in xs:
+            y = torch.cat(y, self.model(x))
+        y = self.pooler(y)
+
