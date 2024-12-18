@@ -52,7 +52,7 @@ TODO: Update doc
 
     # region Main Dataset Methods -- init, len, getitem (with helper methods included)
     def __init__(self, root, mode, xl_file=None, label=None, mask_on=True, transforms=None,
-                 use_atlas=False, use_patches=True, patch_size=(512, 512), use_cache=True,
+                 use_atlas=False, use_patches=True, patch_size=(512, 512), use_cache=True, pool_patients=False,
                  device=(torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'))):
         super().__init__()
         self.transforms = transforms
@@ -70,6 +70,8 @@ TODO: Update doc
         self.scalars = {}
 
         # Set attribute and property defaults
+        self.pool_patients = pool_patients
+        self._augment_patients = False
         self.saturate = False
         self._augmented = False
         self.filter_bad_data = True if self._use_atlas else False
@@ -98,7 +100,7 @@ TODO: Update doc
         else:
             self.xl_file = xl_file
         self.features = pd.read_excel(self.xl_file, header=[0, 1])
-        self.patient_count = len(self.features)
+        self.total_patient_count = len(self.features)
         """
         - atlases_by_sample and fovs_by_subject are lists of lists. The inner lists correspond to the images within a 
         given sample or slide and the outer lists match the index of the slide to the features. In other words, the 
@@ -256,6 +258,23 @@ TODO: Update doc
                                 print(f'removed {fov_lut[mode]} due to {mode}')
                                 break
 
+        # Remove empty patients entirely
+        self.good_patient_count = 0
+        for_removal = []
+        for pt in range(self.total_patient_count):
+            if len(self.get_patient_subset(pt)) > 0:
+                self.good_patient_count += 1
+            else:
+                for_removal.append(pt)
+
+        for pt in for_removal:
+            self.features.drop(pt, inplace=True)
+            self.fovs_by_subject.remove([])
+
+        # Reindex patients
+        self.features.index = range(len(self.features))
+
+
     def __len__(self):
         if self._use_atlas:
             if self.use_patches:
@@ -266,6 +285,11 @@ TODO: Update doc
                 return 5 * atlas_len
             else:
                 return atlas_len
+        elif self.pool_patients:
+            if self.augment_patients:
+                return 5 * self.good_patient_count
+            else:
+                return self.good_patient_count
         else:
             if self.augmented:
                 return 5 * len(self.all_fovs)
@@ -305,7 +329,22 @@ TODO: Update doc
         # Return appropriate indices
         return slide_idx, path_index, sub_index, patch_index, load_dict
 
-    def __getitem__(self, index):
+    def __getitem__(self, index, pool=None):
+        # Handle pooling (recurse without pooling, so ust include it as arg)
+        pool = self.pool_patients if pool is None else pool
+
+        # Cat all the images for a patient together
+        if pool:
+            pool_idx = self.get_patient_subset(index)
+            y = self.get_patient_label(index)
+            if len(pool_idx) > 0:
+                x_pool = torch.rand(*self.shape, len(pool_idx))
+                for i, idx in enumerate(pool_idx):
+                    x_pool[..., i], _ = self.__getitem__(idx, pool=False)
+            else:
+                x_pool = torch.tensor([])
+            return x_pool, y
+
         slide_idx, path_index, sub_index, patch_index, load_dict = self.__parse_index__(index)
 
         # Check if this index has been previously deemed bad
@@ -441,12 +480,7 @@ TODO: Update doc
         # cached indices
         index_cache_base = mp.Array(ctypes.c_int, cache_len * [-1])
         self.index_cache = convert_mp_to_torch(index_cache_base, (cache_len,), device=self.device)
-
-        # If filtering bad data, store a map of bad to good indices to avoid reprocessing the same bad samples. As we
-        # find bad indices, we will set that index in the bad index cache to True. Then we can just check ether an
-        # index was previously deemed bad by checking if the value at that index is True
-        bad_index_base = mp.Array(ctypes.c_bool, len(self) * [False])
-        self.in_bad_index_cache = convert_mp_to_torch(bad_index_base, (len(self),), device=self.device)
+        self._open_bad_index_cache()
 
         shared_x_base = cache_len * [mp.Array(ctypes.c_float, 0)]
         self.shared_x = [convert_mp_to_torch(x_base, 0, device=self.device) for x_base in shared_x_base]
@@ -465,6 +499,16 @@ TODO: Update doc
         self.shared_y = convert_mp_to_torch(shared_y_base, (cache_len,) + y_shape, device=self.device)
 
         print('Cache opened.')
+
+    def _open_bad_index_cache(self):
+        # If filtering bad data, store a map of bad to good indices to avoid reprocessing the same bad samples. As we
+        # find bad indices, we will set that index in the bad index cache to True. Then we can just check whether an
+        # index was previously deemed bad by checking if the value at that index is True
+        temp_pool = self.pool_patients
+        self.pool_patients = False
+        bad_index_base = mp.Array(ctypes.c_bool, len(self) * [False])
+        self.in_bad_index_cache = convert_mp_to_torch(bad_index_base, (len(self),), device=self.device)
+        self.pool_patients = temp_pool
 
     def to(self, device):
         # Move caches to device
@@ -486,13 +530,17 @@ TODO: Update doc
         self.device = device
 
     def get_patient_subset(self, pt_index):
+        if self.augment_patients:
+            subset_index = pt_index % 5
+            pt_index = int(pt_index // 5)
+
         # Get actual index from input index (to handle negatives)
         pt_index = list(range(len(self.features)))[pt_index]
         if self._use_atlas:
             pt_id = self.features['ID'].at[pt_index, 'Sample']
             indices = [i for i, path_str in enumerate(self.all_atlases) if pt_id in path_str]
         else:
-            pt_id = self.features['ID'].at[pt_index, 'Subject']
+            pt_id = self.features['ID'].loc[pt_index, 'Subject']
             indices = [i for i, path_str in enumerate(self.all_fovs) if pt_id in path_str]
 
         # If using atlas patches, we have to determine how many patches come before this patient and add the number from
@@ -505,10 +553,15 @@ TODO: Update doc
         # If using augmenting, each base image results in 5 sequential daughter images
         if self.augmented:
             indices = [5 * idx + i for idx in indices for i in range(5)]
+        # If augmenting patient, every 5th image of the patient is used
+        if self.augment_patients:
+            indices = [idx for i, idx in enumerate(indices) if i % 5 == subset_index]
 
         return indices
 
     def get_patient_label(self, pt_index):
+        if self.augment_patients:
+            pt_index = int(pt_index // 5)
         match self.label:
             case 'Response':
                 y = torch.tensor(1 if self.features['FOLLOWUP DATA'].at[pt_index, 'Status (NR/R)'] == 'R' else 0,
@@ -528,6 +581,8 @@ TODO: Update doc
         return y
 
     def get_patient_ID(self, pt_index):
+        if self.augment_patients:
+            pt_index = int(pt_index // 5)
         if type(pt_index) is int:
             return self.features['ID'].at[pt_index, 'Subject']
         elif type(pt_index) is str:
@@ -535,6 +590,7 @@ TODO: Update doc
 
     def is_bad_data(self, x):
         return (torch.sum(x <= 0.1).item() + torch.sum(x >= 0.9).item()) > (0.60 * np.prod(x.shape))
+
 
     # endregion
 
@@ -560,7 +616,7 @@ TODO: Update doc
         self.filter_bad_data = False
         if self._use_atlas and not self.use_patches:
             warnings.warn('`shape` is ambiguous when using non-patched atlases.')
-        self._shape = self[0][0].shape
+        self._shape = self.__getitem__(0, pool=False)[0].shape
         self.filter_bad_data = temp_filter
         return self._shape
 
@@ -668,14 +724,17 @@ TODO: Update doc
         # Updates method and the size of bad index cache because it holds a single value for each possible index, not
         # base image wise like the others
         if augmented is not self.augmented:
-            if augmented:
-                self._augmented = True
-                bad_index_base = mp.Array(ctypes.c_bool, len(self) * [False])
-                self.in_bad_index_cache = convert_mp_to_torch(bad_index_base, (len(self),), device=self.device)
-            else:
-                self._augmented = False
-                bad_index_base = mp.Array(ctypes.c_bool, len(self) * [False])
-                self.in_bad_index_cache = convert_mp_to_torch(bad_index_base, (len(self),), device=self.device)
+            self._augmented = augmented
+            self._open_bad_index_cache()
+
+    @property
+    def augment_patients(self):
+        return self._augment_patients
+
+    @augment_patients.setter
+    def augment_patients(self, augment_patients):
+        self.augmented = augment_patients
+        self._augment_patients = augment_patients
 
     #endregion
 
@@ -762,20 +821,20 @@ TODO: Update doc
                     The results for each mode are as  included as a dict below, which will be used to calculate the 
                     ranges for all modes.
                     '''
-                    mean_std_mode_dict = {'fad':            [0.21998976171016693, 0.0163725633174181],
-                                          'nadh':           [0.4831325113773346, 0.06519994884729385],
-                                          'shg':            [0.1766463816165924, 0.15144270658493042],
-                                          'intensity':      [0.35156112909317017, 0.03592873364686966],
-                                          'orr':            [0.3561578094959259, 0.022590430453419685],
-                                          'g':              [0.3222281336784363, 0.009898046031594276],
-                                          's':              [0.3749162554740906, 0.0024291533045470715],
-                                          'photons':        [191.2639617919922, 11.133986473083496],
-                                          'tau1':           [786.095458984375, 51.755043029785156],
-                                          'tau2':           [4271.404296875, 232.18263244628906],
-                                          'alpha1':         [103.16101837158203, 6.902841567993164],
-                                          'alpha2':         [78.77812194824219, 4.96993350982666],
-                                          'taumean':        [2319.463134765625, 95.37203979492188],
-                                          'boundfraction':  [0.44960716366767883, 0.01542571373283863]}
+                    mean_std_mode_dict = {'fad': [0.21998976171016693, 0.0163725633174181],
+                                          'nadh': [0.4831325113773346, 0.06519994884729385],
+                                          'shg': [0.1766463816165924, 0.15144270658493042],
+                                          'intensity': [0.35156112909317017, 0.03592873364686966],
+                                          'orr': [0.3561578094959259, 0.022590430453419685],
+                                          'g': [0.3222281336784363, 0.009898046031594276],
+                                          's': [0.3749162554740906, 0.0024291533045470715],
+                                          'photons': [191.2639617919922, 11.133986473083496],
+                                          'tau1': [786.095458984375, 51.755043029785156],
+                                          'tau2': [4271.404296875, 232.18263244628906],
+                                          'alpha1': [103.16101837158203, 6.902841567993164],
+                                          'alpha2': [78.77812194824219, 4.96993350982666],
+                                          'taumean': [2319.463134765625, 95.37203979492188],
+                                          'boundfraction': [0.44960716366767883, 0.01542571373283863]}
 
                     self._preset_values = {}
                     for key, (m, s) in mean_std_mode_dict.items():
