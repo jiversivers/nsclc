@@ -966,9 +966,24 @@ class MultiSamplePooler(nn.Module):
         self.name = f'{self.model.name} with {type(pooler).__name__} Pooling'
 
     def forward(self, xs):
-        x = torch.tensor([])
+        x = []
         for i in range(xs.shape[-1]):
-            x = torch.cat((x, self.model(xs[..., i])))
+            x_layer = xs[..., i]
+            if not torch.isnan(x_layer).all():
+                # Detect pad layers by finding where the entire layer is nan. Base model will deal with this
+                pads = torch.isnan(x_layer).all(dim=tuple(range(1, x_layer.ndim)))
+
+                # Mdoe lthe batch of layers
+                y = self.model(x_layer)
+
+                # Re-nan the output where layers were pads
+                y[pads] = torch.nan
+
+                # Stack the layers for pooling
+                x.append(y)
+        x = torch.stack(x, dim=-1)
+
+        # Pool with user-defined pooling function (nan-pads can be dealt with here)
         x = self.pooler(x)
         return x
 
