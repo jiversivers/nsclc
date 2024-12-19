@@ -159,10 +159,12 @@ def main():
                         ParallelCNNet(train_data.shape),
                         RegularizedParallelCNNet(train_data.shape)]
 
-    # Set-up multi image pooling models from base models
-    # Creating a min-pooler
+    # Create a min-pooler (negative of max of negatives) that will handle nan-pads by making them large
     def pooler(p):
-        return -nn.AdaptiveMaxPool1d(1)(-p.permute(1, 0))
+        p[torch.isnan(p)] = float('inf')
+        return -nn.AdaptiveMaxPool1d(1)(-p)
+
+    # Set-up multi image pooling models from base models
     models = [MultiSamplePooler(model, pooler=pooler) for model in base]
 
     # Put all models on GPU if available
