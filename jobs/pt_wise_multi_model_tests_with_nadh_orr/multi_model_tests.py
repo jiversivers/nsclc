@@ -119,19 +119,41 @@ def main():
     test_set = torch.utils.data.Subset(eval_test_data, test_idx)
     comb_set = torch.utils.data.Subset(eval_test_data, comb_idx)
 
+    # Custom collate function to handle image pools with different numbers of images by nan-padding
+    def collate_fn(batch):
+        # Extract samples and labels
+        batch_data, batch_labels = zip(*batch)
+
+        # Find max image stack dimension
+        max_size = max(d.shape[-1] for d in batch_data)
+
+        # Pad smaller samples with nan layer (to be ignored at modelling)
+        padded_data = []
+        for d in batch_data:
+            pad = max_size - d.shape[-1]
+            padded_data.append(nn.functional.pad(d, (0, pad), mode='constant', value=float('nan')))
+
+        padded_data = torch.stack(padded_data)
+        batch_labels = torch.tensor(batch_labels)
+        return padded_data, batch_labels
+
     # Create loaders
     train_loader = torch.utils.data.DataLoader(train_set,
                                                batch_size=batch_size, shuffle=True, num_workers=0,
-                                               drop_last=(True if len(train_idx) % batch_size == 1 else False))
+                                               drop_last=(True if len(train_idx) % batch_size == 1 else False),
+                                               collate_fn=collate_fn)
     eval_loader = torch.utils.data.DataLoader(eval_set,
                                               batch_size=batch_size, shuffle=False, num_workers=0,
-                                              drop_last=(True if len(eval_idx) % batch_size == 1 else False))
+                                              drop_last=(True if len(eval_idx) % batch_size == 1 else False),
+                                              collate_fn=collate_fn)
     test_loader = torch.utils.data.DataLoader(test_set,
                                               batch_size=batch_size, shuffle=False, num_workers=0,
-                                              drop_last=(True if len(test_idx) % batch_size == 1 else False))
+                                              drop_last=(True if len(test_idx) % batch_size == 1 else False),
+                                              collate_fn=collate_fn)
     comb_loader = torch.utils.data.DataLoader(comb_set,
                                               batch_size=batch_size, shuffle=False, num_workers=0,
-                                              drop_last=(True if len(comb_idx) % batch_size == 1 else False))
+                                              drop_last=(True if len(comb_idx) % batch_size == 1 else False),
+                                              collate_fn=collate_fn)
 
     #####################
     # Prepare model zoo #
