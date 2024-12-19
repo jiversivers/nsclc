@@ -239,7 +239,7 @@ def main():
                 out = model(x)
                 outs[i] = torch.cat((outs[i], out.cpu().detach()), dim=0)
                 targets[i] = torch.cat((targets[i], target.cpu().detach()), dim=0)
-                loss = loss_function(out, target.unsqueeze(1))
+                loss = loss_function(out.squeeze(), target)
                 optimizers[i].zero_grad()
                 loss.backward()
                 epoch_loss[i] += loss.item()
@@ -265,7 +265,7 @@ def main():
                     out = model(x)
                     outs[i] = torch.cat((outs[i], out.cpu().detach()), dim=0)
                     targets[i] = torch.cat((targets[i], target.cpu().detach()), dim=0)
-                    loss = loss_function(out, target.unsqueeze(1))
+                    loss = loss_function(out.squeeze(), target)
                     epoch_loss[i] += loss.item()
             for el, evl, ea, tx, ot, model in zip(epoch_loss, eval_loss, eval_auc, targets, outs, models):
                 evl.append(el / len(eval_set))
