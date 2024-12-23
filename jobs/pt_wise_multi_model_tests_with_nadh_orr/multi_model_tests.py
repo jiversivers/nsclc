@@ -245,7 +245,7 @@ def main():
                 loss.backward()
                 epoch_loss[i] += loss.item()
                 optimizers[i].step()
-        targets = torch.stack(targets)
+        targets = torch.cat(targets)
         for el, tl, ta, ot in zip(epoch_loss, train_loss, train_auc, outs):
             ot = torch.cat(ot)
             tl.append(el / len(train_set))
