@@ -183,6 +183,7 @@ def main():
 
     # Create a min-pooler (negative of max of negatives) that will handle nan-pads by making them large
     def pooler(p):
+        p = p.clone()
         p[torch.isnan(p)] = float('inf')
         return -nn.AdaptiveMaxPool1d(1)(-p)
 
@@ -214,46 +215,48 @@ def main():
         with open(f'outputs/results.txt', 'w') as f:
             f.write('Overall Results\n')
 
-    train_loss = [[] for _ in range(len(models))]
-    train_auc = [[] for _ in range(len(models))]
-    eval_loss = [[] for _ in range(len(models))]
-    eval_auc = [[] for _ in range(len(models))]
-    best_score = [0 for _ in range(len(models))]
+    train_loss = [[] for _ in models]
+    train_auc = [[] for _ in models]
+    eval_loss = [[] for _ in models]
+    eval_auc = [[] for _ in models]
+    best_score = [[] for _ in models]
     # For each epoch
     for ep in range(epochs[-1]):
         print(f'\nEpoch {ep + 1}')
 
         # Train
-        epoch_loss = [0 for _ in range(len(models))]
+        epoch_loss = [0 for _ in models]
 
         # Preds and ground truth to calculate training AUC without having to re-run full set
-        outs = [torch.tensor([]) for _ in range(len(models))]
-        targets = [torch.tensor([]) for _ in range(len(models))]
+        outs = [[] for _ in models]
+        targets = []
 
         for model in models:
             model.train()
         for x, target in train_loader:
             x = x.to(device)
             target = target.to(device)
+            targets.append(target)
             for i, model in enumerate(models):
                 out = model(x)
-                outs[i] = torch.cat((outs[i], out.cpu().detach()), dim=0)
-                targets[i] = torch.cat((targets[i], target.cpu().detach()), dim=0)
+                outs[i].append(out.cpu().detach())
                 loss = loss_function(out.squeeze(), target)
                 optimizers[i].zero_grad()
                 loss.backward()
                 epoch_loss[i] += loss.item()
                 optimizers[i].step()
-        for el, tl, ta, tx, ot, model in zip(epoch_loss, train_loss, train_auc, targets, outs, models):
+        targets = torch.stack(targets)
+        for el, tl, ta, ot in zip(epoch_loss, train_loss, train_auc, outs):
+            ot = torch.cat(ot)
             tl.append(el / len(train_set))
-            ta.append(roc_auc_score(tx, ot))
+            ta.append(roc_auc_score(targets, ot))
 
         # Evaluation
         epoch_loss = [0 for _ in range(len(models))]
 
         # Preds and ground truth to calculate training AUC without having to re-run full set
-        outs = [torch.tensor([]) for _ in range(len(models))]
-        targets = [torch.tensor([]) for _ in range(len(models))]
+        outs = [[] for _ in models]
+        targets = []
 
         for model in models:
             model.eval()
@@ -261,15 +264,17 @@ def main():
             for x, target in eval_loader:
                 x = x.to(device)
                 target = target.to(device)
+                targets.append(target)
                 for i, model in enumerate(models):
                     out = model(x)
-                    outs[i] = torch.cat((outs[i], out.cpu().detach()), dim=0)
-                    targets[i] = torch.cat((targets[i], target.cpu().detach()), dim=0)
+                    outs[i].append(out.cpu().detach())
                     loss = loss_function(out.squeeze(), target)
                     epoch_loss[i] += loss.item()
-            for el, evl, ea, tx, ot, model in zip(epoch_loss, eval_loss, eval_auc, targets, outs, models):
+            targets = torch.cat(targets)
+            for el, evl, ea, ot in zip(epoch_loss, eval_loss, eval_auc, outs):
+                ot = torch.cat(ot)
                 evl.append(el / len(eval_set))
-                ea.append(roc_auc_score(tx, ot))
+                ea.append(roc_auc_score(targets, ot))
 
         for i, (model, el, ea, tl) in enumerate(zip(models, eval_loss, eval_auc, train_loss)):
             print(f'>>> {model.name}: Train - Loss: {tl[-1]}. AUC: {ta[-1]}.')
