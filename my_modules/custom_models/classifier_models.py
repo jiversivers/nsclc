@@ -968,13 +968,14 @@ class MultiSamplePooler(nn.Module):
     def forward(self, xs):
         x = []
         for i in range(xs.shape[-1]):
-            x_layer = xs[..., i]
+            x_layer = xs[..., i].clone()
             if not torch.isnan(x_layer).all():
                 # Detect pad layers by finding where the entire layer is nan. Base model will deal with this
                 pads = torch.isnan(x_layer).all(dim=tuple(range(1, x_layer.ndim)))
 
-                # Mdoe lthe batch of layers
+                # Model the batch of layers
                 y = self.model(x_layer)
+                y = y.clone()
 
                 # Re-nan the output where layers were pads
                 y[pads] = torch.nan
