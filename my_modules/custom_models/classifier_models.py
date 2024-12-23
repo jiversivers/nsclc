@@ -986,5 +986,6 @@ class MultiSamplePooler(nn.Module):
 
         # Pool with user-defined pooling function (nan-pads can be dealt with here)
         x = self.pooler(x)
+        x = x.squeeze(-1)
         return x
 
