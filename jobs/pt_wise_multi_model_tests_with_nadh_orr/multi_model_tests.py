@@ -263,8 +263,8 @@ def main():
         with torch.no_grad():
             for x, target in eval_loader:
                 x = x.to(device)
-                target = target.to(device.cpu().detach())
-                targets.append(target)
+                target = target.to(device)
+                targets.append(target.cpu().detach())
                 for i, model in enumerate(models):
                     out = model(x)
                     outs[i].append(out.cpu().detach())
