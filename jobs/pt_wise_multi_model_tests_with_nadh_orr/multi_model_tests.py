@@ -113,7 +113,7 @@ def main():
     print(f'Training patients: {train_pts}.\nEvaluation patients: {eval_idx}.\nTest patients: {test_idx}.\n')
 
     # Create dataloaders for fold
-    batch_size = 2
+    batch_size = 16
     train_set = torch.utils.data.Subset(train_data, train_idx)
     eval_set = torch.utils.data.Subset(eval_test_data, eval_idx)
     test_set = torch.utils.data.Subset(eval_test_data, test_idx)
@@ -198,8 +198,8 @@ def main():
     ###################
     # Hyperparameters #
     ###################
-    epochs = [250, 500, 1500, 2000, 2500]
-    learning_rate = 1e-8
+    epochs = [250, 500, 1500]
+    learning_rate = 1e-9
     loss_function = nn.BCELoss()
     optimizers = [torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=0.01) for model in models]
 
@@ -219,7 +219,7 @@ def main():
     train_auc = [[] for _ in models]
     eval_loss = [[] for _ in models]
     eval_auc = [[] for _ in models]
-    best_score = [[] for _ in models]
+    best_score = [0 for _ in models]
     # For each epoch
     for ep in range(epochs[-1]):
         print(f'\nEpoch {ep + 1}')
