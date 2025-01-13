@@ -51,8 +51,8 @@ TODO: Update doc
     """
 
     # region Main Dataset Methods -- init, len, getitem (with helper methods included)
-    def __init__(self, root, mode, xl_file=None, label=None, mask_on=True, transforms=None,
-                 use_atlas=False, use_patches=True, patch_size=(512, 512), use_cache=True, pool_patients=False,
+    def __init__(self, root, mode, xl_file=None, label=None, mask_on=True, transforms=None, use_atlas=False,
+                 use_patches=True, patch_size=(512, 512), use_cache=True, pool_patients=False, remove_empties=True,
                  device=(torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'))):
         super().__init__()
         self.transforms = transforms
@@ -258,13 +258,17 @@ TODO: Update doc
                                 print(f'removed {fov_lut[mode]} due to {mode}')
                                 break
 
+        self.patient_count = self.total_patient_count
+
         # Remove empty patients entirely
-        self.patient_count = 0
+        if remove_empties:
+            self.remove_empty()
+
+    def remove_empty(self):
         for_removal = []
         for pt in range(self.total_patient_count):
-            if len(self.get_patient_subset(pt)) > 0:
-                self.patient_count += 1
-            else:
+            if len(self.get_patient_subset(pt)) == 0:
+                self.patient_count -= 1
                 for_removal.append(pt)
 
         for pt in for_removal:
@@ -273,7 +277,6 @@ TODO: Update doc
 
         # Reindex patients
         self.features.index = range(len(self.features))
-
 
     def __len__(self):
         if self._use_atlas:
@@ -590,7 +593,6 @@ TODO: Update doc
 
     def is_bad_data(self, x):
         return (torch.sum(x <= 0.1).item() + torch.sum(x >= 0.9).item()) > (0.60 * np.prod(x.shape))
-
 
     # endregion
 
