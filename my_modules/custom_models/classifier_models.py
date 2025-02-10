@@ -769,7 +769,7 @@ class ResNet18NPlaned(nn.Module):
         self.flat = nn.Flatten()
         self.fc = nn.Linear(width, 1000)
         self.out = nn.Linear(1000, n_classes)
-        self.sigmoid = nn.Sigmoid()
+        self.compressor = nn.Sigmoid() if n_classes == 1 else nn.Softmax(dim=1)
 
     def forward(self, x):
         # Prep
@@ -812,7 +812,7 @@ class ResNet18NPlaned(nn.Module):
         x = self.flat(x)
         x = self.fc(x)
         x = self.out(x)
-        x = self.sigmoid(x)
+        x = self.compressor(x)
         return x
 
 
