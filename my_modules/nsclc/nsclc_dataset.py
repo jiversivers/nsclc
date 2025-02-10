@@ -850,7 +850,7 @@ TODO: Update doc
     # endregion
 
     # region Show data samples
-    def show(self, index, stack_as_rgb=False):
+    def show(self, index, stack_as_rgb=False, cmap='gray'):
         slide_idx, *_ = self.__parse_index__(index)
         if self.dist_transformed:
             fig = plt.figure(index)
@@ -870,7 +870,7 @@ TODO: Update doc
             if self.stack_height == 1 or stack_as_rgb:
                 img = self[index][0]
                 img[torch.isnan(img)] = 0
-                ax.imshow(transform(img))
+                ax.imshow(transform(img), cmap=cmap)
                 ax.tick_params(top=False, bottom=False, left=False, right=False,
                                labelleft=False, labelbottom=False)
                 ax.set_title(f'{self.mode[:]}', fontsize=10)
@@ -878,7 +878,7 @@ TODO: Update doc
                 for ii in range(self.stack_height):
                     img = self[index][0][ii]
                     img[torch.isnan(img)] = 0
-                    ax[ii].imshow(transform(img))
+                    ax[ii].imshow(transform(img), cmap=cmap)
                     ax[ii].tick_params(top=False, bottom=False, left=False, right=False,
                                        labelleft=False, labelbottom=False)
                     ax[ii].set_title(f'{self.mode[ii]}', fontsize=10)
@@ -887,8 +887,8 @@ TODO: Update doc
             plt.show()
         return fig, ax
 
-    def show_random(self, stack_as_rgb=False, n=5):
+    def show_random(self, stack_as_rgb=False, n=5, cmap='gray'):
         for ii in range(n):
             index = np.random.randint(0, len(self))
-            self.show(index, stack_as_rgb=stack_as_rgb)
+            self.show(index, stack_as_rgb=stack_as_rgb, cmap=cmap)
     # endregion
