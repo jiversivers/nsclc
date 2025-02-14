@@ -85,3 +85,6 @@ def main():
             torch.save(model.state_dict(), f'NSCLC_masking_model_{ep}.pth')
             with open(results, 'a') as f:
                 f.write(f'Checkpoint saved at epoch {ep}\n')
+
+if __name__ == '__main__':
+    main()
