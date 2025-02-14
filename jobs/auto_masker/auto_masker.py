@@ -19,7 +19,7 @@ def main():
                                          tvt.RandomHorizontalFlip(p=0.25),
                                          tvt.RandomRotation(degrees=(-180, 180))])
 
-    eval_data = NSCLCDataset('D:/Paola/JI-Finalized NSCLC Dataset Oct 2024', ['fad', 'nadh', 'orr', 'shg', 'intensity'],
+    eval_data = NSCLCDataset('NSCLC_Data_for_ML', ['fad', 'nadh', 'orr', 'shg', 'intensity'],
                              device=torch.device('cpu'), label='mask', mask_on=False)
 
     subsampler = [i for i in torch.utils.data.SubsetRandomSampler(range(0, len(train_data)))]
