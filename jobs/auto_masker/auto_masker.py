@@ -2,7 +2,7 @@ import torch
 import torchvision.transforms.v2 as tvt
 from torch import nn
 
-from my_modules.custom_models import VariationalAutoEncoderMLP
+from my_modules.custom_models import AutoEncoderMLP
 from my_modules.nsclc import NSCLCDataset, set_seed
 import torch.multiprocessing as mp
 
@@ -10,30 +10,25 @@ import torch.multiprocessing as mp
 def main():
     # Set random seed for reproducibility
     set_seed(42)
-
-    # Set up multiprocessing
-    print(f'Num cores: {mp.cpu_count()}')
-    print(f'Num GPUs: {torch.cuda.device_count()}')
-    mp.set_start_method('forkserver', force=True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    train_data = NSCLCDataset('NSCLC_Data_for_ML', ['fad', 'nadh', 'orr', 'shg', 'intensity'],
+    train_data = NSCLCDataset('D:/Paola/JI-Finalized NSCLC Dataset Oct 2024',
+                              ['fad', 'nadh', 'orr', 'shg', 'intensity'],
                               device=torch.device('cpu'), label='Mask', mask_on=False)
     train_data.to(device)
     train_data.transforms = tvt.Compose([tvt.RandomVerticalFlip(p=0.25),
                                          tvt.RandomHorizontalFlip(p=0.25),
                                          tvt.RandomRotation(degrees=(-180, 180))])
 
-    eval_data = NSCLCDataset('NSCLC_Data_for_ML', ['fad', 'nadh', 'orr', 'shg', 'intensity'],
+    eval_data = NSCLCDataset('D:/Paola/JI-Finalized NSCLC Dataset Oct 2024', ['fad', 'nadh', 'orr', 'shg', 'intensity'],
                              device=torch.device('cpu'), label='mask', mask_on=False)
 
     subsampler = [i for i in torch.utils.data.SubsetRandomSampler(range(0, len(train_data)))]
-    train_indices = 0.8 * len(subsampler)
-    eval_indices = 0.2 * len(subsampler)
+    train_indices = subsampler[:int(0.8 * len(subsampler))]
+    eval_indices = subsampler[int(0.8 * len(subsampler)):]
     train_data = torch.utils.data.Subset(train_data, train_indices)
     eval_data = torch.utils.data.Subset(eval_data, eval_indices)
 
-    model = VariationalAutoEncoderMLP(train_data.size, 512)
+    model = AutoEncoderMLP(train_data.dataset.shape, train_data.dataset[0][1].shape, 512)
     model.to(device)
 
     batch_size = 32
