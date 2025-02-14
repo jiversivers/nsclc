@@ -26,6 +26,7 @@ class AutoEncoderMLP(nn.Module):
         self.sigm = nn.Sigmoid()
 
     def forward(self, x):
+        x[torch.isnan(x)] = 0
         x = self.flat(x)
         x = self.relu(self.fc1(x))
         x = self.relu(self.fc2(x))
