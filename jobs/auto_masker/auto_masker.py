@@ -11,7 +11,7 @@ def main():
     # Set random seed for reproducibility
     set_seed(42)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    train_data = NSCLCDataset('D:/Paola/JI-Finalized NSCLC Dataset Oct 2024',
+    train_data = NSCLCDataset('NSCLC_Data_for_ML',
                               ['fad', 'nadh', 'orr', 'shg', 'intensity'],
                               device=torch.device('cpu'), label='Mask', mask_on=False)
     train_data.to(device)
