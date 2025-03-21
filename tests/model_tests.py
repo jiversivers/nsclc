@@ -3,7 +3,7 @@ import inspect
 import sys
 from abc import ABC, abstractmethod
 
-from my_modules.custom_models import *
+from nsclc.models import *
 
 sys.path.append('C:\\Users\\jdivers\\PycharmProjects\\NSCLC_Classification')
 
@@ -42,7 +42,6 @@ class BinaryClassifierTests(unittest.TestCase):
         # Normal case of hist data
         x = torch.randn(32, 4, 25)
         mod = self.model(tuple(x.shape[1:]))
-        print(x.shape[1:])
         out = mod(x)
         self.assertTrue((out.shape == (32, 1) and out.dtype == torch.float32))
 
